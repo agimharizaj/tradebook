@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Tradebook — the terminal for disciplined trading</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0D0F14; --bg2:#11141B; --surface:#161A22; --surface2:#1E222C;
+  --border:rgba(255,255,255,.08); --border2:rgba(255,255,255,.15);
+  --text:#E7E9EF; --muted:#9AA0B0; --dim:#656C7C;
+  --violet:#7C6CFF; --violet2:#AB9DFF; --teal:#22D39A; --red:#FF6274; --gold:#F3C57C;
+  --radius:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:'Inter',system-ui,sans-serif; line-height:1.6;
+  -webkit-font-smoothing:antialiased; overflow-x:hidden;
+}
+.display{font-family:'Space Grotesk',sans-serif;letter-spacing:-.02em}
+.mono{font-family:'JetBrains Mono',monospace}
+a{color:inherit;text-decoration:none}
+
+/* animated background layers */
+.bg-grid{position:fixed;inset:0;z-index:0;
+  background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:52px 52px;mask-image:radial-gradient(ellipse 90% 60% at 50% 0%,#000 30%,transparent 78%);
+  opacity:.5}
+.orb{position:fixed;border-radius:50%;filter:blur(90px);z-index:0;opacity:.5;pointer-events:none;will-change:transform}
+.orb.v{width:520px;height:520px;background:radial-gradient(circle,#5b46ff88,transparent 68%);top:-160px;left:-120px;animation:drift1 22s ease-in-out infinite}
+.orb.t{width:460px;height:460px;background:radial-gradient(circle,#0e8f6a66,transparent 68%);top:180px;right:-160px;animation:drift2 26s ease-in-out infinite}
+@keyframes drift1{50%{transform:translate(120px,90px) scale(1.15)}}
+@keyframes drift2{50%{transform:translate(-90px,120px) scale(1.1)}}
+
+.wrap{position:relative;z-index:2;max-width:1180px;margin:0 auto;padding:0 28px}
+
+/* nav */
+nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);
+  background:rgba(8,9,12,.6);border-bottom:1px solid var(--border)}
+.navin{display:flex;align-items:center;justify-content:space-between;height:68px;max-width:1180px;margin:0 auto;padding:0 28px}
+.brand{display:flex;align-items:center;gap:11px;font-family:'Space Grotesk';font-weight:600;font-size:19px}
+.mark{width:34px;height:34px;border-radius:9px;position:relative;
+  background:linear-gradient(150deg,#8b7bff,#5b46ff);box-shadow:0 0 0 1px #ffffff18, 0 8px 24px #5b46ff55}
+.mark:before{content:"";position:absolute;left:50%;top:6px;bottom:6px;width:2px;background:#fff;transform:translateX(-50%);border-radius:2px}
+.mark:after{content:"";position:absolute;left:50%;top:11px;height:12px;width:9px;background:#fff;transform:translateX(-50%);border-radius:2px}
+.navlinks{display:flex;gap:30px;align-items:center;font-size:14.5px;color:var(--muted)}
+.navlinks a:hover{color:var(--text)}
+.btn{font-family:'Space Grotesk';font-weight:500;font-size:14.5px;padding:10px 18px;border-radius:10px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text);transition:.2s}
+.btn:hover{background:#ffffff0d}
+.btn.primary{background:linear-gradient(150deg,#8b7bff,#5b46ff);border:none;box-shadow:0 8px 26px #5b46ff44}
+.btn.primary:hover{filter:brightness(1.08);transform:translateY(-1px)}
+
+/* ticker */
+.ticker{border-bottom:1px solid var(--border);background:var(--bg2);overflow:hidden;position:relative;z-index:2}
+.tickrow{display:flex;gap:44px;white-space:nowrap;padding:11px 0;animation:scroll 34s linear infinite;font-size:13.5px}
+.tickrow:hover{animation-play-state:paused}
+@keyframes scroll{to{transform:translateX(-50%)}}
+.tk{display:inline-flex;gap:9px;align-items:center;color:var(--muted)}
+.tk b{color:var(--text);font-weight:500}
+.up{color:var(--teal)} .down{color:var(--red)}
+
+/* hero */
+.hero{padding:88px 0 70px;display:grid;grid-template-columns:1.05fr .95fr;gap:52px;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--violet2);
+  border:1px solid #7c6cff44;background:#7c6cff14;padding:6px 13px;border-radius:100px;margin-bottom:26px}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:var(--teal);box-shadow:0 0 8px var(--teal)}
+h1{font-family:'Space Grotesk';font-weight:600;font-size:60px;line-height:1.03;letter-spacing:-.03em}
+h1 .g{background:linear-gradient(120deg,#fff,#a99bff 60%,#1fd69b);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--muted);font-size:18px;max-width:490px;margin:24px 0 34px;line-height:1.65}
+.cta{display:flex;gap:14px;align-items:center}
+.ghosthint{font-size:13px;color:var(--dim);margin-top:22px}
+
+/* terminal card */
+.term{background:linear-gradient(180deg,#13151d,#0e1016);border:1px solid var(--border2);border-radius:18px;
+  box-shadow:0 30px 80px #00000066, inset 0 1px 0 #ffffff0d;overflow:hidden;position:relative}
+.termbar{display:flex;align-items:center;gap:7px;padding:13px 16px;border-bottom:1px solid var(--border)}
+.tdot{width:11px;height:11px;border-radius:50%}
+.termtitle{margin-left:10px;font-size:12.5px;color:var(--muted)}
+.termbody{padding:18px}
+.statrow{display:flex;justify-content:space-between;margin-bottom:14px}
+.stat .l{font-size:11.5px;color:var(--dim);letter-spacing:.03em;text-transform:uppercase}
+.stat .v{font-family:'JetBrains Mono';font-size:22px;font-weight:500;margin-top:3px}
+canvas{display:block;width:100%;height:150px}
+.chartwrap{border:1px solid var(--border);border-radius:12px;background:#0a0c10;padding:10px;margin-top:6px}
+
+/* section */
+section{padding:74px 0;position:relative;z-index:2}
+.eyebrow{font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--violet2);margin-bottom:14px}
+h2{font-family:'Space Grotesk';font-weight:600;font-size:38px;letter-spacing:-.02em;line-height:1.1}
+.lead{color:var(--muted);font-size:17px;max-width:560px;margin-top:16px}
+
+/* feature tabs */
+.tabs{display:flex;gap:8px;margin:34px 0 26px;flex-wrap:wrap}
+.tab{font-family:'Space Grotesk';font-size:14.5px;padding:11px 20px;border-radius:11px;border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:.2s;background:var(--surface)}
+.tab:hover{color:var(--text);border-color:var(--border2)}
+.tab.on{color:#fff;border-color:#7c6cff77;background:#7c6cff1c;box-shadow:0 0 0 1px #7c6cff44}
+.panel{display:none;animation:fade .45s ease}
+.panel.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px}
+.grid2{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}
+.step{display:flex;gap:13px;align-items:center;padding:9px 0;font-size:15px}
+.num{width:26px;height:26px;border-radius:8px;background:#7c6cff1c;color:var(--violet2);font-family:'JetBrains Mono';font-size:12.5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid #7c6cff33}
+.chk{display:flex;gap:11px;align-items:center;padding:8px 0;font-size:15px;color:var(--muted)}
+.box{width:19px;height:19px;border-radius:6px;border:1.5px solid var(--border2);flex-shrink:0}
+.box.done{background:var(--teal);border-color:var(--teal);position:relative}
+.box.done:after{content:"";position:absolute;left:6px;top:2px;width:5px;height:10px;border:solid #06120d;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.rc{display:flex;justify-content:space-between;padding:7px 0;font-size:13.5px;border-bottom:1px solid var(--border)}
+.rc:last-child{border:none}
+.rc .k{color:var(--dim)} .rc .val{font-family:'JetBrains Mono';color:var(--text)}
+
+/* risk calc */
+.field{margin-bottom:13px}
+.field label{display:block;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.field input,.field select{width:100%;background:#0a0c10;border:1px solid var(--border2);color:var(--text);
+  font-family:'JetBrains Mono';font-size:15px;padding:11px 13px;border-radius:10px;outline:none;transition:.2s}
+.field input:focus,.field select:focus{border-color:#7c6cff88;box-shadow:0 0 0 3px #7c6cff22}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.resrow{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)}
+.resrow .k{color:var(--muted);font-size:14px}
+.resrow .v{font-family:'JetBrains Mono';font-size:15px;font-weight:500}
+.bigres{font-family:'JetBrains Mono';font-size:34px;font-weight:700;
+  background:linear-gradient(120deg,#a99bff,#1fd69b);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* calendar */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cell{aspect-ratio:1.15;border:1px solid var(--border);border-radius:9px;padding:7px;font-size:11px;position:relative}
+.cell .d{color:var(--dim)}
+.cell .p{position:absolute;bottom:7px;left:7px;font-family:'JetBrains Mono';font-weight:500;font-size:11.5px}
+.win{background:#1fd69b14;border-color:#1fd69b40}.win .p{color:var(--teal)}
+.los{background:#ff5c7714;border-color:#ff5c7740}.los .p{color:var(--red)}
+
+/* principles band */
+.band{border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--bg2);text-align:center}
+.quote{font-family:'Space Grotesk';font-weight:500;font-size:30px;letter-spacing:-.02em;max-width:840px;margin:0 auto;min-height:80px;transition:opacity .5s}
+.quote .g{color:var(--violet2)}
+
+footer{padding:46px 0;border-top:1px solid var(--border);color:var(--dim);font-size:13.5px;position:relative;z-index:2}
+.foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px}
+
+@media(max-width:900px){
+  .hero{grid-template-columns:1fr;gap:36px}
+  h1{font-size:44px}.grid2{grid-template-columns:1fr}.navlinks{display:none}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="orb v"></div>
+<div class="orb t"></div>
+
+<nav>
+  <div class="navin">
+    <div class="brand"><span class="mark"></span>Tradebook</div>
+    <div class="navlinks">
+      <a href="#playbook">Playbook</a>
+      <a href="#journal">Journal</a>
+      <a href="#risk">Risk</a>
+      <a href="#discipline">Discipline</a>
+    </div>
+    <button class="btn primary" onclick="document.getElementById('features').scrollIntoView()">Launch app</button>
+  </div>
+</nav>
+
+<div class="ticker">
+  <div class="tickrow" id="tick"></div>
+</div>
+
+<div class="wrap">
+  <div class="hero">
+    <div>
+      <div class="pill"><span class="dot"></span> Built for disciplined execution</div>
+      <h1 class="display">Trade your <span class="g">edge</span>,<br>not your emotions.</h1>
+      <p class="sub">Tradebook is the terminal where your strategy, your journal, and your risk live as one system. Define the playbook. Log every trade. Size every position by the numbers.</p>
+      <div class="cta">
+        <button class="btn primary" onclick="document.getElementById('features').scrollIntoView()">Open the terminal</button>
+        <button class="btn" onclick="document.getElementById('risk').scrollIntoView()">Try the risk engine</button>
+      </div>
+      <div class="ghosthint">No emotion. No guesswork. Just process, logged and repeated.</div>
+    </div>
+
+    <div class="term">
+      <div class="termbar">
+        <span class="tdot" style="background:#ff5f57"></span>
+        <span class="tdot" style="background:#febc2e"></span>
+        <span class="tdot" style="background:#28c840"></span>
+        <span class="termtitle mono">EUR/USD · 15m · session live</span>
+      </div>
+      <div class="termbody">
+        <div class="statrow">
+          <div class="stat"><div class="l">Net PnL</div><div class="v up" id="pnl">+$12,480</div></div>
+          <div class="stat"><div class="l">Win rate</div><div class="v" id="wr">54.2%</div></div>
+          <div class="stat"><div class="l">Expectancy</div><div class="v" id="exp">0.31R</div></div>
+        </div>
+        <div class="chartwrap"><canvas id="chart"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <div class="eyebrow">One system, three disciplines</div>
+    <h2 class="display">Everything a serious trader repeats.</h2>
+    <p class="lead">Most tools give you a chart and a hope. Tradebook gives you a process you can audit against your own results.</p>
+
+    <div class="tabs">
+      <div class="tab on" data-p="playbook">Strategy playbook</div>
+      <div class="tab" data-p="journal">Trade journal</div>
+      <div class="tab" data-p="riskp">Risk engine</div>
+    </div>
+
+    <div class="panel on" id="playbook" data-anchor>
+      <div class="grid2">
+        <div class="card">
+          <div style="font-family:'Space Grotesk';font-weight:600;font-size:20px;margin-bottom:4px">A+ Setup Checklist</div>
+          <div style="color:var(--dim);font-size:13px;margin-bottom:18px">Plan type · The 5 Golden Rules</div>
+          <div style="font-size:12px;color:var(--violet2);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Charting process</div>
+          <div class="step"><span class="num">1</span>Mark HTF range + premium / discount</div>
+          <div class="step"><span class="num">2</span>Mark liquidity: PDH / PDL, equal highs/lows</div>
+          <div class="step"><span class="num">3</span>Decide continuation vs reversal</div>
+          <div class="step"><span class="num">4</span>Pick one target, define invalidation</div>
+          <div style="font-size:12px;color:var(--violet2);letter-spacing:.08em;text-transform:uppercase;margin:18px 0 6px">Entry criteria</div>
+          <div class="chk"><span class="box done"></span>Bias alignment</div>
+          <div class="chk"><span class="box done"></span>High probability POI</div>
+          <div class="chk"><span class="box"></span>LQ sweep + market shift</div>
+          <div class="chk"><span class="box"></span>Asymmetric risk to reward</div>
+        </div>
+        <div class="card" style="align-self:start">
+          <div style="font-size:12px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Risk controls</div>
+          <div class="rc"><span class="k">Max trades / day</span><span class="val">5</span></div>
+          <div class="rc"><span class="k">Max daily loss</span><span class="val" style="color:var(--red)">$3,000</span></div>
+          <div class="rc"><span class="k">Max daily profit</span><span class="val" style="color:var(--teal)">$10,000</span></div>
+          <div class="rc"><span class="k">Risk per trade</span><span class="val">1.00%</span></div>
+          <div class="rc"><span class="k">Trading window</span><span class="val">08:00–17:00 UTC</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="journal" data-anchor>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px">
+          <div style="font-family:'Space Grotesk';font-weight:600;font-size:20px">February 2026</div>
+          <div class="mono" style="color:var(--teal)">+$18,940 net</div>
+        </div>
+        <div class="cal" id="cal"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="riskp" data-anchor>
+      <div class="card" style="color:var(--muted)">The risk engine has its own full section below. <a href="#risk" style="color:var(--violet2)">Jump to it →</a></div>
+    </div>
+  </div>
+</section>
+
+<section id="risk" style="border-top:1px solid var(--border)">
+  <div class="wrap">
+    <div class="eyebrow">Risk engine</div>
+    <h2 class="display">Never oversize a trade again.</h2>
+    <p class="lead">Enter your account risk and your levels. Get the exact lot size, with correct pip-value handling for every pair. This calculator is live, try it.</p>
+
+    <div class="grid2" style="margin-top:30px">
+      <div class="card">
+        <div class="field"><label>Pair</label>
+          <select id="pair"><option>EUR/USD</option><option>GBP/USD</option><option>AUD/USD</option><option>USD/JPY</option><option>GBP/JPY</option></select>
+        </div>
+        <div class="two">
+          <div class="field"><label>Account size ($)</label><input id="acc" value="10000"/></div>
+          <div class="field"><label>Risk %</label><input id="pct" value="1"/></div>
+        </div>
+        <div class="two">
+          <div class="field"><label>Entry price</label><input id="entry" value="1.08500"/></div>
+          <div class="field"><label>Stop loss</label><input id="stop" value="1.08200"/></div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="font-size:12px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">Result</div>
+        <div class="resrow"><span class="k">Direction</span><span class="v" id="rdir">—</span></div>
+        <div class="resrow"><span class="k">Risk amount</span><span class="v" id="rrisk">—</span></div>
+        <div class="resrow"><span class="k">Stop distance</span><span class="v" id="rpips">—</span></div>
+        <div style="margin:18px 0 4px;font-size:12px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase">Position size</div>
+        <div class="bigres" id="rlots">—</div>
+        <div class="resrow" style="margin-top:8px"><span class="k">Units</span><span class="v" id="runits">—</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="discipline">
+  <div class="wrap">
+    <div class="eyebrow">The discipline layer</div>
+    <div class="quote display" id="quote"></div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <div class="brand" style="font-size:16px"><span class="mark" style="width:26px;height:26px"></span>Tradebook</div>
+    <div>Conviction → confidence → competence → consistency.</div>
+    <div>Concept build · 2026</div>
+  </div>
+</footer>
+
+<script>
+/* ticker */
+const pairs=[["EUR/USD","1.0851",0.12],["GBP/USD","1.2743",-0.08],["USD/JPY","156.42",0.31],["AUD/USD","0.6621",-0.19],["XAU/USD","2,341.8",0.54],["GBP/JPY","199.31",0.22],["USD/CAD","1.3688",-0.05],["EUR/GBP","0.8515",0.09],["NZD/USD","0.6033",-0.14],["USD/CHF","0.8974",0.07]];
+const trow=document.getElementById('tick');
+const mk=()=>pairs.map(([s,p,c])=>`<span class="tk"><b>${s}</b> ${p} <span class="${c>=0?'up':'down'}">${c>=0?'▲':'▼'} ${Math.abs(c).toFixed(2)}%</span></span>`).join('');
+trow.innerHTML=mk()+mk();
+
+/* candlestick chart */
+const cv=document.getElementById('chart'),ctx=cv.getContext('2d');
+function sizeCv(){const r=cv.getBoundingClientRect(),d=devicePixelRatio||1;cv.width=r.width*d;cv.height=r.height*d;ctx.setTransform(d,0,0,d,0,0);}
+let candles=[],px=1.085;
+function seed(n){candles=[];let p=1.083;for(let i=0;i<n;i++){const o=p,c=p+(Math.random()-.48)*0.0016;const h=Math.max(o,c)+Math.random()*0.0007;const l=Math.min(o,c)-Math.random()*0.0007;candles.push({o,h,l,c});p=c;}px=p;}
+function draw(){
+  const r=cv.getBoundingClientRect(),W=r.width,H=r.height;ctx.clearRect(0,0,W,H);
+  const vals=candles.flatMap(k=>[k.h,k.l]),mn=Math.min(...vals),mx=Math.max(...vals),pad=(mx-mn)*.12||.001;
+  const lo=mn-pad,hi=mx+pad,y=v=>H-((v-lo)/(hi-lo))*H;
+  const n=candles.length,cw=W/n,bw=cw*.55;
+  candles.forEach((k,i)=>{
+    const x=i*cw+cw/2,up=k.c>=k.o,col=up?'#1FD69B':'#FF5C77';
+    ctx.strokeStyle=col;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,y(k.h));ctx.lineTo(x,y(k.l));ctx.stroke();
+    ctx.fillStyle=col;const yo=y(k.o),yc=y(k.c);ctx.fillRect(x-bw/2,Math.min(yo,yc),bw,Math.max(2,Math.abs(yc-yo)));
+  });
+}
+function step(){const o=px,c=px+(Math.random()-.48)*0.0016;const h=Math.max(o,c)+Math.random()*0.0007;const l=Math.min(o,c)-Math.random()*0.0007;candles.push({o,h,l,c});candles.shift();px=c;draw();
+  document.getElementById('pnl').textContent=(c>1.084?'+':'')+'$'+(12000+(c-1.083)*900000|0).toLocaleString();}
+sizeCv();seed(46);draw();
+addEventListener('resize',()=>{sizeCv();draw()});
+setInterval(step,900);
+
+/* tabs */
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on');document.getElementById(t.dataset.p).classList.add('on');
+});
+
+/* calendar */
+const cal=document.getElementById('cal');
+const cdata=[null,null,null,7300,-900,null,null, 8800,-7400,5400,8500,-1000,null,null, 3200,null,4100,-1500,2600,null,null];
+let html='';['M','T','W','T','F','S','S'].forEach(d=>html+=`<div style="text-align:center;color:var(--dim);font-size:10px;padding-bottom:3px">${d}</div>`);
+cdata.forEach((v,i)=>{const day=i+1;if(v===null){html+=`<div class="cell"><span class="d">${day}</span></div>`}else{const w=v>0;html+=`<div class="cell ${w?'win':'los'}"><span class="d">${day}</span><span class="p">${w?'+':'-'}$${Math.abs(v/1000).toFixed(1)}k</span></div>`}});
+cal.innerHTML=html;
+
+/* risk engine */
+function calc(){
+  const pair=pair_.value,acc=+acc_.value,pct=+pct_.value,e=+entry_.value,s=+stop_.value;
+  const ok=[acc,pct,e,s].every(x=>!isNaN(x))&&e!==s&&acc>0&&pct>0;
+  if(!ok){['rdir','rrisk','rpips','runits'].forEach(id=>document.getElementById(id).textContent='—');rlots_.textContent='—';return;}
+  const pip=pair.includes('JPY')?0.01:0.0001;
+  const risk=acc*pct/100, pips=Math.abs(e-s)/pip, pv=pip*100000, lots=risk/(pips*pv);
+  rdir_.textContent=e>s?'Long':'Short';rdir_.style.color=e>s?'var(--teal)':'var(--red)';
+  rrisk_.textContent='$'+risk.toLocaleString(undefined,{maximumFractionDigits:0});
+  rpips_.textContent=pips.toFixed(1)+' pips';
+  rlots_.textContent=lots.toFixed(2)+' lots';
+  runits_.textContent=Math.round(lots*100000).toLocaleString();
+}
+const pair_=document.getElementById('pair'),acc_=document.getElementById('acc'),pct_=document.getElementById('pct'),entry_=document.getElementById('entry'),stop_=document.getElementById('stop');
+const rdir_=document.getElementById('rdir'),rrisk_=document.getElementById('rrisk'),rpips_=document.getElementById('rpips'),rlots_=document.getElementById('rlots'),runits_=document.getElementById('runits');
+[pair_,acc_,pct_,entry_,stop_].forEach(el=>{el.oninput=calc;el.onchange=calc});calc();
+
+/* rotating principles */
+const quotes=['Bias is a plan plus invalidation, <span class="g">not a prediction.</span>','You don’t build trust in your system with affirmations. <span class="g">You build it with data.</span>','If invalidation hits, <span class="g">reset.</span> No coping, no revenge trade.','If you can’t say your bias in one sentence, <span class="g">you don’t have one.</span>'];
+let qi=0;const qel=document.getElementById('quote');qel.innerHTML=quotes[0];
+setInterval(()=>{qel.style.opacity=0;setTimeout(()=>{qi=(qi+1)%quotes.length;qel.innerHTML=quotes[qi];qel.style.opacity=1;},500);},4200);
+</script>
+</body>
+</html>

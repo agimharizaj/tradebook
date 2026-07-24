@@ -1,0 +1,285 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+
+type Grid = { headers: string[]; rows: string[][] };
+type FieldKey = "symbol" | "direction" | "date" | "lots" | "pnl" | "commissions" | "swap" | "entry" | "exit" | "ticket";
+
+const FIELDS: { key: FieldKey; label: string; required?: boolean; keys: RegExp; pick: "first" | "last" }[] = [
+  { key: "symbol", label: "Symbol", required: true, keys: /symbol|instrument/i, pick: "first" },
+  { key: "direction", label: "Direction / type", keys: /type|direction|side/i, pick: "first" },
+  { key: "date", label: "Close date", required: true, keys: /close.*time|close.*date|time|date/i, pick: "last" },
+  { key: "lots", label: "Lots / volume", keys: /volume|lots|size|qty/i, pick: "first" },
+  { key: "pnl", label: "Gross profit", required: true, keys: /profit|pnl|p.?\/.?l|net/i, pick: "last" },
+  { key: "commissions", label: "Commissions", keys: /commission|comm|fee/i, pick: "first" },
+  { key: "swap", label: "Swap", keys: /swap/i, pick: "first" },
+  { key: "entry", label: "Entry price", keys: /open.*price|price.*open|entry/i, pick: "first" },
+  { key: "exit", label: "Exit price", keys: /close.*price|price.*close|exit/i, pick: "last" },
+  { key: "ticket", label: "Ticket / position", keys: /ticket|position|deal|order/i, pick: "first" },
+];
+
+function detectDelimiter(line: string) {
+  const counts: [string, number][] = [
+    ["\t", (line.match(/\t/g) || []).length],
+    [";", (line.match(/;/g) || []).length],
+    [",", (line.match(/,/g) || []).length],
+  ];
+  counts.sort((a, b) => b[1] - a[1]);
+  return counts[0][1] > 0 ? counts[0][0] : ",";
+}
+
+function parseCSV(text: string): Grid {
+  const firstLine = text.split(/\r?\n/).find((l) => l.trim() !== "") ?? "";
+  const delim = detectDelimiter(firstLine);
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false;
+      } else field += c;
+    } else if (c === '"') inQ = true;
+    else if (c === delim) { row.push(field); field = ""; }
+    else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+    else if (c !== "\r") field += c;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  const clean = rows.filter((r) => r.some((x) => x.trim() !== "")).map((r) => r.map((x) => x.trim()));
+  return { headers: clean[0] ?? [], rows: clean.slice(1) };
+}
+
+function parseHTML(text: string): Grid {
+  const doc = new DOMParser().parseFromString(text, "text/html");
+  const tables = Array.from(doc.querySelectorAll("table"));
+  let best: string[][] = [];
+  for (const t of tables) {
+    const rows = Array.from(t.querySelectorAll("tr")).map((tr) =>
+      Array.from(tr.querySelectorAll("th,td")).map((td) => (td.textContent ?? "").replace(/\s+/g, " ").trim())
+    );
+    if (rows.length > best.length) best = rows;
+  }
+  const headerIdx = best.findIndex((r) => r.some((c) => /symbol|instrument/i.test(c)) && r.some((c) => /profit|price|volume/i.test(c)));
+  const hi = headerIdx >= 0 ? headerIdx : 0;
+  const headers = best[hi] ?? [];
+  const rows = best.slice(hi + 1).filter((r) => r.length >= headers.length - 1 && r.some((x) => x !== ""));
+  return { headers, rows };
+}
+
+function normalizeSymbol(raw: string) {
+  const s = raw.toUpperCase().replace(/[^A-Z]/g, "");
+  if (s.length === 6 && !raw.includes("/")) return `${s.slice(0, 3)}/${s.slice(3)}`;
+  return raw.trim();
+}
+function parseDate(raw: string): string | null {
+  const iso = raw.match(/(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
+  const dmy = raw.match(/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})/);
+  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+  return null;
+}
+function num(s: string | undefined): number | null {
+  if (!s) return null;
+  let t = s.replace(/\s/g, "").replace(/[^\d.,-]/g, "");
+  if (t.includes(",") && !t.includes(".")) t = t.replace(",", ".");
+  else t = t.replace(/,/g, "");
+  const n = parseFloat(t);
+  return Number.isNaN(n) ? null : n;
+}
+
+function autoMap(headers: string[]): Record<FieldKey, number> {
+  const map = {} as Record<FieldKey, number>;
+  for (const f of FIELDS) {
+    const matches = headers.map((h, i) => ({ h, i })).filter((x) => f.keys.test(x.h));
+    map[f.key] = matches.length ? (f.pick === "last" ? matches[matches.length - 1].i : matches[0].i) : -1;
+  }
+  return map;
+}
+
+export default function ImportTradesModal({
+  onClose,
+  onImported,
+}: {
+  onClose: () => void;
+  onImported: () => void;
+}) {
+  const supabase = createClient();
+  const [grid, setGrid] = useState<Grid | null>(null);
+  const [mapping, setMapping] = useState<Record<FieldKey, number>>({} as Record<FieldKey, number>);
+  const [fileName, setFileName] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    setResult(null);
+    const text = await file.text();
+    const g = /\.html?$/i.test(file.name) || /<table/i.test(text) ? parseHTML(text) : parseCSV(text);
+    setGrid(g);
+    setMapping(autoMap(g.headers));
+  }
+
+  const trades = useMemo(() => {
+    if (!grid) return [];
+    const col = (r: string[], k: FieldKey) => (mapping[k] >= 0 ? r[mapping[k]] : undefined);
+    return grid.rows
+      .map((r) => {
+        const date = parseDate(col(r, "date") ?? "");
+        if (!date) return null;
+        const dir = (col(r, "direction") ?? "").toLowerCase();
+        const profit = num(col(r, "pnl"));
+        const commissions = num(col(r, "commissions")) ?? 0;
+        const swap = num(col(r, "swap")) ?? 0;
+        return {
+          traded_on: date,
+          pair: normalizeSymbol(col(r, "symbol") ?? ""),
+          direction: dir.includes("buy") ? "long" : dir.includes("sell") ? "short" : dir.includes("long") ? "long" : dir.includes("short") ? "short" : null,
+          size_lots: num(col(r, "lots")),
+          pnl: profit == null ? null : Math.round((profit + commissions + swap) * 100) / 100,
+          entry_price: num(col(r, "entry")),
+          exit_price: num(col(r, "exit")),
+          ext_id: (col(r, "ticket") ?? "").trim() || null,
+        };
+      })
+      .filter((t): t is NonNullable<typeof t> => t !== null && t.pair !== "");
+  }, [grid, mapping]);
+
+  async function doImport() {
+    setImporting(true);
+    setResult(null);
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) { setResult("Not signed in."); setImporting(false); return; }
+    const userId = u.user.id;
+
+    // Existing imported rows (by ticket) so re-import updates instead of duplicating.
+    const { data: existing } = await supabase
+      .from("trades")
+      .select("id, ext_id")
+      .not("ext_id", "is", null);
+    const idByExt = new Map<string, string>(
+      ((existing as { id: string; ext_id: string }[]) ?? []).map((x) => [x.ext_id, x.id])
+    );
+
+    const rows = trades.map((t) => {
+      const base = { ...t, user_id: userId };
+      const id = t.ext_id ? idByExt.get(t.ext_id) : undefined;
+      return id ? { ...base, id } : base;
+    });
+
+    let done = 0;
+    for (let i = 0; i < rows.length; i += 500) {
+      const chunk = rows.slice(i, i + 500);
+      const { error } = await supabase.from("trades").upsert(chunk);
+      if (error) { setResult(`Import error: ${error.message}`); setImporting(false); return; }
+      done += chunk.length;
+    }
+    setImporting(false);
+    setResult(`Imported / updated ${done} trade${done === 1 ? "" : "s"}. Closing...`);
+    onImported();
+    setTimeout(onClose, 1200);
+  }
+
+  const missingRequired = FIELDS.filter((f) => f.required && (mapping[f.key] ?? -1) < 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-card p-6 ring-1 ring-border2">
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <h2 className="text-lg" style={{ fontFamily: "var(--font-display)" }}>Import trades from MT5 / FTMO</h2>
+            <p className="mt-1 text-sm text-muted">
+              In MT5: History tab, right-click, Report, save as HTML (or export CSV). Upload it here.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-muted hover:text-foreground" aria-label="Close">✕</button>
+        </div>
+
+        <label className="flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-border2 py-6 text-sm text-muted transition hover:border-accent hover:text-accent2">
+          {fileName ? `Selected: ${fileName}` : "Choose MT5 report (.html or .csv)"}
+          <input type="file" accept=".csv,.html,.htm,.txt" onChange={onFile} className="hidden" />
+        </label>
+
+        {grid && (
+          <>
+            <div className="mt-5">
+              <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Map columns</div>
+              <div className="grid grid-cols-2 gap-3">
+                {FIELDS.map((f) => (
+                  <label key={f.key} className="block">
+                    <span className="mb-1 block text-xs text-dim">
+                      {f.label}{f.required && <span className="text-danger"> *</span>}
+                    </span>
+                    <select
+                      value={mapping[f.key] ?? -1}
+                      onChange={(e) => setMapping((m) => ({ ...m, [f.key]: Number(e.target.value) }))}
+                      className="jfield"
+                    >
+                      <option value={-1}>—</option>
+                      {grid.headers.map((h, i) => (<option key={i} value={i}>{h || `Column ${i + 1}`}</option>))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
+                Preview ({trades.length} trades detected)
+              </div>
+              <div className="overflow-x-auto rounded-lg border border-border">
+                <table className="w-full text-left text-xs">
+                  <thead className="text-dim">
+                    <tr>
+                      <th className="p-2">Date</th><th className="p-2">Pair</th><th className="p-2">Dir</th>
+                      <th className="p-2">Lots</th><th className="p-2">PnL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trades.slice(0, 10).map((t, i) => (
+                      <tr key={i} className="border-t border-border">
+                        <td className="p-2" style={{ fontFamily: "var(--font-mono)" }}>{t.traded_on}</td>
+                        <td className="p-2">{t.pair}</td>
+                        <td className="p-2">{t.direction ?? "-"}</td>
+                        <td className="p-2" style={{ fontFamily: "var(--font-mono)" }}>{t.size_lots ?? "-"}</td>
+                        <td className="p-2" style={{ fontFamily: "var(--font-mono)" }}>{t.pnl ?? "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {trades.length === 0 && (
+                <p className="mt-2 text-xs text-danger">
+                  No trades detected. Check the column mapping above, especially Close date and Symbol.
+                </p>
+              )}
+            </div>
+
+            <div className="mt-5 flex items-center gap-3">
+              <button
+                onClick={doImport}
+                disabled={importing || trades.length === 0 || missingRequired.length > 0}
+                className="rounded-lg bg-accent px-5 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+              >
+                {importing ? "Importing..." : `Import ${trades.length} trades`}
+              </button>
+              {missingRequired.length > 0 && (
+                <span className="text-xs text-dim">Map: {missingRequired.map((f) => f.label).join(", ")}</span>
+              )}
+              {result && <span className="text-sm text-success">{result}</span>}
+            </div>
+          </>
+        )}
+      </div>
+
+      <style>{`
+        .jfield{width:100%;border-radius:.5rem;border:1px solid var(--border2);background:var(--surface2);color:var(--foreground);padding:.5rem .65rem;font-size:.85rem;outline:none}
+        .jfield:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+      `}</style>
+    </div>
+  );
+}
