@@ -14,7 +14,7 @@ const nav = [
 export default function MobileNav() {
   const pathname = usePathname();
   return (
-    <nav className="flex shrink-0 border-t border-border bg-background md:hidden">
+    <nav className="flex shrink-0 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden">
       {nav.map((item) => {
         const active = pathname.startsWith(item.href);
         return (

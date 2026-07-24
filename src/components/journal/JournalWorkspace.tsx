@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { moneySigned } from "@/lib/format";
+import { moneySigned, sym } from "@/lib/format";
 import ImportTradesModal from "./ImportTradesModal";
 
 type Trade = {
@@ -192,7 +192,7 @@ export default function JournalWorkspace() {
               <button
                 key={key}
                 onClick={() => setSelectedDay(key)}
-                className={`flex h-16 flex-col rounded-lg border p-1.5 text-left transition hover:border-accent md:h-24 md:p-2 ${
+                className={`flex h-16 flex-col overflow-hidden rounded-lg border p-1.5 text-left transition hover:border-accent md:h-24 md:p-2 ${
                   has
                     ? win
                       ? "border-success/40 bg-success/10"
@@ -204,15 +204,18 @@ export default function JournalWorkspace() {
               >
                 <span className="text-xs text-dim">{d.getDate()}</span>
                 {has && (
-                  <span className="mt-auto">
-                    <span className="block text-[11px] text-muted">
+                  <span className="mt-auto block min-w-0">
+                    <span className="hidden text-[11px] text-muted md:block">
                       {dayTradesCell.length} {dayTradesCell.length === 1 ? "trade" : "trades"}
                     </span>
                     <span
-                      className={`block text-xs font-medium ${win ? "text-success" : net < 0 ? "text-danger" : "text-muted"}`}
+                      className={`block truncate text-[10px] font-medium md:text-xs ${win ? "text-success" : net < 0 ? "text-danger" : "text-muted"}`}
                       style={{ fontFamily: "var(--font-mono)" }}
                     >
-                      {moneySigned(net, cur)}
+                      <span className="md:hidden">
+                        {`${net > 0 ? "+" : net < 0 ? "-" : ""}${sym(cur)}${Math.abs(Math.round(net)).toLocaleString()}`}
+                      </span>
+                      <span className="hidden md:inline">{moneySigned(net, cur)}</span>
                     </span>
                   </span>
                 )}

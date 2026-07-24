@@ -377,18 +377,34 @@ export default function StrategyWorkspace() {
           ))}
         </div>
         {!draft ? (
-          <div className="mx-auto max-w-2xl pt-16 text-center">
+          <div className="mx-auto max-w-2xl pt-4 md:pt-16 md:text-center">
             <h1 className="text-2xl">Strategy</h1>
             <p className="mt-2 text-muted">
-              Build and refine your trading playbooks. Select a plan on the left
-              or create a new one.
+              Build and refine your trading playbooks. Pick a plan or create a
+              new one.
             </p>
             <button
               onClick={newStrategy}
-              className="mt-6 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white transition hover:opacity-90"
+              className="mt-5 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white transition hover:opacity-90"
             >
               + New plan
             </button>
+            {list.length > 0 && (
+              <div className="mt-6 space-y-2 md:hidden">
+                {list.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => openStrategy(s.id)}
+                    className="block w-full rounded-lg border border-border2 px-4 py-3 text-left text-sm text-foreground transition hover:border-accent"
+                  >
+                    <span className="font-medium">{s.name}</span>
+                    {s.plan_type && (
+                      <span className="block text-xs text-dim">{s.plan_type}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ) : mode === "view" ? (
           <StrategyView

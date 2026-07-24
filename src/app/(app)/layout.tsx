@@ -22,7 +22,7 @@ export default async function AppLayout({
     "";
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-dvh overflow-hidden">
       <Sidebar email={user.email ?? ""} name={displayName} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border bg-background px-4 md:hidden">
