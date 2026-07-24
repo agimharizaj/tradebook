@@ -53,7 +53,7 @@ export default async function DashboardPage() {
   const pct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
 
   return (
-    <div className="mx-auto max-w-5xl px-8 py-10">
+    <div className="mx-auto max-w-5xl px-4 py-8 md:px-8 md:py-10">
       <h1 className="text-2xl">{name ? `Welcome back, ${name.split(" ")[0]}` : "Dashboard"}</h1>
       <p className="mt-1 text-muted">Your trading workspace at a glance.</p>
 

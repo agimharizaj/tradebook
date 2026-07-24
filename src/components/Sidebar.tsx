@@ -56,7 +56,7 @@ export default function Sidebar({
 
   return (
     <aside
-      className={`flex h-screen shrink-0 flex-col border-r border-border bg-background transition-[width] duration-200 ${
+      className={`hidden h-screen shrink-0 flex-col border-r border-border bg-background transition-[width] duration-200 md:flex ${
         collapsed ? "w-16" : "w-60"
       }`}
     >

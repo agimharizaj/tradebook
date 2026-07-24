@@ -148,7 +148,7 @@ export default function ProfileForm({
   });
 
   return (
-    <div className="mx-auto max-w-2xl px-8 py-10">
+    <div className="mx-auto max-w-2xl px-4 py-8 md:px-8 md:py-10">
       <h1 className="text-2xl">Profile</h1>
       <p className="mt-1 text-muted">Manage your account and preferences.</p>
 
@@ -173,7 +173,7 @@ export default function ProfileForm({
         </div>
 
         <Section title="Personal details">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="First name"><input value={form.first_name} onChange={(e) => set("first_name", e.target.value)} className="field" /></Field>
             <Field label="Last name"><input value={form.last_name} onChange={(e) => set("last_name", e.target.value)} className="field" /></Field>
             <Field label="Date of birth"><input type="date" value={form.dob} onChange={(e) => set("dob", e.target.value)} className="field" /></Field>
@@ -210,7 +210,7 @@ export default function ProfileForm({
         </Section>
 
         <Section title="Trading profile">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Broker / prop firm"><input value={form.broker} onChange={(e) => set("broker", e.target.value)} placeholder="FTMO" className="field" /></Field>
             <Field label="Account currency">
               <input

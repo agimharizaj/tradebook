@@ -136,7 +136,7 @@ export default function JournalWorkspace() {
   const todayStr = ymd(now);
 
   return (
-    <div className="mx-auto max-w-6xl px-8 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl">Journal</h1>
@@ -192,7 +192,7 @@ export default function JournalWorkspace() {
               <button
                 key={key}
                 onClick={() => setSelectedDay(key)}
-                className={`flex h-24 flex-col rounded-lg border p-2 text-left transition hover:border-accent ${
+                className={`flex h-16 flex-col rounded-lg border p-1.5 text-left transition hover:border-accent md:h-24 md:p-2 ${
                   has
                     ? win
                       ? "border-success/40 bg-success/10"

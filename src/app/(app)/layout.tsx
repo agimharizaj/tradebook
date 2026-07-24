@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Sidebar from "@/components/Sidebar";
+import MobileNav from "@/components/MobileNav";
+import LogoMark from "@/components/LogoMark";
 
 export default async function AppLayout({
   children,
@@ -22,7 +24,14 @@ export default async function AppLayout({
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar email={user.email ?? ""} name={displayName} />
-      <main className="flex-1 overflow-y-auto bg-bg2">{children}</main>
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <header className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border bg-background px-4 md:hidden">
+          <LogoMark size={26} className="rounded-md" />
+          <span className="font-display text-base font-semibold">Tradebook</span>
+        </header>
+        <main className="flex-1 overflow-y-auto bg-bg2">{children}</main>
+        <MobileNav />
+      </div>
     </div>
   );
 }

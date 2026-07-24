@@ -316,7 +316,7 @@ export default function StrategyWorkspace() {
 
   return (
     <div className="flex">
-      <aside className="sticky top-0 h-screen w-64 shrink-0 self-start overflow-y-auto border-r border-border p-4">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 self-start overflow-y-auto border-r border-border p-4 md:block">
         <div className="mb-3 flex items-center justify-between">
           <span className="text-xs font-medium uppercase tracking-wide text-dim">
             My plans
@@ -354,7 +354,28 @@ export default function StrategyWorkspace() {
         )}
       </aside>
 
-      <main className="flex-1 px-8 py-8">
+      <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
+        <div className="mb-4 flex gap-2 overflow-x-auto pb-1 md:hidden">
+          <button
+            onClick={newStrategy}
+            className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white"
+          >
+            + New
+          </button>
+          {list.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => openStrategy(s.id)}
+              className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs transition ${
+                draft?.id === s.id
+                  ? "border-accent bg-accent-soft text-accent2"
+                  : "border-border2 text-muted"
+              }`}
+            >
+              {s.name}
+            </button>
+          ))}
+        </div>
         {!draft ? (
           <div className="mx-auto max-w-2xl pt-16 text-center">
             <h1 className="text-2xl">Strategy</h1>

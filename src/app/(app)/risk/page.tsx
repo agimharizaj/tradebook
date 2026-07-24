@@ -183,7 +183,7 @@ export default function RiskPage() {
   }, [mode, pair, accountCurrency, accountSize, conversion, riskPct, entry, stop, lots, direction, priceDecimals]);
 
   return (
-    <div className="mx-auto max-w-3xl px-8 py-10">
+    <div className="mx-auto max-w-3xl px-4 py-8 md:px-8 md:py-10">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl">Risk &amp; position size</h1>
@@ -199,7 +199,7 @@ export default function RiskPage() {
         </button>
       </div>
 
-      <div className="mt-5 inline-flex rounded-xl border border-border2 bg-card p-1">
+      <div className="mt-5 flex flex-wrap gap-1 rounded-xl border border-border2 bg-card p-1">
         {MODES.map((m) => (
           <button
             key={m.id}
