@@ -9,12 +9,19 @@ const jbmono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jbmono" })
 export const metadata: Metadata = {
   title: "Tradebook",
   description: "Your trading playbooks, journal, and risk control in one place.",
+  appleWebApp: {
+    capable: true,
+    title: "Tradebook",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: "cover",
+  themeColor: "#161A23",
 };
 
 export default function RootLayout({
