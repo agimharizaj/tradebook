@@ -6,7 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 // "img" blocks hold a storage path in `text` (entry-models bucket) and are
 // created by "Send to Notebook" on a chart analysis, not from the palette.
 type BlockType = "text" | "h" | "todo" | "bullet" | "number" | "sticky" | "date" | "img";
-type Block = { id: string; type: BlockType; text: string; checked?: boolean; color?: string };
+// w: image width as a percent of the note column (Notion-style resize).
+type Block = { id: string; type: BlockType; text: string; checked?: boolean; color?: string; w?: number };
 
 const STICKY_COLORS: { key: string; c: string }[] = [
   { key: "gold", c: "var(--gold)" },
@@ -38,7 +39,7 @@ function StorageImage({ path }: { path: string }) {
   }, [path]);
   if (!url) return <span className="w-full py-2 text-xs text-dim">Loading screenshot...</span>;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={url} alt="Note image" className="my-1 h-auto w-full min-w-0 max-w-xl rounded-lg border border-border" />;
+  return <img src={url} alt="Note image" className="my-1 h-auto w-full min-w-0 rounded-lg border border-border" />;
 }
 
 function stickyStyle(color?: string) {
@@ -74,7 +75,12 @@ export function NoteView({ content, onChange }: { content: string; onChange: (c:
     <div className="space-y-2">
       {blocks.map((b) => {
         const n = b.type === "number" ? ++num : (num = 0);
-        if (b.type === "img") return <StorageImage key={b.id} path={b.text} />;
+        if (b.type === "img")
+          return (
+            <div key={b.id} style={{ width: `${b.w ?? 100}%` }}>
+              <StorageImage path={b.text} />
+            </div>
+          );
         if (b.type === "date") {
           const d = new Date(`${b.text}T00:00:00`);
           return (
@@ -300,6 +306,32 @@ export default function BlockEditor({
     if (file) uploadFile(file);
   }
 
+  // Notion-style image resize: drag the right-edge handle; width is stored
+  // on the block as a percent of the note column. One undo step per drag.
+  function startImgResize(e: React.PointerEvent, id: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    const wrap = (e.currentTarget as HTMLElement).parentElement;
+    const parent = wrap?.parentElement;
+    if (!wrap || !parent) return;
+    const startPx = wrap.getBoundingClientRect().width;
+    const parentPx = parent.getBoundingClientRect().width;
+    const startX = e.clientX;
+    snapshot();
+    const onMove = (ev: PointerEvent) => {
+      const pct = Math.round(Math.min(100, Math.max(20, ((startPx + ev.clientX - startX) / parentPx) * 100)));
+      setBlocks((bs) => bs.map((b) => (b.id === id ? { ...b, w: pct } : b)));
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  }
+
   // Pasting a screenshot anywhere in the note (long-press paste on mobile,
   // Cmd+V on desktop) uploads it and appends an image block.
   function onPaste(e: React.ClipboardEvent) {
@@ -314,24 +346,34 @@ export default function BlockEditor({
   const EMOJIS = ["✅","❌","⚠️","🔥","📈","📉","💰","🎯","🧠","😤","😌","🚀","🐂","🐻","💡","⭐","❗","⏰","📌","👀","💪","🤝"];
   const [showEmoji, setShowEmoji] = useState(false);
 
-  function insertEmoji(em: string) {
+  function insertText(txt: string) {
     const id = lastFocus.current;
     const el = id ? refs.current[id] : null;
     if (id && el) {
       const start = el.selectionStart ?? el.value.length;
       const end = el.selectionEnd ?? el.value.length;
-      const next = el.value.slice(0, start) + em + el.value.slice(end);
+      const next = el.value.slice(0, start) + txt + el.value.slice(end);
       update(id, { text: next });
       requestAnimationFrame(() => {
         el.focus();
-        const pos = start + em.length;
+        const pos = start + txt.length;
         el.setSelectionRange(pos, pos);
       });
     } else {
-      const nb: Block = { id: uid(), type: "text", text: em };
+      const nb: Block = { id: uid(), type: "text", text: txt };
       focusId.current = nb.id;
       setBlocks((bs) => [...bs, nb]);
     }
+  }
+  const insertEmoji = (em: string) => insertText(em);
+
+  // "+ Now": stamps the current date and time at the cursor (or as a new
+  // line) so progress updates can be logged as they happen.
+  function insertNow() {
+    const d = new Date();
+    const day = d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
+    insertText(`${day} ${time} - `);
   }
 
   function startPalDrag(e: React.PointerEvent) {
@@ -537,7 +579,15 @@ export default function BlockEditor({
             )}
 
             {b.type === "img" ? (
-              <StorageImage path={b.text} />
+              <span className="relative block min-w-0" style={{ width: `${b.w ?? 100}%` }}>
+                <StorageImage path={b.text} />
+                <span
+                  onPointerDown={(e) => startImgResize(e, b.id)}
+                  className="absolute -right-1 top-1/2 h-10 w-2 -translate-y-1/2 cursor-ew-resize touch-none rounded-full bg-foreground/50 ring-1 ring-background/60 md:opacity-0 md:transition md:group-hover:opacity-100"
+                  role="separator"
+                  aria-label="Drag to resize image"
+                />
+              </span>
             ) : b.type === "date" ? (
               <input
                 type="date"
@@ -694,6 +744,13 @@ export default function BlockEditor({
             </button>
           ))}
           <button
+            onClick={insertNow}
+            className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground"
+            title="Insert the current date and time"
+          >
+            + Now
+          </button>
+          <button
             onClick={() => fileRef.current?.click()}
             disabled={imgBusy}
             className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground disabled:opacity-50"
@@ -734,6 +791,13 @@ export default function BlockEditor({
               + {a.label}
             </button>
           ))}
+          <button
+            onClick={insertNow}
+            className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground"
+            title="Insert the current date and time"
+          >
+            + Now
+          </button>
           <button
             onClick={() => fileRef.current?.click()}
             disabled={imgBusy}
