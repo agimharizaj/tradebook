@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import LogoMark from "@/components/LogoMark";
 import ThemeToggle from "@/components/ThemeToggle";
 import { NAV, PROFILE } from "@/lib/nav";
@@ -24,6 +24,8 @@ export default function Sidebar({ email, name }: { email: string; name?: string 
 
   const MIN = 200;
   const MAX = 380;
+  const widthRef = useRef(width);
+  widthRef.current = width;
 
   useEffect(() => {
     setCollapsed(localStorage.getItem("tb_sidebar_collapsed") === "1");
@@ -35,8 +37,15 @@ export default function Sidebar({ email, name }: { email: string; name?: string 
     if (!dragging) return;
     document.body.style.userSelect = "none";
     document.body.style.cursor = "col-resize";
-    const onMove = (e: PointerEvent) => setWidth(Math.min(MAX, Math.max(MIN, e.clientX)));
-    const onUp = () => setDragging(false);
+    const onMove = (e: PointerEvent) => {
+      const w = Math.min(MAX, Math.max(MIN, e.clientX));
+      widthRef.current = w;
+      setWidth(w);
+    };
+    const onUp = () => {
+      setDragging(false);
+      localStorage.setItem("tb_sidebar_width", String(widthRef.current));
+    };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
     return () => {
@@ -44,9 +53,9 @@ export default function Sidebar({ email, name }: { email: string; name?: string 
       window.removeEventListener("pointerup", onUp);
       document.body.style.userSelect = "";
       document.body.style.cursor = "";
-      localStorage.setItem("tb_sidebar_width", String(width));
     };
-  }, [dragging, width]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragging]);
 
   function toggle() {
     setCollapsed((c) => {
