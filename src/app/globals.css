@@ -83,7 +83,7 @@ body {
 @media (display-mode: standalone) {
   html,
   body {
-    height: 100%;
+    height: var(--app-height, 100%);
     overflow: hidden;
   }
 }

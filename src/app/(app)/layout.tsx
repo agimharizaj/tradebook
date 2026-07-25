@@ -22,10 +22,10 @@ export default async function AppLayout({
     "";
 
   return (
-    // Viewport units misbehave in iOS standalone PWAs (dvh under-measures,
-    // vh over-measures). globals.css pins html/body to the exact visible
-    // area in standalone, so the shell inherits that via h-full there.
-    <div className="flex h-dvh overflow-hidden [@media(display-mode:standalone)]:h-full">
+    // Every CSS viewport unit measures wrong somewhere in iOS standalone
+    // PWAs. --app-height is set from window.innerHeight (the real usable
+    // height) by the boot script in the root layout.
+    <div className="flex h-dvh overflow-hidden [@media(display-mode:standalone)]:h-[var(--app-height,100vh)]">
       <Sidebar email={user.email ?? ""} name={displayName} />
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Browser tabs get the logo header for orientation. The installed
