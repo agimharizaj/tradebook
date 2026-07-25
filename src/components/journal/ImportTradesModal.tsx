@@ -281,19 +281,26 @@ export default function ImportTradesModal({
               <div className="overflow-x-auto rounded-lg border border-border">
                 <table className="w-full text-left text-xs">
                   <thead className="text-dim">
-                    <tr>
+                    <tr className="whitespace-nowrap">
                       <th className="p-2">Date</th><th className="p-2">Pair</th><th className="p-2">Dir</th>
-                      <th className="p-2">Lots</th><th className="p-2">PnL</th>
+                      <th className="p-2">Lots</th><th className="p-2">Entry</th><th className="p-2">Stop</th>
+                      <th className="p-2">Exit</th><th className="p-2">PnL</th><th className="p-2">Fees</th>
+                      <th className="p-2">Ticket</th>
                     </tr>
                   </thead>
                   <tbody>
                     {trades.slice(0, 10).map((t, i) => (
-                      <tr key={i} className="border-t border-border">
-                        <td className="p-2" style={{ fontFamily: "var(--font-mono)" }}>{t.traded_on.slice(0, 16)}</td>
-                        <td className="p-2">{t.pair}</td>
-                        <td className="p-2">{t.direction ?? "-"}</td>
-                        <td className="p-2" style={{ fontFamily: "var(--font-mono)" }}>{t.size_lots ?? "-"}</td>
-                        <td className="p-2" style={{ fontFamily: "var(--font-mono)" }}>{t.pnl ?? "-"}</td>
+                      <tr key={i} className="whitespace-nowrap border-t border-border" style={{ fontFamily: "var(--font-mono)" }}>
+                        <td className="p-2">{t.traded_on.slice(0, 16)}</td>
+                        <td className="p-2" style={{ fontFamily: "var(--font-sans)" }}>{t.pair}</td>
+                        <td className="p-2" style={{ fontFamily: "var(--font-sans)" }}>{t.direction ?? "-"}</td>
+                        <td className="p-2">{t.size_lots ?? "-"}</td>
+                        <td className="p-2">{t.entry_price ?? "-"}</td>
+                        <td className="p-2">{t.stop_price ?? "-"}</td>
+                        <td className="p-2">{t.exit_price ?? "-"}</td>
+                        <td className="p-2">{t.pnl ?? "-"}</td>
+                        <td className="p-2">{t.commission ?? "-"}</td>
+                        <td className="p-2">{t.ext_id ?? "-"}</td>
                       </tr>
                     ))}
                   </tbody>
