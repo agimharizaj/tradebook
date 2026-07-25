@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { usePairs } from "@/lib/usePairs";
 
 type ListItem = { key: string; id?: string; text: string; checked: boolean };
 type ImgItem = { key: string; path: string; url: string };
@@ -12,8 +10,6 @@ type Draft = {
   id: string | null;
   name: string;
   plan_type: string;
-  // undefined until migration 0006 adds the column; saves only send it when set
-  pair?: string;
   charting: ListItem[];
   entry: ListItem[];
   rules: ListItem[];
@@ -37,7 +33,6 @@ function emptyDraft(): Draft {
     id: null,
     name: "",
     plan_type: "",
-    pair: "",
     charting: [],
     entry: [],
     rules: [],
@@ -69,7 +64,6 @@ function isTypingTarget() {
 
 export default function StrategyWorkspace() {
   const supabase = createClient();
-  const watchlist = usePairs();
   // Account size from the profile, used to convert "1%" into a figure in
   // the risk-control fields.
   const [accountSize, setAccountSize] = useState(0);
@@ -184,7 +178,6 @@ export default function StrategyWorkspace() {
       id: s.id,
       name: s.name ?? "",
       plan_type: s.plan_type ?? "",
-      pair: "pair" in s ? ((s.pair as string | null) ?? "") : undefined,
       charting: toItems(charting.data ?? []),
       entry: toItems(entry.data ?? []),
       rules: toItems(rules.data ?? []),
@@ -311,7 +304,6 @@ export default function StrategyWorkspace() {
       user_id: userId,
       name: draft.name || "Untitled",
       plan_type: draft.plan_type || null,
-      ...(draft.pair !== undefined ? { pair: draft.pair || null } : {}),
       trading_notes: draft.notes || null,
       max_trades_per_day: num(draft.maxTrades),
       max_daily_loss: num(draft.maxLoss),
@@ -607,22 +599,6 @@ export default function StrategyWorkspace() {
                   placeholder="e.g. Liquidity sweep, break and retest"
                   className="field"
                 />
-              </Section>
-              <Section label="Pair">
-                <select
-                  value={draft.pair ?? ""}
-                  onChange={(e) => patch({ pair: e.target.value })}
-                  className="field"
-                >
-                  <option value="">No pair</option>
-                  {watchlist.map((pr) => (<option key={pr} value={pr}>{pr}</option>))}
-                  {draft.pair && !watchlist.includes(draft.pair) && (
-                    <option value={draft.pair}>{draft.pair}</option>
-                  )}
-                </select>
-                <span className="mt-1 block text-xs">
-                  <Link href="/profile/pairs" className="text-accent2 hover:underline">Edit pairs</Link>
-                </span>
               </Section>
             </div>
 
@@ -998,9 +974,6 @@ function StrategyView({
         <div>
           <h1 className="text-2xl">{draft.name || "Untitled"}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            {draft.pair && (
-              <span className="rounded bg-accent-soft px-1.5 py-0.5 font-mono text-xs text-accent2">{draft.pair}</span>
-            )}
             {draft.plan_type && <span className="text-muted">{draft.plan_type}</span>}
           </div>
         </div>
