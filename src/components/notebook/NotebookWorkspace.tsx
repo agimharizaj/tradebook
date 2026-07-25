@@ -7,6 +7,23 @@ import BlockEditor from "./BlockEditor";
 type NoteRow = { id: string; title: string; updated_at: string; pinned: boolean };
 type Note = { id: string; title: string; content: string; pinned: boolean };
 
+// A note the user never actually wrote in: default/blank title and no
+// block with any text. These are silently discarded instead of saved.
+function isEmptyNote(n: Note) {
+  const t = n.title.trim();
+  if (t && t !== "Untitled") return false;
+  if (!n.content.trim()) return true;
+  try {
+    const j = JSON.parse(n.content);
+    if (j && Array.isArray(j.blocks)) {
+      return j.blocks.every((b: { text?: string }) => !(b.text ?? "").trim());
+    }
+  } catch {
+    return !n.content.trim();
+  }
+  return false;
+}
+
 export default function NotebookWorkspace() {
   const supabase = createClient();
   const [list, setList] = useState<NoteRow[]>([]);
@@ -28,7 +45,32 @@ export default function NotebookWorkspace() {
     loadList();
   }, [loadList]);
 
+  // Delete the given note if the user never wrote in it.
+  const discardIfEmpty = useCallback(
+    async (n: Note | null) => {
+      if (!n || !isEmptyNote(n)) return;
+      await supabase.from("notes").delete().eq("id", n.id);
+      setList((ls) => ls.filter((x) => x.id !== n.id));
+    },
+    [supabase]
+  );
+
+  // Also discard an untouched note when leaving the page entirely.
+  const noteRef = useRef<Note | null>(null);
+  useEffect(() => {
+    noteRef.current = note;
+  }, [note]);
+  useEffect(() => {
+    return () => {
+      const n = noteRef.current;
+      if (n && isEmptyNote(n)) {
+        createClient().from("notes").delete().eq("id", n.id).then(() => {});
+      }
+    };
+  }, []);
+
   async function openNote(id: string) {
+    if (note && note.id !== id) discardIfEmpty(note);
     const { data } = await supabase.from("notes").select("*").eq("id", id).single();
     if (!data) return;
     dirty.current = false;
@@ -37,6 +79,9 @@ export default function NotebookWorkspace() {
   }
 
   async function newNote() {
+    // Reuse the current note if it is still untouched instead of stacking
+    // empty "Untitled" rows.
+    if (note && isEmptyNote(note)) return;
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) {
       setStatus("Not signed in.");
