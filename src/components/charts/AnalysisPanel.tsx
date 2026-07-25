@@ -39,6 +39,9 @@ export default function AnalysisPanel({
   const [viewing, setViewing] = useState<Analysis | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [sentToNotebook, setSentToNotebook] = useState(false);
+  const [sendPicker, setSendPicker] = useState(false);
+  const [noteQuery, setNoteQuery] = useState("");
+  const [recentNotes, setRecentNotes] = useState<{ id: string; title: string; updated_at: string }[]>([]);
 
   const [symbol, setSymbol] = useState(defaultSymbol);
   const [timeframe, setTimeframe] = useState(defaultTimeframe ?? "1H");
@@ -157,22 +160,35 @@ export default function AnalysisPanel({
     load();
   }
 
-  // Copy an analysis into the Notebook as a note: heading, bias, notes and
-  // the screenshot (as an img block resolving the same storage path).
-  async function sendToNotebook(a: Analysis) {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) {
-      setErr("Not signed in.");
-      return;
-    }
-    const blocks = [
+  // Blocks representing an analysis inside a note: heading, bias, notes and
+  // the screenshot (an img block resolving the same storage path).
+  function analysisBlocks(a: Analysis) {
+    return [
       { id: uid(), type: "h", text: `${a.symbol}${a.timeframe ? ` ${a.timeframe}` : ""} analysis` },
       ...(a.direction ? [{ id: uid(), type: "text", text: `Bias: ${a.direction}` }] : []),
       ...(a.notes ? [{ id: uid(), type: "text", text: a.notes }] : []),
       ...(a.image_path ? [{ id: uid(), type: "img", text: a.image_path }] : []),
     ];
+  }
+
+  async function loadRecentNotes() {
+    const { data } = await supabase
+      .from("notes")
+      .select("id, title, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(50);
+    setRecentNotes((data as { id: string; title: string; updated_at: string }[]) ?? []);
+  }
+
+  // Create a brand new note from the analysis.
+  async function sendToNewNote(a: Analysis) {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) {
+      setErr("Not signed in.");
+      return;
+    }
     const title = `${a.symbol} analysis ${new Date(a.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`;
-    const row = { user_id: u.user.id, title, content: JSON.stringify({ blocks }) };
+    const row = { user_id: u.user.id, title, content: JSON.stringify({ blocks: analysisBlocks(a) }) };
     // Try tagging the note with the pair; retry untagged if migration 0006
     // has not run yet.
     let { error } = await supabase.from("notes").insert({ ...row, pair: a.symbol });
@@ -183,6 +199,39 @@ export default function AnalysisPanel({
       setErr(`Could not save note: ${error.message}`);
       return;
     }
+    setSendPicker(false);
+    setSentToNotebook(true);
+  }
+
+  // Append the analysis to an existing note. The note is re-read immediately
+  // before writing so a stale copy never clobbers newer edits.
+  async function appendToNote(a: Analysis, noteId: string) {
+    const { data: n, error: readErr } = await supabase
+      .from("notes")
+      .select("content")
+      .eq("id", noteId)
+      .single();
+    if (readErr || !n) {
+      setErr("Could not open that note.");
+      return;
+    }
+    let blocks: { id: string; type: string; text: string }[] = [];
+    try {
+      const j = JSON.parse(n.content ?? "");
+      if (j && Array.isArray(j.blocks)) blocks = j.blocks;
+      else if (n.content) blocks = [{ id: uid(), type: "text", text: String(n.content) }];
+    } catch {
+      if (n.content) blocks = [{ id: uid(), type: "text", text: n.content }];
+    }
+    const { error } = await supabase
+      .from("notes")
+      .update({ content: JSON.stringify({ blocks: [...blocks, ...analysisBlocks(a)] }) })
+      .eq("id", noteId);
+    if (error) {
+      setErr(`Could not update note: ${error.message}`);
+      return;
+    }
+    setSendPicker(false);
     setSentToNotebook(true);
   }
 
@@ -285,8 +334,8 @@ export default function AnalysisPanel({
               key={a.id}
               role="button"
               tabIndex={0}
-              onClick={() => { setViewing(a); setSentToNotebook(false); }}
-              onKeyDown={(e) => { if (e.key === "Enter") { setViewing(a); setSentToNotebook(false); } }}
+              onClick={() => { setViewing(a); setSentToNotebook(false); setSendPicker(false); setNoteQuery(""); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { setViewing(a); setSentToNotebook(false); setSendPicker(false); setNoteQuery(""); } }}
               className="cursor-pointer rounded-xl border border-border p-3 transition hover:border-accent"
             >
               <div className="flex items-center justify-between">
@@ -371,7 +420,13 @@ export default function AnalysisPanel({
                   </button>
                 )}
                 <button
-                  onClick={() => sendToNotebook(viewing)}
+                  onClick={() => {
+                    if (sentToNotebook) return;
+                    setSendPicker((v) => {
+                      if (!v) loadRecentNotes();
+                      return !v;
+                    });
+                  }}
                   disabled={sentToNotebook}
                   className="rounded-md border border-border2 px-2.5 py-1 text-xs font-medium text-muted transition hover:border-accent hover:text-foreground disabled:opacity-60"
                 >
@@ -385,6 +440,38 @@ export default function AnalysisPanel({
                 <button onClick={() => setViewing(null)} className="rounded-md p-1.5 text-muted hover:text-foreground" aria-label="Close viewer">✕</button>
               </div>
             </div>
+            {sendPicker && !sentToNotebook && (
+              <div className="mb-3 rounded-xl border border-border2 bg-surface2/50 p-3">
+                <input
+                  value={noteQuery}
+                  onChange={(e) => setNoteQuery(e.target.value)}
+                  placeholder="Search notes..."
+                  className="jfield mb-2"
+                />
+                <div className="max-h-44 space-y-1 overflow-y-auto">
+                  <button
+                    onClick={() => sendToNewNote(viewing)}
+                    className="block w-full rounded-md px-2.5 py-2 text-left text-sm font-medium text-accent2 transition hover:bg-surface2"
+                  >
+                    + New note
+                  </button>
+                  {recentNotes
+                    .filter((n) => !noteQuery.trim() || (n.title || "Untitled").toLowerCase().includes(noteQuery.toLowerCase()))
+                    .map((n) => (
+                      <button
+                        key={n.id}
+                        onClick={() => appendToNote(viewing, n.id)}
+                        className="flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-sm text-foreground transition hover:bg-surface2"
+                      >
+                        <span className="truncate">{n.title || "Untitled"}</span>
+                        <span className="shrink-0 text-xs text-dim">
+                          {new Date(n.updated_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
             {viewing.notes && <p className="mb-3 whitespace-pre-wrap text-sm text-muted">{viewing.notes}</p>}
             {urls[viewing.id] ? (
               // eslint-disable-next-line @next/next/no-img-element
