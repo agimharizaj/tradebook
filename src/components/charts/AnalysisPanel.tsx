@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { usePairs } from "@/lib/usePairs";
 
 type Analysis = {
   id: string;
@@ -28,6 +29,7 @@ export default function AnalysisPanel({
   onLoadSymbol?: (symbol: string) => void;
 }) {
   const supabase = createClient();
+  const watchlist = usePairs();
   const [items, setItems] = useState<Analysis[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [adding, setAdding] = useState(false);
@@ -229,7 +231,12 @@ export default function AnalysisPanel({
         {adding && (
           <div className="mb-5 space-y-3 rounded-xl border border-border p-4">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Symbol"><input value={symbol} onChange={(e) => setSymbol(e.target.value)} className="jfield" /></Field>
+              <Field label="Symbol">
+                <input value={symbol} onChange={(e) => setSymbol(e.target.value)} list="analysis-pairs" className="jfield" />
+                <datalist id="analysis-pairs">
+                  {watchlist.map((p) => (<option key={p} value={p} />))}
+                </datalist>
+              </Field>
               <Field label="Timeframe"><input value={timeframe} onChange={(e) => setTimeframe(e.target.value)} placeholder="1H, 15m..." className="jfield" /></Field>
               <Field label="Bias">
                 <select value={direction} onChange={(e) => setDirection(e.target.value)} className="jfield">

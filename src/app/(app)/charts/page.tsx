@@ -1,23 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import TradingViewChart from "@/components/charts/TradingViewChart";
 import AnalysisPanel from "@/components/charts/AnalysisPanel";
 import RiskWidget from "@/components/charts/RiskWidget";
-
-const PAIRS: { label: string; tv: string }[] = [
-  { label: "EUR/USD", tv: "FX:EURUSD" },
-  { label: "GBP/USD", tv: "FX:GBPUSD" },
-  { label: "AUD/USD", tv: "FX:AUDUSD" },
-  { label: "USD/JPY", tv: "FX:USDJPY" },
-  { label: "GBP/JPY", tv: "FX:GBPJPY" },
-  { label: "USD/CAD", tv: "FX:USDCAD" },
-  { label: "XAU/USD (Gold)", tv: "OANDA:XAUUSD" },
-  { label: "BTC/USD", tv: "COINBASE:BTCUSD" },
-  { label: "US30", tv: "OANDA:US30USD" },
-  { label: "NAS100", tv: "OANDA:NAS100USD" },
-];
+import { PAIR_CATALOG, tvSymbolFor } from "@/lib/pairs";
+import { usePairs } from "@/lib/usePairs";
 
 const STUDIES: { id: string; label: string }[] = [
   { id: "RSI@tv-basicstudies", label: "RSI" },
@@ -44,13 +34,24 @@ const TIMEFRAMES: { tv: string; label: string }[] = [
 ];
 
 export default function ChartsPage() {
-  const [tv, setTv] = useState(PAIRS[0].tv);
+  // User watchlist (Profile -> Trading pairs) mapped to TradingView symbols.
+  const watchlist = usePairs();
+  const pairs = watchlist
+    .map((label) => ({ label, tv: tvSymbolFor(label) }))
+    .filter((p): p is { label: string; tv: string } => !!p.tv);
+  const [tv, setTv] = useState("FX:EURUSD");
+
+  // If the saved watchlist loads without the current symbol, jump to its first.
+  useEffect(() => {
+    if (pairs.length && !pairs.some((p) => p.tv === tv)) setTv(pairs[0].tv);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchlist]);
   const [showLog, setShowLog] = useState(false);
   const [showRisk, setShowRisk] = useState(false);
   const [showInd, setShowInd] = useState(false);
   const [studies, setStudies] = useState<string[]>([]);
   const [tf, setTf] = useState("60");
-  const current = PAIRS.find((p) => p.tv === tv)?.label ?? tv;
+  const current = pairs.find((p) => p.tv === tv)?.label ?? tv;
   const tfLabel = TIMEFRAMES.find((t) => t.tv === tf)?.label ?? "1H";
 
   useEffect(() => {
@@ -80,10 +81,17 @@ export default function ChartsPage() {
           onChange={(e) => setTv(e.target.value)}
           className="shrink-0 rounded-lg border border-border2 bg-surface2 px-3 py-2 text-sm outline-none focus:border-accent"
         >
-          {PAIRS.map((p) => (
+          {pairs.map((p) => (
             <option key={p.tv} value={p.tv}>{p.label}</option>
           ))}
         </select>
+        <Link
+          href="/profile#pairs"
+          className="shrink-0 whitespace-nowrap text-xs text-accent2 hover:underline"
+          title="Add or remove pairs"
+        >
+          Edit pairs
+        </Link>
         <select
           value={tf}
           onChange={(e) => setTf(e.target.value)}
@@ -147,9 +155,11 @@ export default function ChartsPage() {
           defaultTimeframe={tfLabel}
           onClose={() => setShowLog(false)}
           onLoadSymbol={(symbol) => {
-            const m = PAIRS.find(
-              (p) => p.label === symbol || p.tv === symbol || p.label.startsWith(symbol)
-            );
+            // Search the full catalog so analyses for pairs no longer on the
+            // watchlist still load on the chart.
+            const m =
+              PAIR_CATALOG.find((p) => p.label === symbol || p.tv === symbol) ??
+              PAIR_CATALOG.find((p) => p.label.startsWith(symbol));
             if (m) setTv(m.tv);
           }}
         />

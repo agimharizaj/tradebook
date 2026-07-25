@@ -3,17 +3,25 @@
 // thin layer over these functions.
 
 export const CONTRACT_SIZE = 100_000;
-export const GOLD_CONTRACT = 100;
+export const GOLD_CONTRACT = 100; // troy oz per lot
+export const SILVER_CONTRACT = 5_000; // troy oz per lot (standard XAG lot)
+
+// Cryptos are sized by price distance directly: pip 1, contract 1, so "lots"
+// simply means coins. Works for any price level (BTC at 100k or XRP at 3).
+const CRYPTO = ["BTC", "ETH", "XRP", "SOL", "DOGE", "ADA", "LTC"];
+export const isCrypto = (pair: string) => CRYPTO.some((c) => pair.startsWith(c));
 
 export function pipSizeFor(pair: string) {
-  if (pair.startsWith("BTC")) return 1; // size BTC by price distance directly
+  if (isCrypto(pair)) return 1;
   if (pair.startsWith("XAU")) return 0.1;
+  if (pair.startsWith("XAG")) return 0.01;
   return pair.includes("JPY") ? 0.01 : 0.0001;
 }
 
 export function contractFor(pair: string) {
-  if (pair.startsWith("BTC")) return 1;
+  if (isCrypto(pair)) return 1;
   if (pair.startsWith("XAU")) return GOLD_CONTRACT;
+  if (pair.startsWith("XAG")) return SILVER_CONTRACT;
   return CONTRACT_SIZE;
 }
 

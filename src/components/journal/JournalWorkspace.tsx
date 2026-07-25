@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { moneySigned, sym } from "@/lib/format";
+import { usePairs } from "@/lib/usePairs";
 import ImportTradesModal from "./ImportTradesModal";
 
 type Trade = {
@@ -222,7 +224,7 @@ export default function JournalWorkspace() {
               <button
                 key={key}
                 onClick={() => setSelectedDay(key)}
-                className={`flex h-16 flex-col overflow-hidden rounded-lg border p-1.5 text-left transition hover:border-accent md:h-24 md:p-2 ${
+                className={`flex h-12 flex-col overflow-hidden rounded-md border p-1 text-left transition hover:border-accent md:h-24 md:rounded-lg md:p-2 ${
                   has
                     ? win
                       ? "border-success/40 bg-success/10"
@@ -368,6 +370,7 @@ function DayModal({
   onDelete: (id: string) => void;
 }) {
   const supabase = createClient();
+  const watchlist = usePairs();
   const [adding, setAdding] = useState(trades.length === 0);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [pair, setPair] = useState("");
@@ -485,7 +488,15 @@ function DayModal({
           <div className="space-y-3">
             {err && <p className="text-sm text-danger">{err}</p>}
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Pair"><input value={pair} onChange={(e) => setPair(e.target.value)} placeholder="EUR/USD" className="jfield" /></Field>
+              <Field label="Pair">
+                <input value={pair} onChange={(e) => setPair(e.target.value)} placeholder="EUR/USD" list="journal-pairs" className="jfield" />
+                <datalist id="journal-pairs">
+                  {watchlist.map((p) => (<option key={p} value={p} />))}
+                </datalist>
+                <span className="mt-0.5 block text-[11px]">
+                  <Link href="/profile#pairs" className="text-accent2 hover:underline">Edit pairs</Link>
+                </span>
+              </Field>
               <Field label="Direction">
                 <select value={direction} onChange={(e) => setDirection(e.target.value)} className="jfield">
                   <option value="long">Long</option>

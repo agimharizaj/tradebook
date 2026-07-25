@@ -10,12 +10,9 @@ import {
   riskFromLots,
 } from "@/lib/risk";
 
-const PAIRS = [
-  "EUR/USD", "GBP/USD", "AUD/USD", "NZD/USD",
-  "USD/JPY", "USD/CHF", "USD/CAD",
-  "EUR/JPY", "GBP/JPY", "AUD/JPY",
-  "EUR/GBP", "XAU/USD", "BTC/USD",
-];
+import Link from "next/link";
+import { isSizable } from "@/lib/pairs";
+import { usePairs } from "@/lib/usePairs";
 const CURRENCIES = [
   "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD",
   "SGD", "HKD", "SEK", "NOK", "DKK", "PLN", "ZAR", "AED",
@@ -31,7 +28,15 @@ const MODES: { id: Mode; label: string }[] = [
 export default function RiskPage() {
   const [mode, setMode] = useState<Mode>("size");
 
+  // Watchlist pairs that the risk engine can size (BASE/QUOTE instruments).
+  const sizablePairs = usePairs().filter(isSizable);
   const [pair, setPair] = useState("EUR/USD");
+
+  // If the saved watchlist loads without the current pair, switch to its first.
+  useEffect(() => {
+    if (sizablePairs.length && !sizablePairs.includes(pair)) setPair(sizablePairs[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sizablePairs.join("|")]);
   const [accountCurrency, setAccountCurrency] = useState("USD");
   const [accountSize, setAccountSize] = useState("10000");
   const [conversion, setConversion] = useState("1");
@@ -227,8 +232,11 @@ export default function RiskPage() {
         <div className="space-y-4 rounded-2xl bg-card p-6 ring-1 ring-border">
           <Field label="Pair">
             <select value={pair} onChange={(e) => setPair(e.target.value)} className="input">
-              {PAIRS.map((p) => (<option key={p}>{p}</option>))}
+              {sizablePairs.map((p) => (<option key={p}>{p}</option>))}
             </select>
+            <span className="mt-1 block text-xs">
+              <Link href="/profile#pairs" className="text-accent2 hover:underline">Edit pairs</Link>
+            </span>
             {livePrice != null ? (
               <span className="mt-1 flex items-center gap-2 text-xs text-dim">
                 Live ~{livePrice.toFixed(priceDecimals)}

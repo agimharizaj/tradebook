@@ -16,25 +16,37 @@ export async function GET(request: Request) {
     return NextResponse.json({ rate: 1, date: null });
   }
 
+  // Keyless CoinGecko ids for the cryptos in the pair catalog.
+  const CRYPTO_IDS: Record<string, string> = {
+    BTC: "bitcoin",
+    ETH: "ethereum",
+    XRP: "ripple",
+    SOL: "solana",
+    DOGE: "dogecoin",
+    ADA: "cardano",
+    LTC: "litecoin",
+  };
+
   try {
-    // Bitcoin (BTC): keyless spot price via CoinGecko.
-    if (from === "BTC") {
+    // Crypto: keyless spot price via CoinGecko.
+    if (CRYPTO_IDS[from]) {
+      const id = CRYPTO_IDS[from];
       const vs = to.toLowerCase();
       const r = await fetch(
-        `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${vs}`,
+        `https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=${vs}`,
         { next: { revalidate: 120 } }
       );
       if (r.ok) {
         const j = await r.json();
-        const price = j?.bitcoin?.[vs];
+        const price = j?.[id]?.[vs];
         if (typeof price === "number") return NextResponse.json({ rate: price, date: null });
       }
-      // Fallback: BTC in USD, then convert USD -> target.
+      // Fallback: price in USD, then convert USD -> target.
       const u = await fetch(
-        "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
+        `https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd`
       ).then((x) => x.json());
-      const usd = u?.bitcoin?.usd;
-      if (typeof usd !== "number") throw new Error("btc unavailable");
+      const usd = u?.[id]?.usd;
+      if (typeof usd !== "number") throw new Error("crypto unavailable");
       if (to === "USD") return NextResponse.json({ rate: usd, date: null });
       const c = await fetch(`https://api.frankfurter.app/latest?from=USD&to=${to}`).then((x) => x.json());
       const conv = c?.rates?.[to];
@@ -42,15 +54,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ rate: usd * conv, date: c.date ?? null });
     }
 
-    // Gold (XAU): Frankfurter has no metals, so use a keyless spot-gold source.
-    if (from === "XAU") {
-      const g = await fetch("https://api.gold-api.com/price/XAU", {
+    // Metals (XAU gold / XAG silver): Frankfurter has no metals, so use a
+    // keyless spot source.
+    if (from === "XAU" || from === "XAG") {
+      const g = await fetch(`https://api.gold-api.com/price/${from}`, {
         next: { revalidate: 300 },
       });
-      if (!g.ok) throw new Error("gold fetch failed");
+      if (!g.ok) throw new Error("metal fetch failed");
       const gj = await g.json();
       const usd = gj?.price;
-      if (typeof usd !== "number") throw new Error("gold unavailable");
+      if (typeof usd !== "number") throw new Error("metal unavailable");
       if (to === "USD") return NextResponse.json({ rate: usd, date: null });
       // Convert USD -> target via Frankfurter.
       const c = await fetch(`https://api.frankfurter.app/latest?from=USD&to=${to}`).then((r) => r.json());
