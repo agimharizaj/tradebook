@@ -7,7 +7,7 @@ export const NAV: NavItem[] = [
   { href: "/journal", label: "Journal", short: "Journal", icon: "M4 4h16v16H4zM4 9h16M9 4v16" },
   { href: "/notebook", label: "Notebook", short: "Notes", icon: "M15.5 3.5a2.12 2.12 0 0 1 3 3L8 17l-4 1 1-4z" },
   { href: "/news", label: "News", short: "News", icon: "M4 5h13v14H4zM7 8h7M7 12h7M7 16h5M17 8h3v9a2 2 0 0 1-2 2" },
-  { href: "/sanctuary", label: "Sanctuary", short: "Calm", icon: "M12 21C7 18 4 14 4 10a4 4 0 0 1 8-1 4 4 0 0 1 8 1c0 4-3 8-8 11z" },
+  { href: "/sanctuary", label: "Calm", short: "Calm", icon: "M12 21C7 18 4 14 4 10a4 4 0 0 1 8-1 4 4 0 0 1 8 1c0 4-3 8-8 11z" },
   { href: "/risk", label: "Risk", short: "Risk", icon: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 8v4M12 16h.01" },
 ];
 

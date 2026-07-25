@@ -92,7 +92,7 @@ export default function SanctuaryPage() {
 
   return (
     <div className="flex min-h-full flex-col items-center justify-center px-6 py-10 text-center">
-      <h1 className="text-2xl">Sanctuary</h1>
+      <h1 className="text-2xl">Calm</h1>
       <p className="mt-1 text-muted">A moment to reset before or after the session.</p>
 
       {!running && (
