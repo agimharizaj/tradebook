@@ -103,10 +103,14 @@ export default function ProfileForm({
   function onCountry(v: string) {
     const newDial = DIAL[v] ?? "";
     setForm((f) => {
-      // Replace the phone value only if it is empty or currently just a dial code.
-      const isBareCode = /^\+\d{1,4}\s*$/.test(f.phone.trim());
-      const replace = f.phone.trim() === "" || isBareCode;
-      return { ...f, country: v, phone: replace && newDial ? `${newDial} ` : f.phone };
+      if (!newDial) return { ...f, country: v };
+      // Swap the dial-code prefix in place, keeping the rest of the number:
+      // ""            -> "+44 "
+      // "+355 "       -> "+44 "
+      // "+355 692..." -> "+44 692..."
+      // "0779..."     -> "+44 0779..."
+      const rest = f.phone.trim().replace(/^\+\d{1,4}\s*/, "");
+      return { ...f, country: v, phone: rest ? `${newDial} ${rest}` : `${newDial} ` };
     });
   }
 
