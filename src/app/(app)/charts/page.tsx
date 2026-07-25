@@ -180,9 +180,6 @@ export default function ChartsPage() {
           </svg>
         </button>
         )}
-        <span className="hidden shrink-0 text-xs text-dim lg:inline">
-          Drawing tools (fib, long/short, trendlines) are in the left toolbar.
-        </span>
       </div>
 
       {showInd && (
