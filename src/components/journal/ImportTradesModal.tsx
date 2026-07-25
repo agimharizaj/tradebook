@@ -160,6 +160,10 @@ export default function ImportTradesModal({
       .map((r) => {
         const date = parseDate(col(r, "date") ?? "");
         if (!date) return null;
+        // Skip non-trade rows: FTMO/MT5 reports include cash adjustments,
+        // deposits and withdrawals under pseudo-symbols like "USCASH".
+        const rawSym = (col(r, "symbol") ?? "").trim();
+        if (/cash|deposit|withdraw|balance|credit/i.test(rawSym)) return null;
         const dir = (col(r, "direction") ?? "").toLowerCase();
         const profit = num(col(r, "pnl"));
         const commissions = num(col(r, "commissions")) ?? 0;
@@ -172,7 +176,8 @@ export default function ImportTradesModal({
           pnl: profit == null ? null : Math.round((profit + commissions + swap) * 100) / 100,
           commission: commissions || swap ? Math.round((commissions + swap) * 100) / 100 : null,
           entry_price: num(col(r, "entry")),
-          stop_price: num(col(r, "stop")),
+          // SL/TP of 0 means "no stop set" in MT5, not a stop at price zero.
+          stop_price: num(col(r, "stop")) || null,
           exit_price: num(col(r, "exit")),
           ext_id: (col(r, "ticket") ?? "").trim() || null,
         };
