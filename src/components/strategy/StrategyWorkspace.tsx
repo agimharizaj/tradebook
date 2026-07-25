@@ -419,6 +419,9 @@ export default function StrategyWorkspace() {
               <input
                 value={draft.name}
                 onChange={(e) => patch({ name: e.target.value })}
+                onFocus={(e) => {
+                  if (draft.name === "New strategy") e.target.select();
+                }}
                 placeholder="Strategy name"
                 className="w-full border-none bg-transparent text-2xl font-semibold outline-none placeholder:text-dim"
                 style={{ fontFamily: "var(--font-display)" }}

@@ -114,11 +114,7 @@ export default function ChartsPage() {
       {/* id used by AnalysisPanel to crop self-tab screen captures to the chart */}
       <div id="tv-chart-area" className="relative flex-1">
         <TradingViewChart symbol={tv} studies={studies} />
-        {showRisk && (
-          <div className="absolute right-3 top-3 z-10">
-            <RiskWidget pairLabel={current} onClose={() => setShowRisk(false)} />
-          </div>
-        )}
+        {showRisk && <RiskWidget pairLabel={current} onClose={() => setShowRisk(false)} />}
       </div>
 
       {showLog && (
