@@ -140,6 +140,41 @@ export default function BlockEditor({
     };
   }, [palDragging]);
 
+  // "+ Analysis" in the palette: pick a saved chart analysis and insert its
+  // blocks (heading, bias, notes, screenshot) into this note.
+  type AnalysisRow = {
+    id: string;
+    symbol: string;
+    timeframe: string | null;
+    direction: string | null;
+    notes: string | null;
+    image_path: string | null;
+    created_at: string;
+  };
+  const [showAnalyses, setShowAnalyses] = useState(false);
+  const [analyses, setAnalyses] = useState<AnalysisRow[]>([]);
+
+  async function openAnalyses() {
+    const { data } = await createClient()
+      .from("chart_analyses")
+      .select("id, symbol, timeframe, direction, notes, image_path, created_at")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    setAnalyses((data as AnalysisRow[]) ?? []);
+    setShowAnalyses(true);
+  }
+
+  function insertAnalysis(a: AnalysisRow) {
+    const add: Block[] = [
+      { id: uid(), type: "h", text: `${a.symbol}${a.timeframe ? ` ${a.timeframe}` : ""} analysis` },
+    ];
+    if (a.direction) add.push({ id: uid(), type: "text", text: `Bias: ${a.direction}` });
+    if (a.notes) add.push({ id: uid(), type: "text", text: a.notes });
+    if (a.image_path) add.push({ id: uid(), type: "img", text: a.image_path });
+    setBlocks((bs) => [...bs, ...add]);
+    setShowAnalyses(false);
+  }
+
   function startPalDrag(e: React.PointerEvent) {
     const el = palRef.current;
     if (!el) return;
@@ -355,6 +390,59 @@ export default function BlockEditor({
         );
       })}
 
+      {showAnalyses && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
+          onClick={() => setShowAnalyses(false)}
+        >
+          <div
+            className="max-h-[70dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-card p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] ring-1 ring-border2 sm:rounded-2xl sm:pb-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-medium" style={{ fontFamily: "var(--font-display)" }}>
+                Insert analysis
+              </h3>
+              <button
+                onClick={() => setShowAnalyses(false)}
+                className="rounded-md p-2 text-muted hover:text-foreground"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            {analyses.length === 0 ? (
+              <p className="text-sm text-dim">
+                No saved analyses yet. Save one from Charts, then insert it here.
+              </p>
+            ) : (
+              <div className="space-y-1">
+                {analyses.map((a) => (
+                  <button
+                    key={a.id}
+                    onClick={() => insertAnalysis(a)}
+                    className="flex w-full items-center justify-between gap-2 rounded-lg border border-border px-3 py-2.5 text-left transition hover:border-accent"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="truncate text-sm font-medium">{a.symbol}</span>
+                      {a.timeframe && <span className="shrink-0 text-xs text-dim">{a.timeframe}</span>}
+                      {a.direction && (
+                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${a.direction === "long" ? "bg-success/15 text-success" : a.direction === "short" ? "bg-danger/15 text-danger" : "bg-surface2 text-muted"}`}>
+                          {a.direction}
+                        </span>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-xs text-dim">
+                      {new Date(a.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {palFloating ? (
         /* Floating palette: drag anywhere by the ⋮⋮ handle, dock to put it back. */
         <div
@@ -380,6 +468,12 @@ export default function BlockEditor({
             </button>
           ))}
           <button
+            onClick={openAnalyses}
+            className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground"
+          >
+            + Analysis
+          </button>
+          <button
             onClick={() => setFloating(false)}
             className="ml-1 rounded-md px-2 py-1.5 text-xs text-dim transition hover:text-foreground"
             title="Dock the palette back under the note"
@@ -399,6 +493,12 @@ export default function BlockEditor({
               + {a.label}
             </button>
           ))}
+          <button
+            onClick={openAnalyses}
+            className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground"
+          >
+            + Analysis
+          </button>
           <button
             onClick={() => setFloating(true)}
             className="rounded-md px-2 py-1.5 text-xs text-dim transition hover:text-foreground"
