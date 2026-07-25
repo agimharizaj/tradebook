@@ -10,7 +10,9 @@ export default function MobileNav() {
   const pathname = usePathname();
   return (
     <div className="relative shrink-0 md:hidden">
-      <nav className="scrollbar-none flex overflow-x-auto border-t border-border bg-background pb-[env(safe-area-inset-bottom)]">
+      {/* Sit partway into the home-indicator zone like native tab bars do,
+          instead of reserving the full inset and floating high. */}
+      <nav className="scrollbar-none flex overflow-x-auto border-t border-border bg-background pb-[max(0px,calc(env(safe-area-inset-bottom)-12px))]">
         {ITEMS.map((item) => {
           const active = pathname.startsWith(item.href);
           return (
