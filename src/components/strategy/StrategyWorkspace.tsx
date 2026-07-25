@@ -793,12 +793,24 @@ function MoneyOrPct({
 // defaulting to the browser timezone. Stored as "08:00-17:00 Europe/London"
 // in the existing text column, so no migration is needed.
 function WindowPicker({ value, on }: { value: string; on: (v: string) => void }) {
-  const m = value.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*(\S.*)?$/);
   const browserTz =
     typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
-  const start = m?.[1] ?? "";
-  const end = m?.[2] ?? "";
-  const tz = m?.[3]?.trim() || browserTz;
+  // Local state, synced from the prop only when it changes externally
+  // (opening another strategy). Re-parsing our own emissions clobbered
+  // half-typed times, because a partial time input reads as "".
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [tz, setTz] = useState(browserTz);
+  const composed = useRef("");
+  useEffect(() => {
+    if (value === composed.current) return;
+    const m = value.match(/^(\d{1,2}:\d{2})?\s*-\s*(\d{1,2}:\d{2})?\s*(\S.*)?$/);
+    setStart(m?.[1] ?? "");
+    setEnd(m?.[2] ?? "");
+    setTz(m?.[3]?.trim() || browserTz);
+    composed.current = value;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
   const TZS = Array.from(
     new Set([
       browserTz,
@@ -813,7 +825,12 @@ function WindowPicker({ value, on }: { value: string; on: (v: string) => void })
     ])
   );
   const emit = (sv: string, ev: string, zv: string) => {
-    on(sv || ev ? `${sv}-${ev} ${zv}` : "");
+    setStart(sv);
+    setEnd(ev);
+    setTz(zv);
+    const v = sv || ev ? `${sv}-${ev} ${zv}` : "";
+    composed.current = v;
+    on(v);
   };
   return (
     <label className="block">
