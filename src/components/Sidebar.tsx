@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import LogoMark from "@/components/LogoMark";
+import ThemeToggle from "@/components/ThemeToggle";
 import { NAV, PROFILE } from "@/lib/nav";
 
 function Icon({ d }: { d: string }) {
@@ -64,6 +65,7 @@ export default function Sidebar({ email, name }: { email: string; name?: string 
           <Icon d={PROFILE.icon} />
           {!collapsed && <span className="truncate">{displayLabel}</span>}
         </Link>
+        <ThemeToggle collapsed={collapsed} />
         <div className={`mt-1 flex ${collapsed ? "flex-col items-center gap-1" : "items-center justify-between"}`}>
           <form action="/auth/signout" method="post" className={collapsed ? "" : "flex-1"}>
             <button

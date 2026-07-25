@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import TradingViewChart from "@/components/charts/TradingViewChart";
+import AnalysisPanel from "@/components/charts/AnalysisPanel";
 
 const PAIRS: { label: string; tv: string }[] = [
   { label: "EUR/USD", tv: "FX:EURUSD" },
@@ -18,6 +19,8 @@ const PAIRS: { label: string; tv: string }[] = [
 
 export default function ChartsPage() {
   const [tv, setTv] = useState(PAIRS[0].tv);
+  const [showLog, setShowLog] = useState(false);
+  const current = PAIRS.find((p) => p.tv === tv)?.label ?? tv;
 
   return (
     <div className="flex h-full flex-col">
@@ -32,13 +35,20 @@ export default function ChartsPage() {
             <option key={p.tv} value={p.tv}>{p.label}</option>
           ))}
         </select>
-        <span className="text-xs text-dim">
-          Full drawing tools. Placing trades from here is coming later.
+        <button
+          onClick={() => setShowLog(true)}
+          className="rounded-lg border border-border2 px-3 py-1.5 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground"
+        >
+          Analysis log
+        </button>
+        <span className="hidden text-xs text-dim sm:inline">
+          Drawing tools (fib, long/short, trendlines) are in the left toolbar.
         </span>
       </div>
       <div className="flex-1">
         <TradingViewChart symbol={tv} />
       </div>
+      {showLog && <AnalysisPanel defaultSymbol={current} onClose={() => setShowLog(false)} />}
     </div>
   );
 }

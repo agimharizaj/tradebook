@@ -144,6 +144,9 @@ export default function NotebookWorkspace() {
               <input
                 value={note.title}
                 onChange={(e) => edit({ title: e.target.value })}
+                onFocus={(e) => {
+                  if (note.title === "Untitled") e.target.select();
+                }}
                 placeholder="Note title"
                 className="flex-1 border-none bg-transparent text-2xl font-semibold outline-none placeholder:text-dim"
                 style={{ fontFamily: "var(--font-display)" }}

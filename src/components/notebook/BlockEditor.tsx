@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type BlockType = "text" | "h" | "todo" | "bullet" | "number" | "sticky";
+type BlockType = "text" | "h" | "todo" | "bullet" | "number" | "sticky" | "date";
 type Block = { id: string; type: BlockType; text: string; checked?: boolean };
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -25,6 +25,7 @@ const ADD: { type: BlockType; label: string }[] = [
   { type: "bullet", label: "Bullet" },
   { type: "number", label: "Numbered" },
   { type: "sticky", label: "Sticky" },
+  { type: "date", label: "Date" },
 ];
 
 export default function BlockEditor({
@@ -150,28 +151,37 @@ export default function BlockEditor({
               <span className="mt-1.5 shrink-0 font-mono text-sm text-muted">{num}.</span>
             )}
 
-            <textarea
-              ref={(el) => {
-                refs.current[b.id] = el;
-                grow(el);
-              }}
-              rows={1}
-              value={b.text}
-              onChange={(e) => {
-                update(b.id, { text: e.target.value });
-                grow(e.target);
-              }}
-              onKeyDown={(e) => onKeyDown(e, b)}
-              placeholder={b.type === "h" ? "Heading" : isSticky ? "Sticky note" : "Type here..."}
-              className={`w-full resize-none border-none bg-transparent outline-none placeholder:text-dim ${
-                b.type === "h"
-                  ? "text-xl font-semibold"
-                  : b.type === "todo" && b.checked
-                    ? "text-muted line-through"
-                    : "text-[15px]"
-              } leading-relaxed`}
-              style={b.type === "h" ? { fontFamily: "var(--font-display)" } : undefined}
-            />
+            {b.type === "date" ? (
+              <input
+                type="date"
+                value={b.text}
+                onChange={(e) => update(b.id, { text: e.target.value })}
+                className="mt-0.5 rounded-md border border-border2 bg-surface2 px-2 py-1 text-sm text-foreground outline-none"
+              />
+            ) : (
+              <textarea
+                ref={(el) => {
+                  refs.current[b.id] = el;
+                  grow(el);
+                }}
+                rows={1}
+                value={b.text}
+                onChange={(e) => {
+                  update(b.id, { text: e.target.value });
+                  grow(e.target);
+                }}
+                onKeyDown={(e) => onKeyDown(e, b)}
+                placeholder={b.type === "h" ? "Heading" : isSticky ? "Sticky note" : "Type here..."}
+                className={`w-full resize-none border-none bg-transparent outline-none placeholder:text-dim ${
+                  b.type === "h"
+                    ? "text-xl font-semibold"
+                    : b.type === "todo" && b.checked
+                      ? "text-muted line-through"
+                      : "text-[15px]"
+                } leading-relaxed`}
+                style={b.type === "h" ? { fontFamily: "var(--font-display)" } : undefined}
+              />
+            )}
 
             <button
               onClick={() => remove(b.id)}

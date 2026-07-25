@@ -32,7 +32,15 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${inter.variable} ${grotesk.variable} ${jbmono.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var t=localStorage.getItem('tb_theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){document.documentElement.dataset.theme='dark';}})();",
+          }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

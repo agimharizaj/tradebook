@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Combobox from "@/components/Combobox";
+import ThemeToggle from "@/components/ThemeToggle";
 
 type Meta = Record<string, unknown>;
 const str = (m: Meta, k: string) => (typeof m[k] === "string" ? (m[k] as string) : "");
@@ -173,6 +174,13 @@ export default function ProfileForm({
             </div>
           </div>
         </div>
+
+        <Section title="Appearance">
+          <div className="w-fit rounded-lg border border-border2">
+            <ThemeToggle />
+          </div>
+          <p className="mt-2 text-xs text-dim">Tap to cycle System, Light, and Dark.</p>
+        </Section>
 
         <Section title="Personal details">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
