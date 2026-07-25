@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { moneySigned, sym } from "@/lib/format";
 
 // Short date for chart axes: "21 Jul" (with year only if not this year).
@@ -39,19 +39,41 @@ export function EquityCurve({
   const color = up ? "var(--success)" : "var(--danger)";
   const mid = dates.length > 2 ? dates[Math.floor(dates.length / 2)] : null;
 
-  function onMove(e: React.PointerEvent<HTMLDivElement>) {
+  // Mouse hovers; touch scrubs while pressed and dismisses on release, so
+  // the chart never traps vertical page scrolling (touch-pan-y).
+  const touching = useRef(false);
+  function update(e: React.PointerEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
     const frac = (e.clientX - rect.left) / rect.width;
     const i = Math.min(values.length - 1, Math.max(0, Math.round(frac * (values.length - 1))));
     setHover(i);
   }
+  function onDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== "mouse") {
+      touching.current = true;
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    }
+    update(e);
+  }
+  function onMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType === "mouse" || touching.current) update(e);
+  }
+  function onEnd() {
+    touching.current = false;
+    setHover(null);
+  }
 
   return (
     <div>
       <div
-        className="relative"
+        className="relative touch-pan-y select-none"
+        onPointerDown={onDown}
         onPointerMove={onMove}
-        onPointerLeave={() => setHover(null)}
+        onPointerUp={onEnd}
+        onPointerCancel={onEnd}
+        onPointerLeave={(e) => {
+          if (e.pointerType === "mouse") setHover(null);
+        }}
       >
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height: 180 }}>
           <line x1={pad} x2={W - pad} y1={y(baseline)} y2={y(baseline)} stroke="var(--border2)" strokeDasharray="4 4" />
@@ -101,19 +123,39 @@ export function DailyBars({ days, cur }: { days: [string, number][]; cur: string
   const bw = (W - 2 * pad) / days.length;
   const midDay = days.length > 2 ? days[Math.floor(days.length / 2)][0] : null;
 
-  function onMove(e: React.PointerEvent<HTMLDivElement>) {
+  const touching = useRef(false);
+  function update(e: React.PointerEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
     const vx = ((e.clientX - rect.left) / rect.width) * W;
     const i = Math.min(days.length - 1, Math.max(0, Math.floor((vx - pad) / bw)));
     setHover(i);
   }
+  function onDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== "mouse") {
+      touching.current = true;
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    }
+    update(e);
+  }
+  function onMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType === "mouse" || touching.current) update(e);
+  }
+  function onEnd() {
+    touching.current = false;
+    setHover(null);
+  }
 
   return (
     <div>
       <div
-        className="relative"
+        className="relative touch-pan-y select-none"
+        onPointerDown={onDown}
         onPointerMove={onMove}
-        onPointerLeave={() => setHover(null)}
+        onPointerUp={onEnd}
+        onPointerCancel={onEnd}
+        onPointerLeave={(e) => {
+          if (e.pointerType === "mouse") setHover(null);
+        }}
       >
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height: 150 }}>
           <line x1={pad} x2={W - pad} y1={mid} y2={mid} stroke="var(--border2)" />
