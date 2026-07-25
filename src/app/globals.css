@@ -73,6 +73,19 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  /* Stop pull gestures from rubber-banding the app shell (tab bar drifting
+     up with dead space beneath it). Content scrolls inside <main>. */
+  overscroll-behavior-y: none;
+}
+
+/* Installed PWA: pin the shell completely, like a native app. All pages
+   scroll internally, so the document itself never needs to move. */
+@media (display-mode: standalone) {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
 }
 
 h1,
