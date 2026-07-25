@@ -90,7 +90,7 @@ export default function StrategyWorkspace() {
   // Unsaved-edit guard: clicking another plan (or +New) with unsaved changes
   // prompts to save or discard instead of silently dropping the draft.
   const dirtyEdit = useRef(false);
-  const [pendingNav, setPendingNav] = useState<{ kind: "open"; id: string } | { kind: "new" } | null>(null);
+  const [pendingNav, setPendingNav] = useState<{ kind: "open"; id: string } | { kind: "new" } | { kind: "close" } | null>(null);
 
   const loadList = useCallback(async () => {
     const { data } = await supabase
@@ -475,7 +475,7 @@ export default function StrategyWorkspace() {
         )}
       </aside>
 
-      <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
+      <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">
         <div className="mb-4 flex gap-2 overflow-x-auto pb-1 md:hidden">
           <button
             onClick={newStrategy}
@@ -497,6 +497,22 @@ export default function StrategyWorkspace() {
             </button>
           ))}
         </div>
+        {draft && (
+          <button
+            onClick={() => {
+              if (mode === "edit" && dirtyEdit.current) {
+                setPendingNav({ kind: "close" });
+                return;
+              }
+              dirtyEdit.current = false;
+              setDraft(null);
+            }}
+            className="mb-2 inline-flex items-center gap-1 text-sm text-accent2 md:hidden"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+            Plans
+          </button>
+        )}
         {!draft ? (
           <div className="mx-auto max-w-2xl pt-4 md:pt-16 md:text-center">
             <h1 className="text-2xl">Strategy</h1>
@@ -744,7 +760,8 @@ export default function StrategyWorkspace() {
                   setPendingNav(null);
                   dirtyEdit.current = false;
                   if (nav.kind === "open") openStrategy(nav.id);
-                  else newStrategy();
+                  else if (nav.kind === "new") newStrategy();
+                  else setDraft(null);
                 }}
                 className="rounded-lg border border-border2 px-4 py-2 text-sm text-danger transition hover:border-danger"
               >
@@ -757,7 +774,8 @@ export default function StrategyWorkspace() {
                   const ok = await save();
                   if (!ok) return;
                   if (nav.kind === "open") openStrategy(nav.id);
-                  else newStrategy();
+                  else if (nav.kind === "new") newStrategy();
+                  else setDraft(null);
                 }}
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
               >

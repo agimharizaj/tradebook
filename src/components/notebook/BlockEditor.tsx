@@ -189,23 +189,10 @@ export default function BlockEditor({
   // file picker on desktop) into the entry-models bucket, or embed by URL.
   // Both become img blocks; StorageImage renders either form.
   const fileRef = useRef<HTMLInputElement>(null);
-  const [showImgAdd, setShowImgAdd] = useState(false);
-  const [imgUrl, setImgUrl] = useState("");
   const [imgBusy, setImgBusy] = useState(false);
   const [imgErr, setImgErr] = useState<string | null>(null);
 
-  function addImgBlock(src: string) {
-    snapshot();
-    setBlocks((bs) => [...bs, { id: uid(), type: "img", text: src }]);
-    setShowImgAdd(false);
-    setImgUrl("");
-    setImgErr(null);
-  }
-
-  async function uploadImage(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
+  async function uploadFile(file: File) {
     setImgBusy(true);
     setImgErr(null);
     const c = createClient();
@@ -215,23 +202,33 @@ export default function BlockEditor({
       setImgBusy(false);
       return;
     }
-    const path = `${u.user.id}/note-${uid()}-${file.name.replace(/[^\w.\-]/g, "_")}`;
+    const name = file.name || "pasted.png";
+    const path = `${u.user.id}/note-${uid()}-${name.replace(/[^\w.\-]/g, "_")}`;
     const { error } = await c.storage.from("entry-models").upload(path, file);
     setImgBusy(false);
     if (error) {
       setImgErr(`Upload failed: ${error.message}`);
       return;
     }
-    addImgBlock(path);
+    snapshot();
+    setBlocks((bs) => [...bs, { id: uid(), type: "img", text: path }]);
   }
 
-  function addImgFromUrl() {
-    const u = imgUrl.trim();
-    if (!/^https?:\/\/\S+$/.test(u)) {
-      setImgErr("Enter a full image URL (https://...).");
-      return;
-    }
-    addImgBlock(u);
+  function uploadImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) uploadFile(file);
+  }
+
+  // Pasting a screenshot anywhere in the note (long-press paste on mobile,
+  // Cmd+V on desktop) uploads it and appends an image block.
+  function onPaste(e: React.ClipboardEvent) {
+    const item = Array.from(e.clipboardData?.items ?? []).find((i) => i.type.startsWith("image/"));
+    if (!item) return;
+    const file = item.getAsFile();
+    if (!file) return;
+    e.preventDefault();
+    uploadFile(file);
   }
 
   const EMOJIS = ["✅","❌","⚠️","🔥","📈","📉","💰","🎯","🧠","😤","😌","🚀","🐂","🐻","💡","⭐","❗","⏰","📌","👀","💪","🤝"];
@@ -404,7 +401,7 @@ export default function BlockEditor({
   let numCount = 0;
 
   return (
-    <div className="space-y-1" onKeyDown={onHistoryKeys}>
+    <div className="space-y-1" onKeyDown={onHistoryKeys} onPaste={onPaste}>
       {blocks.map((b) => {
         const num = b.type === "number" ? ++numCount : (numCount = 0);
         const isSticky = b.type === "sticky";
@@ -572,35 +569,8 @@ export default function BlockEditor({
         </div>
       )}
 
-      {showImgAdd && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border2 bg-surface2/60 p-2">
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={imgBusy}
-            className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground disabled:opacity-50"
-          >
-            {imgBusy ? "Uploading..." : "Upload from device"}
-          </button>
-          <span className="text-xs text-dim">or</span>
-          <input
-            value={imgUrl}
-            onChange={(e) => setImgUrl(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                addImgFromUrl();
-              }
-            }}
-            placeholder="Paste image URL..."
-            className="jfield min-w-0 flex-1 basis-40"
-          />
-          <button onClick={addImgFromUrl} className="rounded-md bg-accent px-2.5 py-1.5 text-xs font-medium text-white">
-            Add
-          </button>
-          {imgErr && <span className="w-full text-xs text-danger">{imgErr}</span>}
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={uploadImage} />
-        </div>
-      )}
+      {imgErr && <p className="text-xs text-danger">{imgErr}</p>}
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={uploadImage} />
 
       {showEmoji && (
         <div className="flex flex-wrap gap-1 rounded-xl border border-border2 bg-surface2/60 p-2">
@@ -644,11 +614,11 @@ export default function BlockEditor({
             </button>
           ))}
           <button
-            onClick={() => { setShowImgAdd((v) => !v); setImgErr(null); }}
-            aria-pressed={showImgAdd}
-            className={`rounded-md border px-2.5 py-1.5 text-xs transition ${showImgAdd ? "border-accent bg-accent-soft" : "border-border2 text-muted hover:border-accent"}`}
+            onClick={() => fileRef.current?.click()}
+            disabled={imgBusy}
+            className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground disabled:opacity-50"
           >
-            + Image
+            {imgBusy ? "Uploading..." : "+ Image"}
           </button>
           <button
             onClick={openAnalyses}
@@ -685,11 +655,11 @@ export default function BlockEditor({
             </button>
           ))}
           <button
-            onClick={() => { setShowImgAdd((v) => !v); setImgErr(null); }}
-            aria-pressed={showImgAdd}
-            className={`rounded-md border px-2.5 py-1.5 text-xs transition ${showImgAdd ? "border-accent bg-accent-soft" : "border-border2 text-muted hover:border-accent"}`}
+            onClick={() => fileRef.current?.click()}
+            disabled={imgBusy}
+            className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground disabled:opacity-50"
           >
-            + Image
+            {imgBusy ? "Uploading..." : "+ Image"}
           </button>
           <button
             onClick={openAnalyses}
