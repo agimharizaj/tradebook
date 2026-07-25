@@ -6,9 +6,16 @@ type TVWindow = {
   TradingView?: { widget: new (opts: Record<string, unknown>) => unknown };
 };
 
-export default function TradingViewChart({ symbol }: { symbol: string }) {
+export default function TradingViewChart({
+  symbol,
+  studies = [],
+}: {
+  symbol: string;
+  studies?: string[];
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const studiesKey = JSON.stringify(studies);
 
   useEffect(() => {
     const read = () =>
@@ -40,6 +47,7 @@ export default function TradingViewChart({ symbol }: { symbol: string }) {
         allow_symbol_change: true,
         withdateranges: true,
         details: false,
+        studies: JSON.parse(studiesKey) as string[],
         backgroundColor: theme === "dark" ? "#161A23" : "#ffffff",
       });
     };
@@ -54,7 +62,7 @@ export default function TradingViewChart({ symbol }: { symbol: string }) {
       script.onload = create;
       document.body.appendChild(script);
     }
-  }, [symbol, theme]);
+  }, [symbol, theme, studiesKey]);
 
   return <div id="tv_chart" ref={ref} className="h-full w-full" />;
 }
