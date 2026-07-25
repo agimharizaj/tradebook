@@ -994,18 +994,18 @@ function OrderedList({
               <button
                 onClick={() => onReorder(idx, idx - 1)}
                 disabled={idx === 0}
-                className="px-2 py-0.5 text-xs text-dim disabled:opacity-30"
+                className="px-2 py-0.5 text-dim disabled:opacity-30"
                 aria-label="Move up"
               >
-                ▲
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6" /></svg>
               </button>
               <button
                 onClick={() => onReorder(idx, idx + 1)}
                 disabled={idx === items.length - 1}
-                className="px-2 py-0.5 text-xs text-dim disabled:opacity-30"
+                className="px-2 py-0.5 text-dim disabled:opacity-30"
                 aria-label="Move down"
               >
-                ▼
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
               </button>
             </span>
             {numbered && (

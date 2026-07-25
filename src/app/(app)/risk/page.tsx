@@ -20,9 +20,9 @@ const CURRENCIES = [
 
 type Mode = "size" | "stop" | "risk";
 const MODES: { id: Mode; label: string }[] = [
-  { id: "size", label: "Risk → lot size" },
-  { id: "stop", label: "Lot size → stop" },
-  { id: "risk", label: "Lot size + stop → risk" },
+  { id: "size", label: "Risk › lot size" },
+  { id: "stop", label: "Lot size › stop" },
+  { id: "risk", label: "Lot size + stop › risk" },
 ];
 
 export default function RiskPage() {

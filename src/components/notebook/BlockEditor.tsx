@@ -245,17 +245,17 @@ export default function BlockEditor({
             <span className="flex shrink-0 flex-col md:hidden">
               <button
                 onClick={() => moveBy(b.id, -1)}
-                className="px-1.5 py-0.5 text-[10px] text-dim"
+                className="px-1.5 py-0.5 text-dim"
                 aria-label="Move block up"
               >
-                ▲
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6" /></svg>
               </button>
               <button
                 onClick={() => moveBy(b.id, 1)}
-                className="px-1.5 py-0.5 text-[10px] text-dim"
+                className="px-1.5 py-0.5 text-dim"
                 aria-label="Move block down"
               >
-                ▼
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
               </button>
             </span>
 
@@ -378,7 +378,7 @@ export default function BlockEditor({
             className="rounded-md px-2 py-1.5 text-xs text-dim transition hover:text-foreground"
             title="Float this palette so you can drag it anywhere"
           >
-            ⤢ Float
+            Float
           </button>
         </div>
       )}

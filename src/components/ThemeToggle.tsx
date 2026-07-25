@@ -16,6 +16,9 @@ export default function ThemeToggle({ collapsed = false }: { collapsed?: boolean
   useEffect(() => {
     const stored = (localStorage.getItem("tb_theme") as Theme) || "system";
     setTheme(stored);
+    // Apply the saved theme on load. Without this the label said "Light"
+    // while the page stayed dark until the button was clicked.
+    resolve(stored);
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
       if ((localStorage.getItem("tb_theme") as Theme) === "system") resolve("system");

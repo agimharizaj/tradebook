@@ -195,11 +195,11 @@ export default function JournalWorkspace() {
       <div className="rounded-2xl bg-card p-2.5 ring-1 ring-border md:p-5">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => shift(-1)} className="rounded-md border border-border2 px-3 py-2 text-sm text-muted hover:text-foreground">‹</button>
+            <button onClick={() => shift(-1)} className="rounded-md border border-border2 px-3 py-2 text-sm text-muted hover:text-foreground" aria-label="Previous month"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg></button>
             <span className="text-lg font-medium" style={{ fontFamily: "var(--font-display)" }}>
               {MONTHS[cursor.m]} {cursor.y}
             </span>
-            <button onClick={() => shift(1)} className="rounded-md border border-border2 px-3 py-2 text-sm text-muted hover:text-foreground">›</button>
+            <button onClick={() => shift(1)} className="rounded-md border border-border2 px-3 py-2 text-sm text-muted hover:text-foreground" aria-label="Next month"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg></button>
           </div>
           <button
             onClick={() => setCursor({ y: now.getFullYear(), m: now.getMonth() })}

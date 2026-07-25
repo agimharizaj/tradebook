@@ -7,9 +7,9 @@ import { moneySigned } from "@/lib/format";
 
 type Mode = "size" | "stop" | "risk";
 const MODES: { id: Mode; label: string }[] = [
-  { id: "size", label: "Risk → lot size" },
-  { id: "stop", label: "Lot size → stop" },
-  { id: "risk", label: "Lot size + stop → risk" },
+  { id: "size", label: "Risk › lot size" },
+  { id: "stop", label: "Lot size › stop" },
+  { id: "risk", label: "Lot size + stop › risk" },
 ];
 
 export default function RiskWidget({
@@ -144,7 +144,7 @@ export default function RiskWidget({
         <div onPointerDown={startDrag} className="mb-2 flex cursor-move select-none items-center justify-between">
           <span className="text-xs font-medium uppercase tracking-wide text-muted">⋮⋮ Risk · {pair}</span>
           <div className="flex items-center gap-1">
-            <button onPointerDown={(e) => e.stopPropagation()} onClick={() => refresh(true)} className="rounded-md px-1.5 py-0.5 text-[10px] text-accent2 hover:underline" title="Refresh price">↻ price</button>
+            <button onPointerDown={(e) => e.stopPropagation()} onClick={() => refresh(true)} className="rounded-md px-1.5 py-0.5 text-[10px] text-accent2 hover:underline" title="Refresh price">refresh</button>
             <button onPointerDown={(e) => e.stopPropagation()} onClick={onClose} className="rounded-md p-1.5 text-dim hover:text-foreground" aria-label="Close">✕</button>
           </div>
         </div>
