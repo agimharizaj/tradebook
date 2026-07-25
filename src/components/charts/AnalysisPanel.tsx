@@ -51,6 +51,8 @@ export default function AnalysisPanel({
   const [preview, setPreview] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [alsoNote, setAlsoNote] = useState(false);
+  const [noteTarget, setNoteTarget] = useState<{ kind: "new" } | { kind: "note"; id: string; title: string }>({ kind: "new" });
+  const [info, setInfo] = useState<string | null>(null);
 
   function attach(f: File | null) {
     setFile(f);
@@ -163,15 +165,19 @@ export default function AnalysisPanel({
     attach(null);
     setAdding(false);
     load();
-    // "Also add to Notebook": open the just-saved analysis with the note
-    // chooser ready, so the next tap picks (or creates) the note.
+    // Destination was picked in the form: file the analysis immediately.
     if (alsoNote && inserted) {
+      const a = inserted as Analysis;
+      if (noteTarget.kind === "note") {
+        await appendToNote(a, noteTarget.id);
+        setInfo(`Saved and added to "${noteTarget.title || "Untitled"}".`);
+      } else {
+        await sendToNewNote(a);
+        setInfo("Saved and added to a new note.");
+      }
       setAlsoNote(false);
-      setViewing(inserted as Analysis);
-      setSentToNotebook(false);
+      setNoteTarget({ kind: "new" });
       setNoteQuery("");
-      setSendPicker(true);
-      loadRecentNotes();
     }
   }
 
@@ -269,13 +275,14 @@ export default function AnalysisPanel({
           <h2 className="text-lg" style={{ fontFamily: "var(--font-display)" }}>Analysis log</h2>
           <div className="flex items-center gap-2">
             {!adding && (
-              <button onClick={() => setAdding(true)} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white">+ Save analysis</button>
+              <button onClick={() => { setAdding(true); setInfo(null); }} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white">+ Save analysis</button>
             )}
             <button onClick={onClose} className="rounded-md p-2 text-muted hover:text-foreground" aria-label="Close">✕</button>
           </div>
         </div>
 
         {err && <p className="mb-3 text-sm text-danger">{err}</p>}
+        {info && !err && <p className="mb-3 text-sm text-success">{info}</p>}
 
         {adding && (
           <div className="mb-5 space-y-3 rounded-xl border border-border p-4">
@@ -339,16 +346,67 @@ export default function AnalysisPanel({
                 <input
                   type="checkbox"
                   checked={alsoNote}
-                  onChange={(e) => setAlsoNote(e.target.checked)}
+                  onChange={(e) => {
+                    setAlsoNote(e.target.checked);
+                    if (e.target.checked) loadRecentNotes();
+                  }}
                   className="h-4 w-4 accent-[var(--accent)]"
                 />
-                Also add to Notebook after saving
+                Add to Notebook
               </label>
               <span className="flex gap-2">
                 <button onClick={() => setAdding(false)} className="rounded-lg border border-border2 px-4 py-2 text-sm text-muted hover:text-foreground">Cancel</button>
                 <button onClick={save} disabled={saving} className="rounded-lg bg-accent px-5 py-2 text-sm font-medium text-white disabled:opacity-50">{saving ? "Saving..." : "Save"}</button>
               </span>
             </div>
+            {alsoNote && (
+              <div className="rounded-xl border border-border2 bg-surface2/50 p-3">
+                <div className="mb-2 text-xs text-dim">
+                  Where should it go? Saving will add it to
+                  {" "}
+                  <span className="text-foreground">
+                    {noteTarget.kind === "new" ? "a new note" : `"${noteTarget.title || "Untitled"}"`}
+                  </span>
+                  .
+                </div>
+                <input
+                  value={noteQuery}
+                  onChange={(e) => setNoteQuery(e.target.value)}
+                  placeholder="Search notes..."
+                  className="jfield mb-2"
+                />
+                <div className="max-h-56 space-y-1 overflow-y-auto">
+                  <button
+                    type="button"
+                    onClick={() => setNoteTarget({ kind: "new" })}
+                    className={`block w-full rounded-md px-2.5 py-2 text-left text-sm font-medium transition ${
+                      noteTarget.kind === "new" ? "bg-accent-soft text-accent2" : "text-accent2 hover:bg-surface2"
+                    }`}
+                  >
+                    + New note
+                  </button>
+                  {recentNotes
+                    .filter((n) => !noteQuery.trim() || (n.title || "Untitled").toLowerCase().includes(noteQuery.toLowerCase()))
+                    .map((n) => (
+                      <button
+                        key={n.id}
+                        type="button"
+                        onClick={() => setNoteTarget({ kind: "note", id: n.id, title: n.title })}
+                        className={`flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-sm transition ${
+                          noteTarget.kind === "note" && noteTarget.id === n.id
+                            ? "bg-accent-soft text-accent2"
+                            : "text-foreground hover:bg-surface2"
+                        }`}
+                      >
+                        <span className="truncate">{n.title || "Untitled"}</span>
+                        <span className="shrink-0 text-xs text-dim">
+                          {new Date(n.updated_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
