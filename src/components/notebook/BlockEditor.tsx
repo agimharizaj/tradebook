@@ -20,6 +20,11 @@ const STICKY_COLORS: { key: string; c: string }[] = [
 function StorageImage({ path }: { path: string }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
+    // External URL: use it as-is. Otherwise it's a storage path to sign.
+    if (/^https?:\/\//.test(path)) {
+      setUrl(path);
+      return;
+    }
     let live = true;
     createClient()
       .storage.from("entry-models")
@@ -33,7 +38,7 @@ function StorageImage({ path }: { path: string }) {
   }, [path]);
   if (!url) return <span className="w-full py-2 text-xs text-dim">Loading screenshot...</span>;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={url} alt="Chart screenshot" className="my-1 h-auto w-full min-w-0 max-w-xl rounded-lg border border-border" />;
+  return <img src={url} alt="Note image" className="my-1 h-auto w-full min-w-0 max-w-xl rounded-lg border border-border" />;
 }
 
 function stickyStyle(color?: string) {
@@ -180,6 +185,55 @@ export default function BlockEditor({
   // Curated emoji strip: inserts at the cursor of the last-focused block,
   // or appends a text block when nothing is focused. The OS emoji keyboard
   // works in every field too; this is the one-click path while journaling.
+  // "+ Image": upload from the device (photo library / camera on mobile,
+  // file picker on desktop) into the entry-models bucket, or embed by URL.
+  // Both become img blocks; StorageImage renders either form.
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [showImgAdd, setShowImgAdd] = useState(false);
+  const [imgUrl, setImgUrl] = useState("");
+  const [imgBusy, setImgBusy] = useState(false);
+  const [imgErr, setImgErr] = useState<string | null>(null);
+
+  function addImgBlock(src: string) {
+    snapshot();
+    setBlocks((bs) => [...bs, { id: uid(), type: "img", text: src }]);
+    setShowImgAdd(false);
+    setImgUrl("");
+    setImgErr(null);
+  }
+
+  async function uploadImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImgBusy(true);
+    setImgErr(null);
+    const c = createClient();
+    const { data: u } = await c.auth.getUser();
+    if (!u.user) {
+      setImgErr("Not signed in.");
+      setImgBusy(false);
+      return;
+    }
+    const path = `${u.user.id}/note-${uid()}-${file.name.replace(/[^\w.\-]/g, "_")}`;
+    const { error } = await c.storage.from("entry-models").upload(path, file);
+    setImgBusy(false);
+    if (error) {
+      setImgErr(`Upload failed: ${error.message}`);
+      return;
+    }
+    addImgBlock(path);
+  }
+
+  function addImgFromUrl() {
+    const u = imgUrl.trim();
+    if (!/^https?:\/\/\S+$/.test(u)) {
+      setImgErr("Enter a full image URL (https://...).");
+      return;
+    }
+    addImgBlock(u);
+  }
+
   const EMOJIS = ["✅","❌","⚠️","🔥","📈","📉","💰","🎯","🧠","😤","😌","🚀","🐂","🐻","💡","⭐","❗","⏰","📌","👀","💪","🤝"];
   const [showEmoji, setShowEmoji] = useState(false);
 
@@ -518,6 +572,36 @@ export default function BlockEditor({
         </div>
       )}
 
+      {showImgAdd && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border2 bg-surface2/60 p-2">
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={imgBusy}
+            className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground disabled:opacity-50"
+          >
+            {imgBusy ? "Uploading..." : "Upload from device"}
+          </button>
+          <span className="text-xs text-dim">or</span>
+          <input
+            value={imgUrl}
+            onChange={(e) => setImgUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addImgFromUrl();
+              }
+            }}
+            placeholder="Paste image URL..."
+            className="jfield min-w-0 flex-1 basis-40"
+          />
+          <button onClick={addImgFromUrl} className="rounded-md bg-accent px-2.5 py-1.5 text-xs font-medium text-white">
+            Add
+          </button>
+          {imgErr && <span className="w-full text-xs text-danger">{imgErr}</span>}
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={uploadImage} />
+        </div>
+      )}
+
       {showEmoji && (
         <div className="flex flex-wrap gap-1 rounded-xl border border-border2 bg-surface2/60 p-2">
           {EMOJIS.map((em) => (
@@ -560,6 +644,13 @@ export default function BlockEditor({
             </button>
           ))}
           <button
+            onClick={() => { setShowImgAdd((v) => !v); setImgErr(null); }}
+            aria-pressed={showImgAdd}
+            className={`rounded-md border px-2.5 py-1.5 text-xs transition ${showImgAdd ? "border-accent bg-accent-soft" : "border-border2 text-muted hover:border-accent"}`}
+          >
+            + Image
+          </button>
+          <button
             onClick={openAnalyses}
             className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground"
           >
@@ -593,6 +684,13 @@ export default function BlockEditor({
               + {a.label}
             </button>
           ))}
+          <button
+            onClick={() => { setShowImgAdd((v) => !v); setImgErr(null); }}
+            aria-pressed={showImgAdd}
+            className={`rounded-md border px-2.5 py-1.5 text-xs transition ${showImgAdd ? "border-accent bg-accent-soft" : "border-border2 text-muted hover:border-accent"}`}
+          >
+            + Image
+          </button>
           <button
             onClick={openAnalyses}
             className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground"
