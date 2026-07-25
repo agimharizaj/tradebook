@@ -87,21 +87,28 @@ export default function ChartsPage() {
         </select>
         <Link
           href="/profile/pairs"
-          className="shrink-0 whitespace-nowrap text-xs text-accent2 hover:underline"
+          className="shrink-0 whitespace-nowrap text-xs text-dim transition hover:text-accent2"
           title="Add or remove pairs"
         >
           Edit pairs
         </Link>
-        <select
-          value={tf}
-          onChange={(e) => setTf(e.target.value)}
-          className="shrink-0 rounded-lg border border-border2 bg-surface2 px-3 py-2 text-sm outline-none focus:border-accent"
+        <div
+          className="flex shrink-0 items-center gap-0.5 rounded-lg border border-border2 bg-card p-0.5"
+          role="group"
           aria-label="Timeframe"
         >
           {TIMEFRAMES.map((t) => (
-            <option key={t.tv} value={t.tv}>{t.label}</option>
+            <button
+              key={t.tv}
+              onClick={() => setTf(t.tv)}
+              className={`rounded-md px-2 py-1.5 font-mono text-xs font-medium transition ${
+                tf === t.tv ? "bg-accent text-white" : "text-muted hover:text-foreground"
+              }`}
+            >
+              {t.label}
+            </button>
           ))}
-        </select>
+        </div>
         <button
           onClick={() => setShowInd((s) => !s)}
           className={`shrink-0 whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-medium transition ${showInd ? "border-accent bg-accent-soft text-accent2" : "border-border2 text-muted hover:border-accent hover:text-foreground"}`}
