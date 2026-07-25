@@ -97,9 +97,19 @@ export default function RiskPage() {
     [base, quote, accountCurrency, priceDecimals]
   );
 
+  // Pair change: clear the previous trade levels and prefill entry with the new price.
+  useEffect(() => {
+    setStop("");
+    setLots("");
+    refreshMarket(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pair]);
+
+  // Account currency change: just refresh the conversion rate, keep levels.
   useEffect(() => {
     refreshMarket(false);
-  }, [refreshMarket]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountCurrency]);
 
   // Prefill account currency and default risk from the user's saved profile.
   useEffect(() => {

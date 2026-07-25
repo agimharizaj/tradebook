@@ -43,7 +43,7 @@ export default function Combobox({
             <button
               key={o}
               type="button"
-              onMouseDown={(e) => {
+              onPointerDown={(e) => {
                 e.preventDefault();
                 setQuery(o);
                 setOpen(false);

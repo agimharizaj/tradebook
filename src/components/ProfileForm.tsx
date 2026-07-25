@@ -73,8 +73,9 @@ export default function ProfileForm({
   function onCountry(v: string) {
     const newDial = DIAL[v] ?? "";
     setForm((f) => {
-      const prevDial = DIAL[f.country] ?? "";
-      const replace = f.phone.trim() === "" || f.phone.trim() === prevDial;
+      // Replace the phone value only if it is empty or currently just a dial code.
+      const isBareCode = /^\+\d{1,4}\s*$/.test(f.phone.trim());
+      const replace = f.phone.trim() === "" || isBareCode;
       return { ...f, country: v, phone: replace && newDial ? `${newDial} ` : f.phone };
     });
   }
