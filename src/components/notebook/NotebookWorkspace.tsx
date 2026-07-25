@@ -452,6 +452,19 @@ export default function NotebookWorkspace() {
               </button>
               <button onClick={() => setConfirmDelete(true)} className="rounded-lg border border-border2 px-2.5 py-2 text-sm text-muted transition hover:border-danger hover:text-danger">Delete</button>
             </div>
+            {/* Floating mode toggle so long notes don't require scrolling
+                back to the header. Sits above the mobile tab bar and clear
+                of the floating palette's default spot. */}
+            <button
+              onClick={() => setNoteMode((m) => (m === "view" ? "edit" : "view"))}
+              className={`fixed bottom-40 right-3 z-40 rounded-full px-4 py-2.5 text-sm font-medium shadow-xl backdrop-blur transition md:bottom-8 md:right-8 ${
+                noteMode === "edit"
+                  ? "bg-accent text-white hover:opacity-90"
+                  : "border border-border2 bg-card/95 text-foreground hover:border-accent"
+              }`}
+            >
+              {noteMode === "edit" ? "Done" : "Edit"}
+            </button>
             <div className="min-h-[60vh] rounded-xl border border-border bg-card p-5">
               {noteMode === "edit" ? (
                 <BlockEditor
