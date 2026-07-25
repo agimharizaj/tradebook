@@ -56,14 +56,17 @@ export default function BlockEditor({
   const first = useRef(true);
   const [dragId, setDragId] = useState<string | null>(null);
 
-  // Floating add-block palette: draggable, position remembered locally.
+  // Add-block palette: docked under the note by default; the user can pop it
+  // out into a draggable floating pill. Mode and position remembered locally.
   const palRef = useRef<HTMLDivElement>(null);
   const palOffset = useRef({ x: 0, y: 0 });
+  const [palFloating, setPalFloating] = useState(false);
   const [palPos, setPalPos] = useState<{ x: number; y: number } | null>(null);
   const [palDragging, setPalDragging] = useState(false);
 
   useEffect(() => {
     try {
+      setPalFloating(localStorage.getItem("tb-note-palette-float") === "1");
       const s = localStorage.getItem("tb-note-palette");
       if (s) {
         const p = JSON.parse(s);
@@ -73,6 +76,15 @@ export default function BlockEditor({
       // ignore bad stored state
     }
   }, []);
+
+  function setFloating(f: boolean) {
+    setPalFloating(f);
+    try {
+      localStorage.setItem("tb-note-palette-float", f ? "1" : "0");
+    } catch {
+      // fine, just won't persist
+    }
+  }
 
   useEffect(() => {
     if (!palDragging) return;
@@ -317,30 +329,59 @@ export default function BlockEditor({
         );
       })}
 
-      {/* Floating block palette: drag it anywhere by the ⋮⋮ handle. */}
-      <div
-        ref={palRef}
-        style={palPos ? { left: palPos.x, top: palPos.y, right: "auto", bottom: "auto" } : undefined}
-        className="fixed bottom-24 right-3 z-40 flex max-w-[calc(100vw-16px)] flex-wrap items-center gap-1 rounded-2xl border border-border2 bg-card/95 px-2 py-1.5 shadow-xl backdrop-blur md:bottom-6"
-      >
-        <span
-          onPointerDown={startPalDrag}
-          className="cursor-move touch-none select-none px-1.5 py-1 text-dim"
-          aria-label="Drag palette"
-          title="Drag to move"
+      {palFloating ? (
+        /* Floating palette: drag anywhere by the ⋮⋮ handle, dock to put it back. */
+        <div
+          ref={palRef}
+          style={palPos ? { left: palPos.x, top: palPos.y, right: "auto", bottom: "auto" } : undefined}
+          className="fixed bottom-24 right-3 z-40 flex max-w-[calc(100vw-16px)] flex-wrap items-center gap-1 rounded-2xl border border-border2 bg-card/95 px-2 py-1.5 shadow-xl backdrop-blur md:bottom-6"
         >
-          ⋮⋮
-        </span>
-        {ADD.map((a) => (
-          <button
-            key={a.type}
-            onClick={() => append(a.type)}
-            className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground"
+          <span
+            onPointerDown={startPalDrag}
+            className="cursor-move touch-none select-none px-1.5 py-1 text-dim"
+            aria-label="Drag palette"
+            title="Drag to move"
           >
-            + {a.label}
+            ⋮⋮
+          </span>
+          {ADD.map((a) => (
+            <button
+              key={a.type}
+              onClick={() => append(a.type)}
+              className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground"
+            >
+              + {a.label}
+            </button>
+          ))}
+          <button
+            onClick={() => setFloating(false)}
+            className="ml-1 rounded-md px-2 py-1.5 text-xs text-dim transition hover:text-foreground"
+            title="Dock the palette back under the note"
+          >
+            Dock
           </button>
-        ))}
-      </div>
+        </div>
+      ) : (
+        /* Docked palette (default): the original row under the note. */
+        <div className="flex flex-wrap items-center gap-1.5 pt-3">
+          {ADD.map((a) => (
+            <button
+              key={a.type}
+              onClick={() => append(a.type)}
+              className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground"
+            >
+              + {a.label}
+            </button>
+          ))}
+          <button
+            onClick={() => setFloating(true)}
+            className="rounded-md px-2 py-1.5 text-xs text-dim transition hover:text-foreground"
+            title="Float this palette so you can drag it anywhere"
+          >
+            ⤢ Float
+          </button>
+        </div>
+      )}
     </div>
   );
 }
