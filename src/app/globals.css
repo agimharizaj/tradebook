@@ -73,20 +73,12 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
-  /* Stop pull gestures from rubber-banding the app shell (tab bar drifting
-     up with dead space beneath it). Content scrolls inside <main>. */
-  overscroll-behavior-y: none;
 }
 
-/* Installed PWA: pin the shell completely, like a native app. All pages
-   scroll internally, so the document itself never needs to move. */
-@media (display-mode: standalone) {
-  html,
-  body {
-    height: var(--app-height, 100%);
-    overflow: hidden;
-  }
-}
+/* Deliberately NOT pinning the shell against rubber-banding: iOS 26
+   letterboxes standalone PWAs (a dead strip below the layout viewport,
+   fixed in 26.1), and the overscroll drag is the only way to pull content
+   into that strip. Re-evaluate pinning once 26.1 is widespread. */
 
 h1,
 h2,
