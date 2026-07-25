@@ -7,11 +7,16 @@ import BlockEditor from "./BlockEditor";
 type NoteRow = { id: string; title: string; updated_at: string; pinned: boolean };
 type Note = { id: string; title: string; content: string; pinned: boolean };
 
+// New notes are titled with today's date by default; select-on-focus makes
+// replacing it one keystroke, and clearing it is fine (falls back to "Untitled").
+const defaultTitle = () =>
+  new Date().toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+
 // A note the user never actually wrote in: default/blank title and no
 // block with any text. These are silently discarded instead of saved.
 function isEmptyNote(n: Note) {
   const t = n.title.trim();
-  if (t && t !== "Untitled") return false;
+  if (t && t !== "Untitled" && t !== defaultTitle()) return false;
   if (!n.content.trim()) return true;
   try {
     const j = JSON.parse(n.content);
@@ -89,7 +94,7 @@ export default function NotebookWorkspace() {
     }
     const { data, error } = await supabase
       .from("notes")
-      .insert({ user_id: u.user.id, title: "Untitled", content: "" })
+      .insert({ user_id: u.user.id, title: defaultTitle(), content: "" })
       .select("*")
       .single();
     if (error) {
@@ -192,7 +197,7 @@ export default function NotebookWorkspace() {
                 value={note.title}
                 onChange={(e) => edit({ title: e.target.value })}
                 onFocus={(e) => {
-                  if (note.title === "Untitled") e.target.select();
+                  if (note.title === "Untitled" || note.title === defaultTitle()) e.target.select();
                 }}
                 placeholder="Note title"
                 className="min-w-0 flex-1 basis-full border-none bg-transparent text-2xl font-semibold outline-none placeholder:text-dim sm:basis-auto"

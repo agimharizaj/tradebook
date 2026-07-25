@@ -137,7 +137,7 @@ export default function StrategyWorkspace() {
 
   function newStrategy() {
     setStatus(null);
-    setDraft({ ...emptyDraft(), name: "New strategy" });
+    setDraft({ ...emptyDraft(), name: `Strategy ${new Date().toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}` });
     setMode("edit");
   }
 
@@ -420,7 +420,7 @@ export default function StrategyWorkspace() {
                 value={draft.name}
                 onChange={(e) => patch({ name: e.target.value })}
                 onFocus={(e) => {
-                  if (draft.name === "New strategy") e.target.select();
+                  if (draft.name === "New strategy" || draft.name.startsWith("Strategy ")) e.target.select();
                 }}
                 placeholder="Strategy name"
                 className="w-full border-none bg-transparent text-2xl font-semibold outline-none placeholder:text-dim"
