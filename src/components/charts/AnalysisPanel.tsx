@@ -19,9 +19,11 @@ const BUCKET = "entry-models";
 export default function AnalysisPanel({
   defaultSymbol,
   onClose,
+  onLoadSymbol,
 }: {
   defaultSymbol: string;
   onClose: () => void;
+  onLoadSymbol?: (symbol: string) => void;
 }) {
   const supabase = createClient();
   const [items, setItems] = useState<Analysis[]>([]);
@@ -69,6 +71,20 @@ export default function AnalysisPanel({
     load();
   }, [load]);
 
+  // Escape closes the viewer first, then the panel.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setViewing((v) => {
+        if (v) return null;
+        onClose();
+        return v;
+      });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   async function save() {
     setSaving(true);
     setErr(null);
@@ -115,8 +131,14 @@ export default function AnalysisPanel({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-card p-6 ring-1 ring-border2">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-card p-6 ring-1 ring-border2"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg" style={{ fontFamily: "var(--font-display)" }}>Analysis log</h2>
           <div className="flex items-center gap-2">
@@ -141,8 +163,12 @@ export default function AnalysisPanel({
                   <option value="neutral">Neutral</option>
                 </select>
               </Field>
-              <Field label="Screenshot">
+              <Field label="Screenshot (recommended)">
                 <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="text-xs text-muted" />
+                <span className="mt-1 block text-xs text-dim">
+                  The chart cannot restore your drawings later - the screenshot is
+                  what you will reopen.
+                </span>
               </Field>
             </div>
             <Field label="Notes">
@@ -240,6 +266,14 @@ export default function AnalysisPanel({
                 <span className="text-xs text-dim">
                   {new Date(viewing.created_at).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
                 </span>
+                {onLoadSymbol && (
+                  <button
+                    onClick={() => { onLoadSymbol(viewing.symbol); setViewing(null); onClose(); }}
+                    className="rounded-md border border-border2 px-2.5 py-1 text-xs font-medium text-muted transition hover:border-accent hover:text-foreground"
+                  >
+                    Load on chart
+                  </button>
+                )}
                 {urls[viewing.id] && (
                   <a href={urls[viewing.id]} target="_blank" rel="noreferrer" className="text-xs text-accent2 hover:underline">
                     Open full size
@@ -254,7 +288,13 @@ export default function AnalysisPanel({
               <img src={urls[viewing.id]} alt={`${viewing.symbol} analysis screenshot`} className="w-full rounded-lg border border-border" />
             ) : viewing.image_path ? (
               <p className="text-sm text-dim">Screenshot link expired - close and reopen the log to refresh it.</p>
-            ) : null}
+            ) : (
+              <p className="text-sm text-dim">
+                No screenshot was attached to this analysis. The embedded chart
+                cannot restore drawings, so attach a screenshot when saving to
+                keep the visual.
+              </p>
+            )}
           </div>
         </div>
       )}

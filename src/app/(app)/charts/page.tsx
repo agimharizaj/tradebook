@@ -61,7 +61,18 @@ export default function ChartsPage() {
           </div>
         )}
       </div>
-      {showLog && <AnalysisPanel defaultSymbol={current} onClose={() => setShowLog(false)} />}
+      {showLog && (
+        <AnalysisPanel
+          defaultSymbol={current}
+          onClose={() => setShowLog(false)}
+          onLoadSymbol={(symbol) => {
+            const m = PAIRS.find(
+              (p) => p.label === symbol || p.tv === symbol || p.label.startsWith(symbol)
+            );
+            if (m) setTv(m.tv);
+          }}
+        />
+      )}
     </div>
   );
 }
