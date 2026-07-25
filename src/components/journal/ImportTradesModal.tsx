@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type Grid = { headers: string[]; rows: string[][] };
-type FieldKey = "symbol" | "direction" | "date" | "lots" | "pnl" | "commissions" | "swap" | "entry" | "exit" | "ticket";
+type FieldKey = "symbol" | "direction" | "date" | "lots" | "pnl" | "commissions" | "swap" | "entry" | "stop" | "exit" | "ticket";
 
 const FIELDS: { key: FieldKey; label: string; required?: boolean; keys: RegExp; pick: "first" | "last" }[] = [
   { key: "symbol", label: "Symbol", required: true, keys: /symbol|instrument/i, pick: "first" },
@@ -15,6 +15,7 @@ const FIELDS: { key: FieldKey; label: string; required?: boolean; keys: RegExp; 
   { key: "commissions", label: "Commissions", keys: /commission|comm|fee/i, pick: "first" },
   { key: "swap", label: "Swap", keys: /swap/i, pick: "first" },
   { key: "entry", label: "Entry price", keys: /open.*price|price.*open|entry/i, pick: "first" },
+  { key: "stop", label: "Stop loss (SL)", keys: /^s\/?l$|stop.?loss/i, pick: "first" },
   { key: "exit", label: "Exit price", keys: /close.*price|price.*close|exit/i, pick: "last" },
   { key: "ticket", label: "Ticket / position", keys: /ticket|position|deal|order/i, pick: "first" },
 ];
@@ -105,6 +106,25 @@ function autoMap(headers: string[]): Record<FieldKey, number> {
     const matches = headers.map((h, i) => ({ h, i })).filter((x) => f.keys.test(x.h));
     map[f.key] = matches.length ? (f.pick === "last" ? matches[matches.length - 1].i : matches[0].i) : -1;
   }
+  // FTMO/MT5 CSV conventions the generic patterns cannot see:
+  const lower = headers.map((h) => h.trim().toLowerCase());
+  // 1) The close datetime column is titled just "Close".
+  if (map.date < 0) {
+    const i = lower.indexOf("close");
+    if (i >= 0) map.date = i;
+  }
+  // 2) Two bare "Price" columns: the first (after Symbol) is the entry,
+  //    the second (after Close) is the exit.
+  const prices = lower
+    .map((h, i) => ({ h, i }))
+    .filter((x) => x.h === "price")
+    .map((x) => x.i);
+  if (prices.length >= 2) {
+    if (map.entry < 0) map.entry = prices[0];
+    if (map.exit < 0 || map.exit === map.entry) map.exit = prices[prices.length - 1];
+  } else if (prices.length === 1 && map.entry < 0) {
+    map.entry = prices[0];
+  }
   return map;
 }
 
@@ -152,6 +172,7 @@ export default function ImportTradesModal({
           pnl: profit == null ? null : Math.round((profit + commissions + swap) * 100) / 100,
           commission: commissions || swap ? Math.round((commissions + swap) * 100) / 100 : null,
           entry_price: num(col(r, "entry")),
+          stop_price: num(col(r, "stop")),
           exit_price: num(col(r, "exit")),
           ext_id: (col(r, "ticket") ?? "").trim() || null,
         };
