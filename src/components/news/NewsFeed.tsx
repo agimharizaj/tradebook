@@ -27,20 +27,11 @@ function dayLabel(s: string) {
   return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
 }
 
-const RANGES = [
-  { key: "today", label: "Today", hours: 24 },
-  { key: "week", label: "Week", hours: 24 * 7 },
-  { key: "month", label: "Month", hours: 24 * 31 },
-  { key: "all", label: "All", hours: Infinity },
-] as const;
-type RangeKey = (typeof RANGES)[number]["key"];
-
 export default function NewsFeed({ height = 720 }: { height?: number }) {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(false);
   const [open, setOpen] = useState<number | null>(0);
-  const [range, setRange] = useState<RangeKey>("week");
 
   useEffect(() => {
     (async () => {
@@ -103,17 +94,8 @@ export default function NewsFeed({ height = 720 }: { height?: number }) {
     })();
   }, []);
 
-  const maxHours = RANGES.find((r) => r.key === range)?.hours ?? Infinity;
-  const cutoff = Date.now() - maxHours * 3600 * 1000;
-  const visible = items.filter((it) => {
-    if (maxHours === Infinity) return true;
-    const t = new Date(it.pubDate).getTime();
-    return Number.isNaN(t) ? true : t >= cutoff;
-  });
-
   const groups: { label: string; items: { item: Item; idx: number }[] }[] = [];
-  visible.forEach((it) => {
-    const i = items.indexOf(it);
+  items.forEach((it, i) => {
     const lab = dayLabel(it.pubDate);
     const last = groups[groups.length - 1];
     if (last && last.label === lab) last.items.push({ item: it, idx: i });
@@ -121,36 +103,12 @@ export default function NewsFeed({ height = 720 }: { height?: number }) {
   });
 
   return (
-    <div>
-      <div
-        className="mb-2 flex items-center gap-0.5 rounded-lg border border-border2 bg-surface2/60 p-0.5"
-        role="group"
-        aria-label="News time range"
-      >
-        {RANGES.map((r) => (
-          <button
-            key={r.key}
-            onClick={() => setRange(r.key)}
-            className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition ${
-              range === r.key ? "bg-accent text-white" : "text-muted hover:text-foreground"
-            }`}
-          >
-            {r.label}
-          </button>
-        ))}
-      </div>
-
     <div className="overflow-y-auto" style={{ height }}>
       {loading && <p className="p-3 text-sm text-muted">Loading headlines...</p>}
       {!loading && err && (
         <p className="p-3 text-sm text-dim">News feed is unavailable right now. Try again shortly.</p>
       )}
-      {!loading && !err && visible.length === 0 && (
-        <p className="p-3 text-sm text-dim">
-          Nothing in this range. The feed only carries recent headlines, so
-          wider ranges show more.
-        </p>
-      )}
+
       <div className="space-y-3">
         {groups.map((g) => (
           <div key={g.label}>
@@ -210,7 +168,6 @@ export default function NewsFeed({ height = 720 }: { height?: number }) {
           </div>
         ))}
       </div>
-    </div>
     </div>
   );
 }
