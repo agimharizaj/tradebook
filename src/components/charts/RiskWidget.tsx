@@ -73,9 +73,22 @@ export default function RiskWidget({
     [supported, base, quote, cur, priceDecimals]
   );
 
+  // Pair change (and mount): clear all trade levels immediately - a stale
+  // BTC stop against a gold price sizes absurdly - then prefill entry with
+  // the new live price.
+  useEffect(() => {
+    setEntry("");
+    setStop("");
+    setLots("");
+    refresh(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pair]);
+
+  // Account currency change: refresh the conversion only, keep levels.
   useEffect(() => {
     refresh(false);
-  }, [refresh]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cur]);
 
   useEffect(() => {
     if (!dragging) return;
