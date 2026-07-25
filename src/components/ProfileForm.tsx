@@ -111,8 +111,8 @@ export default function ProfileForm({
   }
 
   async function savePassword() {
-    if (newPw.length < 6) {
-      setMsg({ t: "err", text: "New password must be at least 6 characters." });
+    if (newPw.length < 10) {
+      setMsg({ t: "err", text: "New password must be at least 10 characters." });
       return;
     }
     if (newPw !== confirmPw) {
@@ -287,7 +287,7 @@ export default function ProfileForm({
           {showPw && (
             <div className="mt-5 space-y-3 border-t border-border pt-5">
               <Field label="Current password"><input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} className="field" /></Field>
-              <Field label="New password"><input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="At least 6 characters" className="field" /></Field>
+              <Field label="New password"><input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="At least 10 characters" className="field" /></Field>
               <Field label="Confirm new password"><input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className="field" /></Field>
               <div className="flex gap-2 pt-1">
                 <button

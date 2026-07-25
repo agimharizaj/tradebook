@@ -141,7 +141,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         <input
           type="password"
           required
-          minLength={6}
+          minLength={10}
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}

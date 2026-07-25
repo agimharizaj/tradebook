@@ -61,7 +61,9 @@ The approved look is the dark "terminal" concept in `design/tradebook-brand-conc
 3. Journal — monthly calendar with per-day trade summaries you can open, plus weekly and monthly breakdowns.
 4. Risk calculator — DONE.
 
-Later, not now: AI assistant, news feed, notebook, meditation/sanctuary, PWA polish.
+Done beyond the core four: PWA (installable, manifest + icons), responsive mobile layout with bottom tab nav, Charts (TradingView embed with drawing tools) at `/charts`, Notebook (notes CRUD, autosave) at `/notebook` (table in `0003_notes.sql`), News (TradingView market-news timeline + economic calendar) at `/news`, Sanctuary (box-breathing + psychology prompts) at `/sanctuary`. Profile moved to the sidebar footer.
+
+Later, not now: AI assistant, live broker sync (MetaApi), placing trades from the chart, richer note formatting.
 
 ## Definition of done per phase
 

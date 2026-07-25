@@ -17,7 +17,7 @@ export default async function DashboardPage() {
   const cur = (meta.account_currency as string) || "USD";
   const accountSize = parseFloat((meta.account_size as string) ?? "");
 
-  const { data } = await supabase
+  const { data, error: loadError } = await supabase
     .from("trades")
     .select("pnl, traded_on, created_at")
     .order("traded_on", { ascending: true })
@@ -45,9 +45,25 @@ export default async function DashboardPage() {
   const equity = withPnl.map((t) => (run += t.pnl));
   const curveStart = accountSize > 0 ? accountSize : 0;
 
-  // Daily net PnL.
+  // Max drawdown: largest peak-to-trough drop along the equity curve.
+  let peak = curveStart;
+  let maxDd = 0;
+  let maxDdPct = 0;
+  for (const v of equity) {
+    if (v > peak) peak = v;
+    const dd = peak - v;
+    if (dd > maxDd) {
+      maxDd = dd;
+      maxDdPct = peak > 0 ? (dd / peak) * 100 : 0;
+    }
+  }
+
+  // Daily net PnL (traded_on may be a date or a timestamp; key on the date part).
   const dayMap = new Map<string, number>();
-  withPnl.forEach((t) => dayMap.set(t.traded_on, (dayMap.get(t.traded_on) ?? 0) + t.pnl));
+  withPnl.forEach((t) => {
+    const k = t.traded_on.slice(0, 10);
+    dayMap.set(k, (dayMap.get(k) ?? 0) + t.pnl);
+  });
   const days = Array.from(dayMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
 
   const pct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;

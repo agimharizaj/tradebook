@@ -24,6 +24,14 @@ type Strat = { id: string; name: string };
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+// First day of the following month, for half-open date range queries that
+// work whether traded_on is a date or a timestamp.
+const nextMonthStart = (y: number, m: number) => {
+  const d = new Date(y, m + 1, 1);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-01`;
+};
+// traded_on may be a date ("2026-07-25") or a timestamp; day key is the date part.
+const dayKey = (tradedOn: string) => tradedOn.slice(0, 10);
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -37,15 +45,23 @@ function computeStats(trades: Trade[]) {
   const net = withPnl.reduce((s, t) => s + t.pnl, 0);
   const decided = wins.length + losses.length;
   const rs = trades.filter((t) => t.r_multiple != null).map((t) => t.r_multiple as number);
+  const avgWin = wins.length ? wins.reduce((s, t) => s + t.pnl, 0) / wins.length : 0;
+  const avgLoss = losses.length ? losses.reduce((s, t) => s + t.pnl, 0) / losses.length : 0;
+  // True expectancy: win% x avg win - loss% x avg loss, over decided trades.
+  // avgLoss is negative here, so this reduces to a weighted sum.
+  const expectancy = decided
+    ? (wins.length / decided) * avgWin + (losses.length / decided) * avgLoss
+    : 0;
   return {
     total: trades.length,
     winRate: decided ? (wins.length / decided) * 100 : 0,
     net,
-    avgWin: wins.length ? wins.reduce((s, t) => s + t.pnl, 0) / wins.length : 0,
-    avgLoss: losses.length ? losses.reduce((s, t) => s + t.pnl, 0) / losses.length : 0,
+    avgWin,
+    avgLoss,
     best: withPnl.length ? Math.max(...withPnl.map((t) => t.pnl)) : 0,
     worst: withPnl.length ? Math.min(...withPnl.map((t) => t.pnl)) : 0,
-    expectancy: rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : 0,
+    expectancy,
+    avgR: rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : null,
   };
 }
 
@@ -58,19 +74,20 @@ export default function JournalWorkspace() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [cur, setCur] = useState("USD");
   const [accSize, setAccSize] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     const start = `${cursor.y}-${pad(cursor.m + 1)}-01`;
-    const end = ymd(new Date(cursor.y, cursor.m + 1, 0));
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("trades")
       .select("*")
       .gte("traded_on", start)
-      .lte("traded_on", end)
+      .lt("traded_on", nextMonthStart(cursor.y, cursor.m))
       .order("traded_on", { ascending: true });
+    setLoadError(error ? `Could not load trades: ${error.message}` : null);
     setTrades((data as Trade[]) ?? []);
     setLoading(false);
   }, [supabase, cursor]);
@@ -113,7 +130,7 @@ export default function JournalWorkspace() {
   const byDay = useMemo(() => {
     const map: Record<string, Trade[]> = {};
     trades.forEach((t) => {
-      (map[t.traded_on] ||= []).push(t);
+      (map[dayKey(t.traded_on)] ||= []).push(t);
     });
     return map;
   }, [trades]);
@@ -129,7 +146,8 @@ export default function JournalWorkspace() {
   }
 
   async function deleteTrade(id: string) {
-    await supabase.from("trades").delete().eq("id", id);
+    const { error } = await supabase.from("trades").delete().eq("id", id);
+    if (error) setLoadError(`Could not delete trade: ${error.message}`);
     load();
   }
 
@@ -159,6 +177,12 @@ export default function JournalWorkspace() {
           </button>
         </div>
       </div>
+
+      {loadError && (
+        <p className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-4 py-2.5 text-sm text-danger">
+          {loadError}
+        </p>
+      )}
 
       <div className="rounded-2xl bg-card p-5 ring-1 ring-border">
         <div className="mb-4 flex items-center justify-between">
@@ -242,7 +266,12 @@ export default function JournalWorkspace() {
               />
               <Metric label="Win rate" value={`${stats.winRate.toFixed(1)}%`} />
               <Metric label="Total trades" value={String(stats.total)} />
-              <Metric label="Expectancy" value={`${stats.expectancy.toFixed(2)}R`} />
+              <Metric
+                label="Expectancy / trade"
+                value={moneySigned(stats.expectancy, cur)}
+                tone={stats.expectancy >= 0 ? "up" : "down"}
+              />
+              <Metric label="Avg R" value={stats.avgR == null ? "—" : `${stats.avgR.toFixed(2)}R`} />
               <Metric label="Avg win" value={moneySigned(stats.avgWin, cur)} tone="up" />
               <Metric label="Avg loss" value={moneySigned(stats.avgLoss, cur)} tone="down" />
               <Metric label="Best trade" value={moneySigned(stats.best, cur)} tone="up" />
@@ -334,6 +363,7 @@ function DayModal({
 }) {
   const supabase = createClient();
   const [adding, setAdding] = useState(trades.length === 0);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [pair, setPair] = useState("");
   const [direction, setDirection] = useState("long");
   const [pnl, setPnl] = useState("");
@@ -415,7 +445,30 @@ function DayModal({
                       {moneySigned(t.pnl, cur)}
                     </span>
                   )}
-                  <button onClick={() => onDelete(t.id)} className="text-dim hover:text-danger" aria-label="Delete trade">✕</button>
+                  {confirmingId === t.id ? (
+                    <span className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => { setConfirmingId(null); onDelete(t.id); }}
+                        className="rounded-md bg-danger/15 px-2.5 py-1.5 text-xs font-medium text-danger transition hover:bg-danger/25"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setConfirmingId(null)}
+                        className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:text-foreground"
+                      >
+                        Cancel
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmingId(t.id)}
+                      className="rounded-md p-2 text-muted transition hover:bg-danger/15 hover:text-danger"
+                      aria-label="Delete trade"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
