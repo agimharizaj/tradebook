@@ -175,16 +175,27 @@ export default function ImportTradesModal({
       ((existing as { id: string; ext_id: string }[]) ?? []).map((x) => [x.ext_id, x.id])
     );
 
-    const rows = trades.map((t) => {
-      const base = { ...t, user_id: userId };
+    // Updates (already imported, matched by ticket) and inserts (new trades)
+    // must be sent separately: a mixed batch makes PostgREST send id: null
+    // for the new rows, which violates the not-null constraint.
+    const toUpdate: (typeof trades[number] & { user_id: string; id: string })[] = [];
+    const toInsert: (typeof trades[number] & { user_id: string })[] = [];
+    for (const t of trades) {
       const id = t.ext_id ? idByExt.get(t.ext_id) : undefined;
-      return id ? { ...base, id } : base;
-    });
+      if (id) toUpdate.push({ ...t, user_id: userId, id });
+      else toInsert.push({ ...t, user_id: userId });
+    }
 
     let done = 0;
-    for (let i = 0; i < rows.length; i += 500) {
-      const chunk = rows.slice(i, i + 500);
+    for (let i = 0; i < toUpdate.length; i += 500) {
+      const chunk = toUpdate.slice(i, i + 500);
       const { error } = await supabase.from("trades").upsert(chunk);
+      if (error) { setResult(`Import error: ${error.message}`); setImporting(false); return; }
+      done += chunk.length;
+    }
+    for (let i = 0; i < toInsert.length; i += 500) {
+      const chunk = toInsert.slice(i, i + 500);
+      const { error } = await supabase.from("trades").insert(chunk);
       if (error) { setResult(`Import error: ${error.message}`); setImporting(false); return; }
       done += chunk.length;
     }
