@@ -67,6 +67,8 @@ export default async function DashboardPage() {
   const days = Array.from(dayMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
 
   const pct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
+  // Dates matching each equity point, for the curve's x-axis labels.
+  const equityDates = withPnl.map((t) => t.traded_on.slice(0, 10));
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 md:px-8 md:py-10">
@@ -109,7 +111,7 @@ export default async function DashboardPage() {
                 {accountSize > 0 ? `${sym(cur)}${equity[equity.length - 1].toLocaleString(undefined, { maximumFractionDigits: 0 })}` : moneySigned(net, cur)}
               </span>
             </div>
-            <EquityCurve values={equity} baseline={curveStart} />
+            <EquityCurve values={equity} baseline={curveStart} dates={equityDates} />
           </div>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
@@ -155,7 +157,18 @@ export default async function DashboardPage() {
   );
 }
 
-function EquityCurve({ values, baseline }: { values: number[]; baseline: number }) {
+// Short date for chart axes: "21 Jul" (with year only if not this year).
+function axisDate(s: string) {
+  const d = new Date(`${s}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return "";
+  const opts: Intl.DateTimeFormatOptions =
+    d.getFullYear() === new Date().getFullYear()
+      ? { day: "numeric", month: "short" }
+      : { day: "numeric", month: "short", year: "2-digit" };
+  return d.toLocaleDateString(undefined, opts);
+}
+
+function EquityCurve({ values, baseline, dates }: { values: number[]; baseline: number; dates: string[] }) {
   const W = 900, H = 180, pad = 10;
   const all = [baseline, ...values];
   const min = Math.min(...all), max = Math.max(...all);
@@ -166,12 +179,22 @@ function EquityCurve({ values, baseline }: { values: number[]; baseline: number 
   const area = `${line} L${x(values.length - 1).toFixed(1)},${(H - pad).toFixed(1)} L${x(0).toFixed(1)},${(H - pad).toFixed(1)} Z`;
   const up = values[values.length - 1] >= baseline;
   const color = up ? "var(--success)" : "var(--danger)";
+  const mid = dates.length > 2 ? dates[Math.floor(dates.length / 2)] : null;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height: 180 }}>
-      <line x1={pad} x2={W - pad} y1={y(baseline)} y2={y(baseline)} stroke="var(--border2)" strokeDasharray="4 4" />
-      <path d={area} fill={color} opacity="0.12" />
-      <path d={line} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-    </svg>
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height: 180 }}>
+        <line x1={pad} x2={W - pad} y1={y(baseline)} y2={y(baseline)} stroke="var(--border2)" strokeDasharray="4 4" />
+        <path d={area} fill={color} opacity="0.12" />
+        <path d={line} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+      </svg>
+      {dates.length >= 2 && (
+        <div className="mt-1 flex justify-between font-mono text-[11px] text-dim">
+          <span>{axisDate(dates[0])}</span>
+          {mid && <span className="hidden sm:inline">{axisDate(mid)}</span>}
+          <span>{axisDate(dates[dates.length - 1])}</span>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -180,25 +203,37 @@ function DailyBars({ days }: { days: [string, number][] }) {
   const max = Math.max(...days.map((d) => Math.abs(d[1])), 1);
   const mid = H / 2;
   const bw = (W - 2 * pad) / days.length;
+  const midDay = days.length > 2 ? days[Math.floor(days.length / 2)][0] : null;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height: 150 }}>
-      <line x1={pad} x2={W - pad} y1={mid} y2={mid} stroke="var(--border2)" />
-      {days.map(([d, net], i) => {
-        const h = (Math.abs(net) / max) * (H / 2 - pad);
-        const up = net >= 0;
-        return (
-          <rect
-            key={d}
-            x={pad + i * bw + bw * 0.15}
-            width={Math.max(1, bw * 0.7)}
-            y={up ? mid - h : mid}
-            height={Math.max(1, h)}
-            fill={up ? "var(--success)" : "var(--danger)"}
-            rx="1"
-          />
-        );
-      })}
-    </svg>
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height: 150 }}>
+        <line x1={pad} x2={W - pad} y1={mid} y2={mid} stroke="var(--border2)" />
+        {days.map(([d, net], i) => {
+          const h = (Math.abs(net) / max) * (H / 2 - pad);
+          const up = net >= 0;
+          return (
+            <rect
+              key={d}
+              x={pad + i * bw + bw * 0.15}
+              width={Math.max(1, bw * 0.7)}
+              y={up ? mid - h : mid}
+              height={Math.max(1, h)}
+              fill={up ? "var(--success)" : "var(--danger)"}
+              rx="1"
+            >
+              <title>{`${axisDate(d)}: ${net >= 0 ? "+" : ""}${net.toFixed(2)}`}</title>
+            </rect>
+          );
+        })}
+      </svg>
+      {days.length >= 2 && (
+        <div className="mt-1 flex justify-between font-mono text-[11px] text-dim">
+          <span>{axisDate(days[0][0])}</span>
+          {midDay && <span className="hidden sm:inline">{axisDate(midDay)}</span>}
+          <span>{axisDate(days[days.length - 1][0])}</span>
+        </div>
+      )}
+    </div>
   );
 }
 
