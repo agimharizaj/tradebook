@@ -119,6 +119,16 @@ h3 {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+/* iOS gives date inputs an intrinsic width that overflows their card;
+   force them to behave like every other field. */
+input[type="date"],
+input[type="time"] {
+  min-width: 0;
+  max-width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 /* Hide scrollbars on horizontally scrolling nav strips */
 .scrollbar-none {
   scrollbar-width: none;

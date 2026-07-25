@@ -240,23 +240,6 @@ export default function ProfileForm({
           </div>
         </Section>
 
-        <div className="rounded-2xl bg-card p-6 ring-1 ring-border">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="text-xs font-medium uppercase tracking-wide text-muted">Trading pairs</div>
-              <p className="mt-1 text-sm text-muted">
-                The watchlist behind every pair dropdown in the app.
-              </p>
-            </div>
-            <Link
-              href="/profile/pairs"
-              className="shrink-0 rounded-lg border border-border2 px-4 py-2 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground"
-            >
-              Manage pairs
-            </Link>
-          </div>
-        </div>
-
         <Section title="Trading profile">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Broker / prop firm"><input value={form.broker} onChange={(e) => set("broker", e.target.value)} placeholder="FTMO" className="field" /></Field>
@@ -310,6 +293,23 @@ export default function ProfileForm({
             )}
           </div>
         </Section>
+
+        <div className="rounded-2xl bg-card p-6 ring-1 ring-border">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted">Trading pairs</div>
+              <p className="mt-1 text-sm text-muted">
+                The watchlist behind every pair dropdown in the app.
+              </p>
+            </div>
+            <Link
+              href="/profile/pairs"
+              className="shrink-0 rounded-lg border border-border2 px-4 py-2 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground"
+            >
+              Manage pairs
+            </Link>
+          </div>
+        </div>
 
         <div className="rounded-2xl bg-card p-6 ring-1 ring-border">
           <div className="flex items-center justify-between">

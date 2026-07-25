@@ -84,6 +84,10 @@ export default function ChartsPage() {
   // Replaces TradingView's hidden top-toolbar camera: capture the chart
   // (cropped when "This Tab" is picked) and download it as a PNG.
   const [snapping, setSnapping] = useState(false);
+  // iOS Safari has no Screen Capture API: hide the button there instead of
+  // showing a control that silently does nothing.
+  const [canSnap, setCanSnap] = useState(false);
+  useEffect(() => setCanSnap(!!navigator.mediaDevices?.getDisplayMedia), []);
   async function snapshot() {
     setSnapping(true);
     const r = await captureChartArea();
@@ -162,6 +166,7 @@ export default function ChartsPage() {
         >
           Analysis log
         </button>
+        {canSnap && (
         <button
           onClick={snapshot}
           disabled={snapping}
@@ -174,6 +179,7 @@ export default function ChartsPage() {
             <circle cx="12" cy="13" r="3" />
           </svg>
         </button>
+        )}
         <span className="hidden shrink-0 text-xs text-dim lg:inline">
           Drawing tools (fib, long/short, trendlines) are in the left toolbar.
         </span>

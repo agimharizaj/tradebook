@@ -28,7 +28,14 @@ export default function Sidebar({ email, name }: { email: string; name?: string 
   widthRef.current = width;
 
   useEffect(() => {
-    setCollapsed(localStorage.getItem("tb_sidebar_collapsed") === "1");
+    // Landscape phones (short viewports) start collapsed so the content gets
+    // the width; an explicit saved preference always wins.
+    const stored = localStorage.getItem("tb_sidebar_collapsed");
+    if (stored === null && window.matchMedia("(max-height: 500px)").matches) {
+      setCollapsed(true);
+    } else {
+      setCollapsed(stored === "1");
+    }
     const w = parseInt(localStorage.getItem("tb_sidebar_width") || "", 10);
     if (!Number.isNaN(w)) setWidth(Math.min(MAX, Math.max(MIN, w)));
   }, []);

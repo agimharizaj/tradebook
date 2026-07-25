@@ -79,6 +79,8 @@ export default function SanctuaryPage() {
     if (audioRef.current) return;
     try {
       const ctx = new AudioContext();
+      // iOS creates contexts suspended even inside a gesture; resume explicitly.
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});
       const master = ctx.createGain();
       master.gain.value = 0;
       master.connect(ctx.destination);
@@ -254,9 +256,10 @@ export default function SanctuaryPage() {
           style={{
             transform: `scale(${scale})`,
             transition: `transform ${dur}s ease-in-out`,
-            background: "radial-gradient(circle at 50% 40%, #7C6CFF, #22D39A)",
-            opacity: 0.22,
-            filter: "blur(18px)",
+            // Pure radial fade: filter blur() renders with square edges on
+            // iOS Safari, which showed as a box around the circle.
+            background:
+              "radial-gradient(circle, rgba(124,108,255,0.30) 0%, rgba(34,211,154,0.16) 45%, rgba(34,211,154,0) 70%)",
           }}
         />
         <div

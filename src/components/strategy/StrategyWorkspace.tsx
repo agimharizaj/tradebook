@@ -55,6 +55,16 @@ function emptyDraft(): Draft {
 export default function StrategyWorkspace() {
   const supabase = createClient();
   const watchlist = usePairs();
+  // Account size from the profile, used to convert "1%" into a figure in
+  // the risk-control fields.
+  const [accountSize, setAccountSize] = useState(0);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const raw = String(data.user?.user_metadata?.account_size ?? "").replace(/,/g, "");
+      const n = parseFloat(raw);
+      if (!Number.isNaN(n) && n > 0) setAccountSize(n);
+    });
+  }, [supabase]);
   const [list, setList] = useState<StrategyRow[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [loading, setLoading] = useState(true);
@@ -613,18 +623,22 @@ export default function StrategyWorkspace() {
             <Section label="Risk controls">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <Num label="Max trades / day" v={draft.maxTrades} on={(v) => patch({ maxTrades: v })} />
-                <Num label="Max daily loss" v={draft.maxLoss} on={(v) => patch({ maxLoss: v })} />
-                <Num label="Max daily profit" v={draft.maxProfit} on={(v) => patch({ maxProfit: v })} />
+                <MoneyOrPct
+                  label="Max daily loss"
+                  v={draft.maxLoss}
+                  on={(v) => patch({ maxLoss: v })}
+                  accountSize={accountSize}
+                />
+                <MoneyOrPct
+                  label="Max daily profit"
+                  v={draft.maxProfit}
+                  on={(v) => patch({ maxProfit: v })}
+                  accountSize={accountSize}
+                />
                 <Num label="Risk per trade %" v={draft.riskPct} on={(v) => patch({ riskPct: v })} />
-                <label className="block">
-                  <span className="mb-1 block text-xs text-dim">Trading window</span>
-                  <input
-                    value={draft.window}
-                    onChange={(e) => patch({ window: e.target.value })}
-                    placeholder="08:00-17:00 UTC"
-                    className="field"
-                  />
-                </label>
+                <div className="col-span-2">
+                  <WindowPicker value={draft.window} on={(v) => patch({ window: v })} />
+                </div>
               </div>
             </Section>
           </div>
@@ -728,6 +742,108 @@ function Num({ label, v, on }: { label: string; v: string; on: (v: string) => vo
         className="field"
         style={{ fontFamily: "var(--font-mono)" }}
       />
+    </label>
+  );
+}
+
+// Money field that also accepts a percentage: typing "1%" converts to a
+// figure using the profile account size the moment focus leaves the field.
+function MoneyOrPct({
+  label,
+  v,
+  on,
+  accountSize,
+}: {
+  label: string;
+  v: string;
+  on: (v: string) => void;
+  accountSize: number;
+}) {
+  const pct = v.trim().endsWith("%") ? parseFloat(v.trim().slice(0, -1)) : NaN;
+  const preview =
+    !Number.isNaN(pct) && accountSize > 0
+      ? Math.round((pct / 100) * accountSize * 100) / 100
+      : null;
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs text-dim">{label}</span>
+      <input
+        inputMode="decimal"
+        value={v}
+        onChange={(e) => on(e.target.value)}
+        onBlur={() => {
+          if (preview != null) on(String(preview));
+        }}
+        placeholder={accountSize > 0 ? "500 or 5%" : "500"}
+        className="field"
+        style={{ fontFamily: "var(--font-mono)" }}
+      />
+      <span className="mt-0.5 block text-[11px] text-dim">
+        {preview != null
+          ? `= ${preview.toLocaleString()} of ${accountSize.toLocaleString()}`
+          : accountSize > 0
+            ? "Type a figure or % of account"
+            : "\u00A0"}
+      </span>
+    </label>
+  );
+}
+
+// Structured trading window: start/end time pickers plus a timezone select
+// defaulting to the browser timezone. Stored as "08:00-17:00 Europe/London"
+// in the existing text column, so no migration is needed.
+function WindowPicker({ value, on }: { value: string; on: (v: string) => void }) {
+  const m = value.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*(\S.*)?$/);
+  const browserTz =
+    typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
+  const start = m?.[1] ?? "";
+  const end = m?.[2] ?? "";
+  const tz = m?.[3]?.trim() || browserTz;
+  const TZS = Array.from(
+    new Set([
+      browserTz,
+      "UTC",
+      "Europe/London",
+      "Europe/Berlin",
+      "America/New_York",
+      "America/Chicago",
+      "Asia/Tokyo",
+      "Asia/Singapore",
+      "Australia/Sydney",
+    ])
+  );
+  const emit = (sv: string, ev: string, zv: string) => {
+    on(sv || ev ? `${sv}-${ev} ${zv}` : "");
+  };
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs text-dim">Trading window</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="time"
+          value={start}
+          onChange={(e) => emit(e.target.value, end, tz)}
+          className="field !w-auto"
+          aria-label="Window start"
+        />
+        <span className="text-xs text-dim">to</span>
+        <input
+          type="time"
+          value={end}
+          onChange={(e) => emit(start, e.target.value, tz)}
+          className="field !w-auto"
+          aria-label="Window end"
+        />
+        <select
+          value={tz}
+          onChange={(e) => emit(start, end, e.target.value)}
+          className="field !w-auto min-w-0"
+          aria-label="Timezone"
+        >
+          {TZS.map((z) => (<option key={z} value={z}>{z}</option>))}
+          {!TZS.includes(tz) && <option value={tz}>{tz}</option>}
+        </select>
+      </div>
     </label>
   );
 }

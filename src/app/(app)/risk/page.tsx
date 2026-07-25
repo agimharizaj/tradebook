@@ -232,12 +232,21 @@ export default function RiskPage() {
         </div>
       </div>
 
-      <div className="mt-5 grid gap-1 rounded-xl border border-border2 bg-card p-1 sm:flex sm:flex-wrap">
+      {/* Phones get a dropdown; wider screens keep the segmented pills. */}
+      <select
+        value={mode}
+        onChange={(e) => setMode(e.target.value as Mode)}
+        className="input mt-5 w-full sm:hidden"
+        aria-label="Calculator mode"
+      >
+        {MODES.map((m) => (<option key={m.id} value={m.id}>{m.label}</option>))}
+      </select>
+      <div className="mt-5 hidden gap-1 rounded-xl border border-border2 bg-card p-1 sm:flex sm:flex-wrap">
         {MODES.map((m) => (
           <button
             key={m.id}
             onClick={() => setMode(m.id)}
-            className={`rounded-lg px-3.5 py-2.5 text-sm font-medium transition sm:py-1.5 ${
+            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${
               mode === m.id
                 ? "bg-accent text-white"
                 : "text-muted hover:text-foreground"
