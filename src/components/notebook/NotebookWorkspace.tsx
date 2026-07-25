@@ -34,6 +34,21 @@ function isEmptyNote(n: Note) {
   return false;
 }
 
+
+// True while the user is typing in any editable control; keyboard-delete
+// shortcuts must stay inert then, or Backspace while editing text would
+// threaten the whole record.
+function isTypingTarget() {
+  const el = document.activeElement as HTMLElement | null;
+  if (!el) return false;
+  return (
+    el.tagName === "INPUT" ||
+    el.tagName === "TEXTAREA" ||
+    el.tagName === "SELECT" ||
+    el.isContentEditable
+  );
+}
+
 export default function NotebookWorkspace() {
   const supabase = createClient();
   const watchlist = usePairs();
@@ -68,6 +83,18 @@ export default function NotebookWorkspace() {
   useEffect(() => {
     loadList();
   }, [loadList]);
+
+  // Backspace/Delete (outside text fields) asks to delete the open note.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Backspace" && e.key !== "Delete") return;
+      if (!note || confirmDelete || showLog || isTypingTarget()) return;
+      e.preventDefault();
+      setConfirmDelete(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [note, confirmDelete, showLog]);
 
   // Delete the given note if the user never wrote in it.
   const discardIfEmpty = useCallback(

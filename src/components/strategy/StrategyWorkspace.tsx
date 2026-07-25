@@ -52,6 +52,21 @@ function emptyDraft(): Draft {
   };
 }
 
+
+// True while the user is typing in any editable control; keyboard-delete
+// shortcuts must stay inert then, or Backspace while editing text would
+// threaten the whole record.
+function isTypingTarget() {
+  const el = document.activeElement as HTMLElement | null;
+  if (!el) return false;
+  return (
+    el.tagName === "INPUT" ||
+    el.tagName === "TEXTAREA" ||
+    el.tagName === "SELECT" ||
+    el.isContentEditable
+  );
+}
+
 export default function StrategyWorkspace() {
   const supabase = createClient();
   const watchlist = usePairs();
@@ -90,6 +105,18 @@ export default function StrategyWorkspace() {
   useEffect(() => {
     loadList();
   }, [loadList]);
+
+  // Backspace/Delete (outside text fields) asks to delete the open strategy.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Backspace" && e.key !== "Delete") return;
+      if (!draft || confirmDelete || pendingNav || isTypingTarget()) return;
+      e.preventDefault();
+      setConfirmDelete(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [draft, confirmDelete, pendingNav]);
 
   async function openStrategy(id: string) {
     if (mode === "edit" && dirtyEdit.current && draft) {
