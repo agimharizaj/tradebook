@@ -50,6 +50,7 @@ export default function AnalysisPanel({
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
+  const [alsoNote, setAlsoNote] = useState(false);
 
   function attach(f: File | null) {
     setFile(f);
@@ -141,14 +142,18 @@ export default function AnalysisPanel({
       }
       image_path = path;
     }
-    const { error } = await supabase.from("chart_analyses").insert({
-      user_id: u.user.id,
-      symbol,
-      timeframe: timeframe || null,
-      direction,
-      notes: notes || null,
-      image_path,
-    });
+    const { data: inserted, error } = await supabase
+      .from("chart_analyses")
+      .insert({
+        user_id: u.user.id,
+        symbol,
+        timeframe: timeframe || null,
+        direction,
+        notes: notes || null,
+        image_path,
+      })
+      .select("*")
+      .single();
     setSaving(false);
     if (error) {
       setErr(error.message);
@@ -158,6 +163,16 @@ export default function AnalysisPanel({
     attach(null);
     setAdding(false);
     load();
+    // "Also add to Notebook": open the just-saved analysis with the note
+    // chooser ready, so the next tap picks (or creates) the note.
+    if (alsoNote && inserted) {
+      setAlsoNote(false);
+      setViewing(inserted as Analysis);
+      setSentToNotebook(false);
+      setNoteQuery("");
+      setSendPicker(true);
+      loadRecentNotes();
+    }
   }
 
   // Blocks representing an analysis inside a note: heading, bias, notes and
@@ -319,9 +334,20 @@ export default function AnalysisPanel({
             <Field label="Notes">
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Your read on the setup..." className="jfield resize-y" />
             </Field>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setAdding(false)} className="rounded-lg border border-border2 px-4 py-2 text-sm text-muted hover:text-foreground">Cancel</button>
-              <button onClick={save} disabled={saving} className="rounded-lg bg-accent px-5 py-2 text-sm font-medium text-white disabled:opacity-50">{saving ? "Saving..." : "Save"}</button>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-muted">
+                <input
+                  type="checkbox"
+                  checked={alsoNote}
+                  onChange={(e) => setAlsoNote(e.target.checked)}
+                  className="h-4 w-4 accent-[var(--accent)]"
+                />
+                Also add to Notebook after saving
+              </label>
+              <span className="flex gap-2">
+                <button onClick={() => setAdding(false)} className="rounded-lg border border-border2 px-4 py-2 text-sm text-muted hover:text-foreground">Cancel</button>
+                <button onClick={save} disabled={saving} className="rounded-lg bg-accent px-5 py-2 text-sm font-medium text-white disabled:opacity-50">{saving ? "Saving..." : "Save"}</button>
+              </span>
             </div>
           </div>
         )}
@@ -448,7 +474,7 @@ export default function AnalysisPanel({
                   placeholder="Search notes..."
                   className="jfield mb-2"
                 />
-                <div className="max-h-44 space-y-1 overflow-y-auto">
+                <div className="max-h-56 space-y-1 overflow-y-auto">
                   <button
                     onClick={() => sendToNewNote(viewing)}
                     className="block w-full rounded-md px-2.5 py-2 text-left text-sm font-medium text-accent2 transition hover:bg-surface2"

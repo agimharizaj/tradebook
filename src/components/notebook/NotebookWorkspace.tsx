@@ -7,7 +7,7 @@ import { usePairs } from "@/lib/usePairs";
 import AnalysisPanel from "@/components/charts/AnalysisPanel";
 import BlockEditor from "./BlockEditor";
 
-type NoteRow = { id: string; title: string; updated_at: string; pinned: boolean };
+type NoteRow = { id: string; title: string; updated_at: string; created_at: string; pinned: boolean };
 // pair is undefined until migration 0006 adds the column; updates only send
 // it when defined so the app keeps working before the migration runs.
 type Note = { id: string; title: string; content: string; pinned: boolean; pair?: string | null };
@@ -42,12 +42,24 @@ export default function NotebookWorkspace() {
   const [status, setStatus] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showLog, setShowLog] = useState(false);
+  const [q, setQ] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const dirty = useRef(false);
+
+  // Search by title plus optional created-date range.
+  const filteredList = list.filter((n) => {
+    if (q.trim() && !(n.title || "Untitled").toLowerCase().includes(q.toLowerCase())) return false;
+    const created = n.created_at?.slice(0, 10) ?? "";
+    if (fromDate && created < fromDate) return false;
+    if (toDate && created > toDate) return false;
+    return true;
+  });
 
   const loadList = useCallback(async () => {
     const { data } = await supabase
       .from("notes")
-      .select("id, title, updated_at, pinned")
+      .select("id, title, updated_at, created_at, pinned")
       .order("pinned", { ascending: false })
       .order("updated_at", { ascending: false });
     setList((data as NoteRow[]) ?? []);
@@ -208,10 +220,51 @@ export default function NotebookWorkspace() {
             <button onClick={newNote} className="rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-white">+ New</button>
           </span>
         </div>
-        <NoteList list={list} activeId={note?.id} onOpen={openNote} />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search notes..."
+          className="jfield mb-2"
+        />
+        <div className="mb-3 flex items-center gap-1.5">
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="jfield min-w-0"
+            aria-label="Created from"
+            title="Created from"
+          />
+          <span className="shrink-0 text-xs text-dim">to</span>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="jfield min-w-0"
+            aria-label="Created to"
+            title="Created to"
+          />
+        </div>
+        {(q || fromDate || toDate) && (
+          <button
+            onClick={() => { setQ(""); setFromDate(""); setToDate(""); }}
+            className="mb-2 text-xs text-accent2 hover:underline"
+          >
+            Clear filters ({filteredList.length} of {list.length})
+          </button>
+        )}
+        <NoteList list={filteredList} activeId={note?.id} onOpen={openNote} />
       </aside>
 
       <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
+        <div className="mb-2 md:hidden">
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search notes..."
+            className="jfield"
+          />
+        </div>
         <div className="mb-4 flex gap-2 overflow-x-auto pb-1 md:hidden">
           <button onClick={newNote} className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white">+ New</button>
           <button
@@ -220,7 +273,7 @@ export default function NotebookWorkspace() {
           >
             Analysis
           </button>
-          {list.map((n) => (
+          {filteredList.map((n) => (
             <button
               key={n.id}
               onClick={() => openNote(n.id)}
@@ -325,7 +378,7 @@ function NoteList({ list, activeId, onOpen }: { list: NoteRow[]; activeId?: stri
     const d = new Date(s);
     return Number.isNaN(d.getTime())
       ? ""
-      : d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+      : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
   };
   return (
     <div className="space-y-1.5">
@@ -347,7 +400,7 @@ function NoteList({ list, activeId, onOpen }: { list: NoteRow[]; activeId?: stri
                 {n.title || "Untitled"}
               </span>
             </span>
-            <span className="mt-0.5 block text-xs text-dim">{when(n.updated_at)}</span>
+            <span className="mt-0.5 block text-xs text-dim">{when(n.created_at)}</span>
           </button>
         );
       })}
