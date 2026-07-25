@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import Combobox from "@/components/Combobox";
 
 type Meta = Record<string, unknown>;
 const str = (m: Meta, k: string) => (typeof m[k] === "string" ? (m[k] as string) : "");
@@ -177,19 +178,15 @@ export default function ProfileForm({
             <Field label="First name"><input value={form.first_name} onChange={(e) => set("first_name", e.target.value)} className="field" /></Field>
             <Field label="Last name"><input value={form.last_name} onChange={(e) => set("last_name", e.target.value)} className="field" /></Field>
             <Field label="Date of birth"><input type="date" value={form.dob} onChange={(e) => set("dob", e.target.value)} className="field" /></Field>
-            <Field label="Phone"><input value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+44..." className="field" /></Field>
+            <Field label="Phone"><input type="tel" inputMode="tel" value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+44..." className="field" /></Field>
             <Field label="Country">
-              <input
-                list="country-list"
+              <Combobox
                 value={form.country}
-                onChange={(e) => onCountry(e.target.value)}
-                onBlur={(e) => onCountry(e.target.value)}
+                options={COUNTRIES}
+                onType={(v) => set("country", v)}
+                onSelect={(v) => onCountry(v)}
                 placeholder="Search country"
-                className="field"
               />
-              <datalist id="country-list">
-                {COUNTRIES.map((c) => (<option key={c} value={c} />))}
-              </datalist>
             </Field>
             <Field label="City"><input value={form.city} onChange={(e) => set("city", e.target.value)} placeholder="London" className="field" /></Field>
             <Field label="Timezone">
@@ -225,8 +222,8 @@ export default function ProfileForm({
                 ))}
               </datalist>
             </Field>
-            <Field label="Account size"><input value={form.account_size} onChange={(e) => set("account_size", e.target.value)} placeholder="10000" className="field" /></Field>
-            <Field label="Default risk % / trade"><input value={form.default_risk_pct} onChange={(e) => set("default_risk_pct", e.target.value)} placeholder="1" className="field" /></Field>
+            <Field label="Account size"><input inputMode="decimal" value={form.account_size} onChange={(e) => set("account_size", e.target.value)} placeholder="10000" className="field" /></Field>
+            <Field label="Default risk % / trade"><input inputMode="decimal" value={form.default_risk_pct} onChange={(e) => set("default_risk_pct", e.target.value)} placeholder="1" className="field" /></Field>
             <Field label="Experience">
               <select value={form.experience} onChange={(e) => set("experience", e.target.value)} className="field">
                 <option value="">Select...</option>

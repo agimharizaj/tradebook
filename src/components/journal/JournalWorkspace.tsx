@@ -435,10 +435,10 @@ function DayModal({
               </Field>
               <Field label="PnL ($)"><input value={pnl} onChange={(e) => setPnl(e.target.value)} className="jfield" /></Field>
               <Field label="R multiple"><input value={r} onChange={(e) => setR(e.target.value)} className="jfield" /></Field>
-              <Field label="Entry"><input value={entry} onChange={(e) => setEntry(e.target.value)} className="jfield" /></Field>
-              <Field label="Stop"><input value={stop} onChange={(e) => setStop(e.target.value)} className="jfield" /></Field>
-              <Field label="Exit"><input value={exit} onChange={(e) => setExit(e.target.value)} className="jfield" /></Field>
-              <Field label="Size (lots)"><input value={size} onChange={(e) => setSize(e.target.value)} className="jfield" /></Field>
+              <Field label="Entry"><input inputMode="decimal" value={entry} onChange={(e) => setEntry(e.target.value)} className="jfield" /></Field>
+              <Field label="Stop"><input inputMode="decimal" value={stop} onChange={(e) => setStop(e.target.value)} className="jfield" /></Field>
+              <Field label="Exit"><input inputMode="decimal" value={exit} onChange={(e) => setExit(e.target.value)} className="jfield" /></Field>
+              <Field label="Size (lots)"><input inputMode="decimal" value={size} onChange={(e) => setSize(e.target.value)} className="jfield" /></Field>
               <Field label="Emotion"><input value={emotion} onChange={(e) => setEmotion(e.target.value)} placeholder="Calm, FOMO..." className="jfield" /></Field>
               <Field label="Strategy">
                 <select value={strategyId} onChange={(e) => setStrategyId(e.target.value)} className="jfield">

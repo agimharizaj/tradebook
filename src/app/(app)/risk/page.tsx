@@ -251,25 +251,25 @@ export default function RiskPage() {
               </datalist>
             </Field>
             <Field label="Account size">
-              <input type="number" value={accountSize} onChange={(e) => setAccountSize(e.target.value)} className="input" />
+              <input type="number" inputMode="decimal" value={accountSize} onChange={(e) => setAccountSize(e.target.value)} className="input" />
             </Field>
           </div>
 
           {(mode === "size" || mode === "stop") && (
             <Field label="Risk % per trade">
-              <input type="number" step="0.1" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} className="input" />
+              <input type="number" inputMode="decimal" step="0.1" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} className="input" />
             </Field>
           )}
 
           {(mode === "stop" || mode === "risk") && (
             <Field label="Lot size (standard lots)">
-              <input type="number" step="0.01" value={lots} onChange={(e) => setLots(e.target.value)} className="input" />
+              <input type="number" inputMode="decimal" step="0.01" value={lots} onChange={(e) => setLots(e.target.value)} className="input" />
             </Field>
           )}
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Entry price">
-              <input type="number" step="any" value={entry} onChange={(e) => setEntry(e.target.value)} className="input" />
+              <input type="number" inputMode="decimal" step="any" value={entry} onChange={(e) => setEntry(e.target.value)} className="input" />
             </Field>
             {mode === "stop" ? (
               <Field label="Direction">
@@ -280,7 +280,7 @@ export default function RiskPage() {
               </Field>
             ) : (
               <Field label="Stop loss price">
-                <input type="number" step="any" value={stop} onChange={(e) => setStop(e.target.value)} className="input" />
+                <input type="number" inputMode="decimal" step="any" value={stop} onChange={(e) => setStop(e.target.value)} className="input" />
               </Field>
             )}
           </div>
@@ -296,7 +296,7 @@ export default function RiskPage() {
                     : "Auto-fetched. Editable."
               }
             >
-              <input type="number" step="any" value={conversion} onChange={(e) => setConversion(e.target.value)} className="input" />
+              <input type="number" inputMode="decimal" step="any" value={conversion} onChange={(e) => setConversion(e.target.value)} className="input" />
             </Field>
           )}
           {!conversionNeeded && (
