@@ -71,6 +71,7 @@ export default function Sidebar({ email, name }: { email: string; name?: string 
     } ${active ? "bg-accent-soft text-accent2" : "text-muted hover:bg-surface2 hover:text-foreground"}`;
 
   return (
+    <>
     <aside
       style={{ width: collapsed ? 64 : width }}
       className={`relative hidden h-screen shrink-0 flex-col border-r border-border bg-background md:flex ${
@@ -141,5 +142,7 @@ export default function Sidebar({ email, name }: { email: string; name?: string 
         />
       )}
     </aside>
+    {dragging && <div className="fixed inset-0 z-[60] cursor-col-resize" />}
+    </>
   );
 }
