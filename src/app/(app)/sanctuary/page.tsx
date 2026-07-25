@@ -78,6 +78,14 @@ export default function SanctuaryPage() {
   function startAudio() {
     if (audioRef.current) return;
     try {
+      // iOS mutes Web Audio when the ring/silent switch is on silent unless
+      // the page declares itself "playback" content (like a music app).
+      // Supported iOS 16.4+; harmless elsewhere.
+      try {
+        (navigator as unknown as { audioSession?: { type: string } }).audioSession!.type = "playback";
+      } catch {
+        // older iOS / other browsers: no audioSession, silent switch wins
+      }
       const ctx = new AudioContext();
       // iOS creates contexts suspended even inside a gesture; resume explicitly.
       if (ctx.state === "suspended") ctx.resume().catch(() => {});
