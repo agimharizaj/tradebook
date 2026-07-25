@@ -12,6 +12,7 @@ export default function NotebookWorkspace() {
   const [list, setList] = useState<NoteRow[]>([]);
   const [note, setNote] = useState<Note | null>(null);
   const [status, setStatus] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const dirty = useRef(false);
 
   const loadList = useCallback(async () => {
@@ -76,7 +77,8 @@ export default function NotebookWorkspace() {
         .eq("id", note.id);
       dirty.current = false;
       setStatus("Saved");
-      loadList();
+      // Update the list title in place; do not re-sort while editing.
+      setList((ls) => ls.map((n) => (n.id === note.id ? { ...n, title: note.title || "Untitled" } : n)));
     }, 700);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -90,9 +92,9 @@ export default function NotebookWorkspace() {
     loadList();
   }
 
-  async function del() {
+  async function performDelete() {
+    setConfirmDelete(false);
     if (!note) return;
-    if (!confirm("Delete this note?")) return;
     await supabase.from("notes").delete().eq("id", note.id);
     setNote(null);
     loadList();
@@ -155,7 +157,7 @@ export default function NotebookWorkspace() {
               <button onClick={togglePin} title="Pin" className={`rounded-lg border px-2.5 py-2 text-sm ${note.pinned ? "border-accent text-accent2" : "border-border2 text-muted"}`}>
                 {note.pinned ? "Pinned" : "Pin"}
               </button>
-              <button onClick={del} className="rounded-lg border border-border2 px-2.5 py-2 text-sm text-muted transition hover:border-danger hover:text-danger">Delete</button>
+              <button onClick={() => setConfirmDelete(true)} className="rounded-lg border border-border2 px-2.5 py-2 text-sm text-muted transition hover:border-danger hover:text-danger">Delete</button>
             </div>
             <div className="min-h-[60vh] rounded-xl border border-border bg-card p-5">
               <BlockEditor
@@ -167,6 +169,21 @@ export default function NotebookWorkspace() {
           </div>
         )}
       </main>
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-card p-6 ring-1 ring-border2">
+            <h2 className="text-lg">Delete note?</h2>
+            <p className="mt-2 text-sm text-muted">
+              &ldquo;{note?.title || "This note"}&rdquo; will be permanently removed. This cannot be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setConfirmDelete(false)} className="rounded-lg border border-border2 px-4 py-2 text-sm text-muted transition hover:text-foreground">Cancel</button>
+              <button onClick={performDelete} className="rounded-lg bg-danger px-4 py-2 text-sm font-medium text-white transition hover:opacity-90">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

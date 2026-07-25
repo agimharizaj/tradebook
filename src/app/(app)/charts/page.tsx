@@ -3,6 +3,7 @@
 import { useState } from "react";
 import TradingViewChart from "@/components/charts/TradingViewChart";
 import AnalysisPanel from "@/components/charts/AnalysisPanel";
+import RiskWidget from "@/components/charts/RiskWidget";
 
 const PAIRS: { label: string; tv: string }[] = [
   { label: "EUR/USD", tv: "FX:EURUSD" },
@@ -20,6 +21,7 @@ const PAIRS: { label: string; tv: string }[] = [
 export default function ChartsPage() {
   const [tv, setTv] = useState(PAIRS[0].tv);
   const [showLog, setShowLog] = useState(false);
+  const [showRisk, setShowRisk] = useState(false);
   const current = PAIRS.find((p) => p.tv === tv)?.label ?? tv;
 
   return (
@@ -36,6 +38,12 @@ export default function ChartsPage() {
           ))}
         </select>
         <button
+          onClick={() => setShowRisk((s) => !s)}
+          className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${showRisk ? "border-accent bg-accent-soft text-accent2" : "border-border2 text-muted hover:border-accent hover:text-foreground"}`}
+        >
+          Risk
+        </button>
+        <button
           onClick={() => setShowLog(true)}
           className="rounded-lg border border-border2 px-3 py-1.5 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground"
         >
@@ -45,8 +53,13 @@ export default function ChartsPage() {
           Drawing tools (fib, long/short, trendlines) are in the left toolbar.
         </span>
       </div>
-      <div className="flex-1">
+      <div className="relative flex-1">
         <TradingViewChart symbol={tv} />
+        {showRisk && (
+          <div className="absolute right-3 top-3 z-10">
+            <RiskWidget pairLabel={current} onClose={() => setShowRisk(false)} />
+          </div>
+        )}
       </div>
       {showLog && <AnalysisPanel defaultSymbol={current} onClose={() => setShowLog(false)} />}
     </div>

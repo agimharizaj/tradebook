@@ -38,9 +38,15 @@ export default function BlockEditor({
   const [blocks, setBlocks] = useState<Block[]>(() => parse(initial));
   const refs = useRef<Record<string, HTMLTextAreaElement | null>>({});
   const focusId = useRef<string | null>(null);
+  const first = useRef(true);
   const [dragId, setDragId] = useState<string | null>(null);
 
   useEffect(() => {
+    // Skip the initial mount so merely opening a note doesn't trigger a save.
+    if (first.current) {
+      first.current = false;
+      return;
+    }
     onChange(serialize(blocks));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blocks]);
