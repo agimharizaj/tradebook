@@ -18,10 +18,12 @@ const BUCKET = "entry-models";
 
 export default function AnalysisPanel({
   defaultSymbol,
+  defaultTimeframe,
   onClose,
   onLoadSymbol,
 }: {
   defaultSymbol: string;
+  defaultTimeframe?: string;
   onClose: () => void;
   onLoadSymbol?: (symbol: string) => void;
 }) {
@@ -35,7 +37,7 @@ export default function AnalysisPanel({
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const [symbol, setSymbol] = useState(defaultSymbol);
-  const [timeframe, setTimeframe] = useState("1H");
+  const [timeframe, setTimeframe] = useState(defaultTimeframe ?? "1H");
   const [direction, setDirection] = useState("neutral");
   const [notes, setNotes] = useState("");
   const [file, setFile] = useState<File | null>(null);

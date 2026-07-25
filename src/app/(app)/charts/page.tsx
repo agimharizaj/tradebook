@@ -32,13 +32,26 @@ const STUDIES: { id: string; label: string }[] = [
   { id: "ATR@tv-basicstudies", label: "ATR" },
 ];
 
+const TIMEFRAMES: { tv: string; label: string }[] = [
+  { tv: "1", label: "1m" },
+  { tv: "5", label: "5m" },
+  { tv: "15", label: "15m" },
+  { tv: "30", label: "30m" },
+  { tv: "60", label: "1H" },
+  { tv: "240", label: "4H" },
+  { tv: "D", label: "1D" },
+  { tv: "W", label: "1W" },
+];
+
 export default function ChartsPage() {
   const [tv, setTv] = useState(PAIRS[0].tv);
   const [showLog, setShowLog] = useState(false);
   const [showRisk, setShowRisk] = useState(false);
   const [showInd, setShowInd] = useState(false);
   const [studies, setStudies] = useState<string[]>([]);
+  const [tf, setTf] = useState("60");
   const current = PAIRS.find((p) => p.tv === tv)?.label ?? tv;
+  const tfLabel = TIMEFRAMES.find((t) => t.tv === tf)?.label ?? "1H";
 
   useEffect(() => {
     const s = createClient();
@@ -59,36 +72,47 @@ export default function ChartsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
-        <h1 className="text-lg" style={{ fontFamily: "var(--font-display)" }}>Charts</h1>
+      {/* One scrollable row on phones so the toolbar never stacks and eats chart height */}
+      <div className="flex items-center gap-2 overflow-x-auto border-b border-border px-4 py-2.5 md:gap-3 md:py-3">
+        <h1 className="shrink-0 text-lg" style={{ fontFamily: "var(--font-display)" }}>Charts</h1>
         <select
           value={tv}
           onChange={(e) => setTv(e.target.value)}
-          className="rounded-lg border border-border2 bg-surface2 px-3 py-1.5 text-sm outline-none focus:border-accent"
+          className="shrink-0 rounded-lg border border-border2 bg-surface2 px-3 py-2 text-sm outline-none focus:border-accent"
         >
           {PAIRS.map((p) => (
             <option key={p.tv} value={p.tv}>{p.label}</option>
           ))}
         </select>
+        <select
+          value={tf}
+          onChange={(e) => setTf(e.target.value)}
+          className="shrink-0 rounded-lg border border-border2 bg-surface2 px-3 py-2 text-sm outline-none focus:border-accent"
+          aria-label="Timeframe"
+        >
+          {TIMEFRAMES.map((t) => (
+            <option key={t.tv} value={t.tv}>{t.label}</option>
+          ))}
+        </select>
         <button
           onClick={() => setShowInd((s) => !s)}
-          className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${showInd ? "border-accent bg-accent-soft text-accent2" : "border-border2 text-muted hover:border-accent hover:text-foreground"}`}
+          className={`shrink-0 whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-medium transition ${showInd ? "border-accent bg-accent-soft text-accent2" : "border-border2 text-muted hover:border-accent hover:text-foreground"}`}
         >
           Indicators
         </button>
         <button
           onClick={() => setShowRisk((s) => !s)}
-          className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${showRisk ? "border-accent bg-accent-soft text-accent2" : "border-border2 text-muted hover:border-accent hover:text-foreground"}`}
+          className={`shrink-0 whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-medium transition ${showRisk ? "border-accent bg-accent-soft text-accent2" : "border-border2 text-muted hover:border-accent hover:text-foreground"}`}
         >
           Risk
         </button>
         <button
           onClick={() => setShowLog(true)}
-          className="rounded-lg border border-border2 px-3 py-1.5 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground"
+          className="shrink-0 whitespace-nowrap rounded-lg border border-border2 px-3 py-2 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground"
         >
           Analysis log
         </button>
-        <span className="hidden text-xs text-dim sm:inline">
+        <span className="hidden shrink-0 text-xs text-dim lg:inline">
           Drawing tools (fib, long/short, trendlines) are in the left toolbar.
         </span>
       </div>
@@ -113,13 +137,14 @@ export default function ChartsPage() {
 
       {/* id used by AnalysisPanel to crop self-tab screen captures to the chart */}
       <div id="tv-chart-area" className="relative flex-1">
-        <TradingViewChart symbol={tv} studies={studies} />
+        <TradingViewChart symbol={tv} studies={studies} interval={tf} />
         {showRisk && <RiskWidget pairLabel={current} onClose={() => setShowRisk(false)} />}
       </div>
 
       {showLog && (
         <AnalysisPanel
           defaultSymbol={current}
+          defaultTimeframe={tfLabel}
           onClose={() => setShowLog(false)}
           onLoadSymbol={(symbol) => {
             const m = PAIRS.find(

@@ -114,6 +114,18 @@ export default function BlockEditor({
       return next;
     });
   }
+  // Touch fallback: HTML5 drag never fires on iOS.
+  function moveBy(id: string, delta: -1 | 1) {
+    setBlocks((bs) => {
+      const i = bs.findIndex((b) => b.id === id);
+      const j = i + delta;
+      if (i < 0 || j < 0 || j >= bs.length) return bs;
+      const next = [...bs];
+      const [m] = next.splice(i, 1);
+      next.splice(j, 0, m);
+      return next;
+    });
+  }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>, b: Block) {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -150,14 +162,31 @@ export default function BlockEditor({
             className={`group flex items-start gap-1 rounded-lg ${isSticky ? "border p-2" : ""}`}
             style={isSticky ? stickyStyle(b.color) : undefined}
           >
+            {/* Desktop: hover drag handle. Touch: visible up/down buttons. */}
             <span
               draggable
               onDragStart={() => setDragId(b.id)}
               onDragEnd={() => setDragId(null)}
-              className="mt-1.5 cursor-grab select-none px-0.5 text-dim opacity-0 transition group-hover:opacity-100"
+              className="mt-1.5 hidden cursor-grab select-none px-0.5 text-dim opacity-0 transition group-hover:opacity-100 md:inline"
               aria-label="Drag to reorder"
             >
               ⋮⋮
+            </span>
+            <span className="flex shrink-0 flex-col md:hidden">
+              <button
+                onClick={() => moveBy(b.id, -1)}
+                className="px-1.5 py-0.5 text-[10px] text-dim"
+                aria-label="Move block up"
+              >
+                ▲
+              </button>
+              <button
+                onClick={() => moveBy(b.id, 1)}
+                className="px-1.5 py-0.5 text-[10px] text-dim"
+                aria-label="Move block down"
+              >
+                ▼
+              </button>
             </span>
 
             {b.type === "todo" && (
@@ -206,14 +235,14 @@ export default function BlockEditor({
             )}
 
             {isSticky && (
-              <div className="mt-1.5 flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
+              <div className="mt-1.5 flex shrink-0 gap-1.5 transition md:gap-1 md:opacity-0 md:group-hover:opacity-100">
                 {STICKY_COLORS.map((s) => (
                   <button
                     key={s.key}
                     onClick={() => update(b.id, { color: s.key })}
                     title={s.key}
                     aria-label={`Sticky ${s.key}`}
-                    className={`h-3.5 w-3.5 rounded-full border ${(b.color ?? "gold") === s.key ? "border-foreground" : "border-border2"}`}
+                    className={`h-5 w-5 rounded-full border md:h-3.5 md:w-3.5 ${(b.color ?? "gold") === s.key ? "border-foreground" : "border-border2"}`}
                     style={{ background: s.c }}
                   />
                 ))}
@@ -221,7 +250,7 @@ export default function BlockEditor({
             )}
             <button
               onClick={() => remove(b.id)}
-              className="mt-1 px-1 text-sm text-dim opacity-0 transition hover:text-danger group-hover:opacity-100"
+              className="mt-0.5 rounded-md p-1.5 text-sm text-dim transition hover:text-danger md:opacity-0 md:group-hover:opacity-100"
               aria-label="Delete block"
             >
               ✕

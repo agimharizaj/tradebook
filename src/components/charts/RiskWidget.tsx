@@ -99,7 +99,7 @@ export default function RiskWidget({
       <div
         ref={rootRef}
         style={pos ? { left: pos.x, top: pos.y } : { right: 12, top: 12 }}
-        className="absolute z-20 w-64 rounded-xl border border-border2 bg-card/95 p-3 shadow-xl backdrop-blur"
+        className="absolute z-20 w-64 rounded-xl border border-border2 bg-card/95 p-3 shadow-xl backdrop-blur max-md:!inset-x-2 max-md:!bottom-2 max-md:!top-auto max-md:w-auto"
       >
         <div
           onPointerDown={startDrag}
@@ -109,7 +109,7 @@ export default function RiskWidget({
           <button
             onPointerDown={(e) => e.stopPropagation()}
             onClick={onClose}
-            className="text-dim hover:text-foreground"
+            className="rounded-md p-1.5 text-dim hover:text-foreground"
             aria-label="Close"
           >
             ✕
@@ -149,6 +149,8 @@ export default function RiskWidget({
         <style>{`
           .rfield{width:100%;border-radius:.4rem;border:1px solid var(--border2);background:var(--surface2);color:var(--foreground);padding:.35rem .5rem;font-size:.8rem;font-family:var(--font-mono);outline:none}
           .rfield:focus{border-color:var(--accent)}
+          /* 16px on phones so iOS doesn't zoom the page into the input */
+          @media (max-width:767px){ .rfield{ font-size:1rem; padding:.5rem .6rem } }
         `}</style>
       </div>
 

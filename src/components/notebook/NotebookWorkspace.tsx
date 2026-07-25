@@ -142,7 +142,7 @@ export default function NotebookWorkspace() {
           </div>
         ) : (
           <div className="mx-auto max-w-3xl">
-            <div className="mb-3 flex items-center gap-2">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
               <input
                 value={note.title}
                 onChange={(e) => edit({ title: e.target.value })}
@@ -150,7 +150,7 @@ export default function NotebookWorkspace() {
                   if (note.title === "Untitled") e.target.select();
                 }}
                 placeholder="Note title"
-                className="flex-1 border-none bg-transparent text-2xl font-semibold outline-none placeholder:text-dim"
+                className="min-w-0 flex-1 basis-full border-none bg-transparent text-2xl font-semibold outline-none placeholder:text-dim sm:basis-auto"
                 style={{ fontFamily: "var(--font-display)" }}
               />
               <span className="text-xs text-dim">{status}</span>

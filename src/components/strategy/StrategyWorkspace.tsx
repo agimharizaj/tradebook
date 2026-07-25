@@ -415,7 +415,7 @@ export default function StrategyWorkspace() {
           />
         ) : (
           <div className="mx-auto max-w-3xl space-y-8">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               <input
                 value={draft.name}
                 onChange={(e) => patch({ name: e.target.value })}

@@ -9,9 +9,11 @@ type TVWindow = {
 export default function TradingViewChart({
   symbol,
   studies = [],
+  interval = "60",
 }: {
   symbol: string;
   studies?: string[];
+  interval?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
@@ -37,7 +39,7 @@ export default function TradingViewChart({
       new w.TradingView.widget({
         container_id: "tv_chart",
         symbol,
-        interval: "60",
+        interval,
         theme,
         style: "1",
         locale: "en",
@@ -62,7 +64,7 @@ export default function TradingViewChart({
       script.onload = create;
       document.body.appendChild(script);
     }
-  }, [symbol, theme, studiesKey]);
+  }, [symbol, theme, studiesKey, interval]);
 
   return <div id="tv_chart" ref={ref} className="h-full w-full" />;
 }
