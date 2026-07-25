@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import BlockEditor from "./BlockEditor";
 
 type NoteRow = { id: string; title: string; updated_at: string; pinned: boolean };
 type Note = { id: string; title: string; content: string; pinned: boolean };
@@ -153,12 +154,13 @@ export default function NotebookWorkspace() {
               </button>
               <button onClick={del} className="rounded-lg border border-border2 px-2.5 py-2 text-sm text-muted transition hover:border-danger hover:text-danger">Delete</button>
             </div>
-            <textarea
-              value={note.content}
-              onChange={(e) => edit({ content: e.target.value })}
-              placeholder="Start writing..."
-              className="min-h-[60vh] w-full resize-none rounded-xl border border-border bg-card p-5 text-[15px] leading-relaxed outline-none focus:border-accent"
-            />
+            <div className="min-h-[60vh] rounded-xl border border-border bg-card p-5">
+              <BlockEditor
+                key={note.id}
+                initial={note.content}
+                onChange={(c) => edit({ content: c })}
+              />
+            </div>
           </div>
         )}
       </main>
