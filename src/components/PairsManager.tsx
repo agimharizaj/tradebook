@@ -28,7 +28,6 @@ export default function PairsManager({ initial }: { initial: unknown }) {
       return;
     }
     setPairs(next);
-    setMsg(null);
     const { error } = await supabase.auth.updateUser({ data: { pairs: next } });
     setMsg(error ? `Could not save: ${error.message}` : "Saved.");
   }
@@ -40,9 +39,14 @@ export default function PairsManager({ initial }: { initial: unknown }) {
         risk calculator, journal, analysis log, and note or strategy tags.
         Changes save automatically.
       </p>
-      {msg && (
-        <p className={`mb-4 text-xs ${msg === "Saved." ? "text-success" : "text-danger"}`}>{msg}</p>
-      )}
+      {/* Fixed-height slot: the message appearing/disappearing must never
+          shift the pair grid below it (that read as page flicker). */}
+      <p
+        aria-live="polite"
+        className={`mb-4 min-h-4 text-xs ${msg === "Saved." ? "text-success" : "text-danger"}`}
+      >
+        {msg ?? ""}
+      </p>
       <div className="space-y-5">
         {PAIR_CATEGORIES.map((cat) => (
           <div key={cat}>
