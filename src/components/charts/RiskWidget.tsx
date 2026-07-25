@@ -117,18 +117,18 @@ export default function RiskWidget({
       const r = sizeFromRisk({ ...common, riskPct: parseFloat(riskPct), entry: parseFloat(entry), stop: parseFloat(stop) });
       if (r) {
         big = ["Lot size", r.lots.toFixed(2)];
-        rows.push([r.direction === "long" ? "Long" : "Short", `${r.stopPips.toFixed(1)} pips`], ["Risk", moneySigned(r.riskAmount, cur)]);
+        rows.push([r.direction === "long" ? "Long" : "Short", `${r.stopPips.toFixed(1)} pips`], ["Risk", moneySigned(-r.riskAmount, cur)]);
       }
     } else if (mode === "stop") {
       const r = stopFromLots({ ...common, riskPct: parseFloat(riskPct), lots: parseFloat(lots), entry: parseFloat(entry), direction });
       if (r) {
         big = ["Stop-loss", r.stopPrice.toFixed(priceDecimals)];
-        rows.push([direction === "long" ? "Long" : "Short", `${r.stopPips.toFixed(1)} pips`], ["Risk", moneySigned(r.riskAmount, cur)]);
+        rows.push([direction === "long" ? "Long" : "Short", `${r.stopPips.toFixed(1)} pips`], ["Risk", moneySigned(-r.riskAmount, cur)]);
       }
     } else {
       const r = riskFromLots({ ...common, lots: parseFloat(lots), entry: parseFloat(entry), stop: parseFloat(stop) });
       if (r) {
-        big = ["Risk", moneySigned(r.riskAmount, cur)];
+        big = ["Risk", moneySigned(-r.riskAmount, cur)];
         rows.push([r.direction === "long" ? "Long" : "Short", `${r.stopPips.toFixed(1)} pips`], ["Risk %", `${r.riskPct.toFixed(2)}%`]);
       }
     }
