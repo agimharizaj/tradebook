@@ -75,7 +75,7 @@ export default function NewsPage() {
           height={420}
           config={{
             currencies: ["EUR", "USD", "JPY", "GBP", "CHF", "AUD", "CAD", "NZD"],
-            isTransparent: true,
+            isTransparent: false,
             colorTheme: theme,
             locale: "en",
           }}
