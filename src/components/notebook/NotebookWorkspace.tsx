@@ -85,15 +85,26 @@ export default function NotebookWorkspace() {
   }, [loadList]);
 
   // Backspace/Delete (outside text fields) asks to delete the open note.
+  // While the confirm dialog is open: Enter deletes, Escape cancels.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (confirmDelete) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          performDelete();
+        } else if (e.key === "Escape") {
+          setConfirmDelete(false);
+        }
+        return;
+      }
       if (e.key !== "Backspace" && e.key !== "Delete") return;
-      if (!note || confirmDelete || showLog || isTypingTarget()) return;
+      if (!note || showLog || isTypingTarget()) return;
       e.preventDefault();
       setConfirmDelete(true);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note, confirmDelete, showLog]);
 
   // Delete the given note if the user never wrote in it.

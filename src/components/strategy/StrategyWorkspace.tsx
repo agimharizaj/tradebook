@@ -107,15 +107,26 @@ export default function StrategyWorkspace() {
   }, [loadList]);
 
   // Backspace/Delete (outside text fields) asks to delete the open strategy.
+  // While the confirm dialog is open: Enter deletes, Escape cancels.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (confirmDelete) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          performDelete();
+        } else if (e.key === "Escape") {
+          setConfirmDelete(false);
+        }
+        return;
+      }
       if (e.key !== "Backspace" && e.key !== "Delete") return;
-      if (!draft || confirmDelete || pendingNav || isTypingTarget()) return;
+      if (!draft || pendingNav || isTypingTarget()) return;
       e.preventDefault();
       setConfirmDelete(true);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft, confirmDelete, pendingNav]);
 
   async function openStrategy(id: string) {
