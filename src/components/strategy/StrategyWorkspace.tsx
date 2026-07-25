@@ -1082,7 +1082,7 @@ function ViewChecks({
               </svg>
             )}
           </span>
-          <span className={it.checked ? "" : "text-muted"}>{it.text}</span>
+          <span className={it.checked ? "text-muted line-through" : "text-muted"}>{it.text}</span>
         </button>
       ))}
     </div>
