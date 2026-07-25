@@ -18,11 +18,35 @@ function Icon({ d }: { d: string }) {
 export default function Sidebar({ email, name }: { email: string; name?: string }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [width, setWidth] = useState(240);
+  const [dragging, setDragging] = useState(false);
   const displayLabel = name && name.trim() ? name : email;
+
+  const MIN = 200;
+  const MAX = 380;
 
   useEffect(() => {
     setCollapsed(localStorage.getItem("tb_sidebar_collapsed") === "1");
+    const w = parseInt(localStorage.getItem("tb_sidebar_width") || "", 10);
+    if (!Number.isNaN(w)) setWidth(Math.min(MAX, Math.max(MIN, w)));
   }, []);
+
+  useEffect(() => {
+    if (!dragging) return;
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+    const onMove = (e: PointerEvent) => setWidth(Math.min(MAX, Math.max(MIN, e.clientX)));
+    const onUp = () => setDragging(false);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      localStorage.setItem("tb_sidebar_width", String(width));
+    };
+  }, [dragging, width]);
 
   function toggle() {
     setCollapsed((c) => {
@@ -39,8 +63,9 @@ export default function Sidebar({ email, name }: { email: string; name?: string 
 
   return (
     <aside
-      className={`hidden h-screen shrink-0 flex-col border-r border-border bg-background transition-[width] duration-200 md:flex ${
-        collapsed ? "w-16" : "w-60"
+      style={{ width: collapsed ? 64 : width }}
+      className={`relative hidden h-screen shrink-0 flex-col border-r border-border bg-background md:flex ${
+        dragging ? "" : "transition-[width] duration-200"
       }`}
     >
       <Link
@@ -91,6 +116,21 @@ export default function Sidebar({ email, name }: { email: string; name?: string 
           </button>
         </div>
       </div>
+
+      {!collapsed && (
+        <div
+          onPointerDown={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDoubleClick={() => {
+            setWidth(240);
+            localStorage.setItem("tb_sidebar_width", "240");
+          }}
+          title="Drag to resize, double-click to reset"
+          className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize transition hover:bg-accent/40"
+        />
+      )}
     </aside>
   );
 }
