@@ -206,7 +206,7 @@ export default function ImportTradesModal({
               In MT5: History tab, right-click, Report, save as HTML (or export CSV). Upload it here.
             </p>
           </div>
-          <button onClick={onClose} className="text-muted hover:text-foreground" aria-label="Close">✕</button>
+          <button onClick={onClose} className="-m-2 shrink-0 rounded-md p-2 text-muted hover:text-foreground" aria-label="Close">✕</button>
         </div>
 
         <label className="flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-border2 py-6 text-sm text-muted transition hover:border-accent hover:text-accent2">
@@ -218,7 +218,7 @@ export default function ImportTradesModal({
           <>
             <div className="mt-5">
               <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Map columns</div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2">
                 {FIELDS.map((f) => (
                   <label key={f.key} className="block">
                     <span className="mb-1 block text-xs text-dim">

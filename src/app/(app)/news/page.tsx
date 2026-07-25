@@ -4,6 +4,19 @@ import { useEffect, useState } from "react";
 import TVWidget from "@/components/TVWidget";
 import NewsFeed from "@/components/news/NewsFeed";
 
+// Shorter embeds on phones so the page doesn't become a 2000px scroll.
+function useIsMobile() {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const update = () => setMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return mobile;
+}
+
 function useAppTheme() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   useEffect(() => {
@@ -19,6 +32,8 @@ function useAppTheme() {
 
 export default function NewsPage() {
   const theme = useAppTheme();
+  const mobile = useIsMobile();
+  const tall = mobile ? 480 : 720;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
@@ -49,14 +64,14 @@ export default function NewsPage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <div className="rounded-2xl bg-card p-4 ring-1 ring-border">
           <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">Market news</h2>
-          <NewsFeed height={720} />
+          <NewsFeed height={tall} />
         </div>
 
         <div className="rounded-2xl bg-card p-3 ring-1 ring-border">
           <h2 className="mb-2 px-1 pt-1 text-sm font-medium uppercase tracking-wide text-muted">Economic calendar</h2>
           <TVWidget
             src="https://s3.tradingview.com/external-embedding/embed-widget-events.js"
-            height={720}
+            height={tall}
             config={{
               colorTheme: theme,
               isTransparent: false,
@@ -72,7 +87,7 @@ export default function NewsPage() {
         <h2 className="mb-2 px-1 pt-1 text-sm font-medium uppercase tracking-wide text-muted">Forex heatmap</h2>
         <TVWidget
           src="https://s3.tradingview.com/external-embedding/embed-widget-forex-heat-map.js"
-          height={420}
+          height={mobile ? 360 : 420}
           config={{
             currencies: ["EUR", "USD", "JPY", "GBP", "CHF", "AUD", "CAD", "NZD"],
             isTransparent: false,

@@ -207,7 +207,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "up
     <div className="rounded-xl bg-card p-4 ring-1 ring-border">
       <div className="text-xs text-dim">{label}</div>
       <div
-        className={`mt-1 text-xl font-medium ${tone === "up" ? "text-success" : tone === "down" ? "text-danger" : ""}`}
+        className={`mt-1 truncate text-xl font-medium ${tone === "up" ? "text-success" : tone === "down" ? "text-danger" : ""}`}
         style={{ fontFamily: "var(--font-mono)" }}
       >
         {value}
@@ -221,7 +221,7 @@ function Mini({ label, value, tone }: { label: string; value: string; tone?: "up
     <div className="rounded-lg bg-surface2 p-3">
       <div className="text-xs text-dim">{label}</div>
       <div
-        className={`mt-0.5 text-base font-medium ${tone === "up" ? "text-success" : tone === "down" ? "text-danger" : ""}`}
+        className={`mt-0.5 truncate text-base font-medium ${tone === "up" ? "text-success" : tone === "down" ? "text-danger" : ""}`}
         style={{ fontFamily: "var(--font-mono)" }}
       >
         {value}

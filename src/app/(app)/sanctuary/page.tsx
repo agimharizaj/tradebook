@@ -102,7 +102,7 @@ export default function SanctuaryPage() {
               <button
                 key={k}
                 onClick={() => setPatternKey(k)}
-                className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+                className={`rounded-lg border px-3 py-2.5 text-sm transition ${
                   patternKey === k ? "border-accent bg-accent-soft text-accent2" : "border-border2 text-muted"
                 }`}
               >
@@ -115,7 +115,7 @@ export default function SanctuaryPage() {
               <button
                 key={d}
                 onClick={() => setDurationMin(d)}
-                className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+                className={`rounded-lg border px-3 py-2.5 text-sm transition ${
                   durationMin === d ? "border-accent bg-accent-soft text-accent2" : "border-border2 text-muted"
                 }`}
               >

@@ -192,7 +192,7 @@ export default function RiskPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 md:px-8 md:py-10">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
           <h1 className="text-2xl">Risk &amp; position size</h1>
           <p className="mt-1 text-muted">
@@ -201,18 +201,18 @@ export default function RiskPage() {
         </div>
         <button
           onClick={() => refreshMarket(true)}
-          className="shrink-0 rounded-lg border border-border2 px-3 py-2 text-xs text-muted transition hover:border-accent hover:text-foreground"
+          className="self-start rounded-lg border border-border2 px-3 py-2 text-xs text-muted transition hover:border-accent hover:text-foreground sm:shrink-0"
         >
           {fxLoading ? "Refreshing..." : "Refresh prices"}
         </button>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-1 rounded-xl border border-border2 bg-card p-1">
+      <div className="mt-5 grid gap-1 rounded-xl border border-border2 bg-card p-1 sm:flex sm:flex-wrap">
         {MODES.map((m) => (
           <button
             key={m.id}
             onClick={() => setMode(m.id)}
-            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${
+            className={`rounded-lg px-3.5 py-2.5 text-sm font-medium transition sm:py-1.5 ${
               mode === m.id
                 ? "bg-accent text-white"
                 : "text-muted hover:text-foreground"
@@ -351,7 +351,7 @@ function Row({ label, value, big }: { label: string; value: string; big?: boolea
   return (
     <div className="flex items-center justify-between">
       <span className="text-sm text-muted">{label}</span>
-      <span className={big ? "font-mono text-3xl font-bold text-accent2" : "font-mono text-sm font-medium"}>
+      <span className={big ? "font-mono text-2xl font-bold text-accent2 md:text-3xl" : "font-mono text-sm font-medium"}>
         {value}
       </span>
     </div>

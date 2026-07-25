@@ -32,6 +32,12 @@ const nextMonthStart = (y: number, m: number) => {
 };
 // traded_on may be a date ("2026-07-25") or a timestamp; day key is the date part.
 const dayKey = (tradedOn: string) => tradedOn.slice(0, 10);
+// Phone calendar cells are ~40px wide; "1.2k" fits where "1,234" cannot.
+function compactMoney(net: number) {
+  const abs = Math.abs(net);
+  if (abs >= 1000) return `${(abs / 1000).toFixed(abs >= 10000 ? 0 : 1)}k`;
+  return String(Math.round(abs));
+}
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -155,7 +161,7 @@ export default function JournalWorkspace() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl">Journal</h1>
           <p className="mt-1 text-muted">
@@ -184,24 +190,24 @@ export default function JournalWorkspace() {
         </p>
       )}
 
-      <div className="rounded-2xl bg-card p-5 ring-1 ring-border">
+      <div className="rounded-2xl bg-card p-2.5 ring-1 ring-border md:p-5">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => shift(-1)} className="rounded-md border border-border2 px-2 py-1 text-sm text-muted hover:text-foreground">‹</button>
+            <button onClick={() => shift(-1)} className="rounded-md border border-border2 px-3 py-2 text-sm text-muted hover:text-foreground">‹</button>
             <span className="text-lg font-medium" style={{ fontFamily: "var(--font-display)" }}>
               {MONTHS[cursor.m]} {cursor.y}
             </span>
-            <button onClick={() => shift(1)} className="rounded-md border border-border2 px-2 py-1 text-sm text-muted hover:text-foreground">›</button>
+            <button onClick={() => shift(1)} className="rounded-md border border-border2 px-3 py-2 text-sm text-muted hover:text-foreground">›</button>
           </div>
           <button
             onClick={() => setCursor({ y: now.getFullYear(), m: now.getMonth() })}
-            className="rounded-md border border-border2 px-3 py-1 text-xs text-muted hover:text-foreground"
+            className="rounded-md border border-border2 px-3 py-2 text-xs text-muted hover:text-foreground"
           >
             This month
           </button>
         </div>
 
-        <div className="grid grid-cols-7 gap-1.5">
+        <div className="grid grid-cols-7 gap-1 md:gap-1.5">
           {DOW.map((d) => (
             <div key={d} className="pb-1 text-center text-xs text-dim">{d}</div>
           ))}
@@ -237,7 +243,7 @@ export default function JournalWorkspace() {
                       style={{ fontFamily: "var(--font-mono)" }}
                     >
                       <span className="md:hidden">
-                        {`${net > 0 ? "+" : net < 0 ? "-" : ""}${sym(cur)}${Math.abs(Math.round(net)).toLocaleString()}`}
+                        {`${net > 0 ? "+" : net < 0 ? "-" : ""}${sym(cur)}${compactMoney(net)}`}
                       </span>
                       <span className="hidden md:inline">{moneySigned(net, cur)}</span>
                     </span>
@@ -335,7 +341,7 @@ function Metric({ label, value, tone }: { label: string; value: string; tone?: "
     <div className="rounded-lg bg-surface2 p-3">
       <div className="text-xs text-dim">{label}</div>
       <div
-        className={`mt-0.5 text-lg font-medium ${tone === "up" ? "text-success" : tone === "down" ? "text-danger" : ""}`}
+        className={`mt-0.5 truncate text-lg font-medium ${tone === "up" ? "text-success" : tone === "down" ? "text-danger" : ""}`}
         style={{ fontFamily: "var(--font-mono)" }}
       >
         {value}
@@ -424,7 +430,7 @@ function DayModal({
       <div className="max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-card p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] ring-1 ring-border2 sm:rounded-2xl sm:pb-6">
         <div className="mb-4 flex items-start justify-between">
           <h2 className="text-lg" style={{ fontFamily: "var(--font-display)" }}>{heading}</h2>
-          <button onClick={onClose} className="text-muted hover:text-foreground" aria-label="Close">✕</button>
+          <button onClick={onClose} className="-m-2 rounded-md p-2 text-muted hover:text-foreground" aria-label="Close">✕</button>
         </div>
 
         {trades.length > 0 && (
