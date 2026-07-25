@@ -360,23 +360,28 @@ export default function StrategyWorkspace() {
         ) : list.length === 0 ? (
           <p className="text-sm text-muted">No plans yet. Create one.</p>
         ) : (
-          <div className="space-y-1">
-            {list.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => openStrategy(s.id)}
-                className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${
-                  draft?.id === s.id
-                    ? "bg-accent-soft text-accent2"
-                    : "text-muted hover:bg-surface2 hover:text-foreground"
-                }`}
-              >
-                <div className="font-medium">{s.name}</div>
-                {s.plan_type && (
-                  <div className="text-xs text-dim">{s.plan_type}</div>
-                )}
-              </button>
-            ))}
+          <div className="space-y-1.5">
+            {list.map((s) => {
+              const active = draft?.id === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => openStrategy(s.id)}
+                  className={`w-full rounded-lg border px-3 py-2.5 text-left transition ${
+                    active
+                      ? "border-accent bg-accent-soft"
+                      : "border-border bg-card hover:border-accent"
+                  }`}
+                >
+                  <div className={`truncate text-sm font-medium ${active ? "text-accent2" : "text-foreground"}`}>
+                    {s.name}
+                  </div>
+                  {s.plan_type && (
+                    <div className="mt-0.5 truncate text-xs text-dim">{s.plan_type}</div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
       </aside>

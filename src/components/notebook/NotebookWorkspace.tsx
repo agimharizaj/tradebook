@@ -295,20 +295,36 @@ export default function NotebookWorkspace() {
 
 function NoteList({ list, activeId, onOpen }: { list: NoteRow[]; activeId?: string; onOpen: (id: string) => void }) {
   if (list.length === 0) return <p className="text-sm text-muted">No notes yet.</p>;
+  const when = (s: string) => {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime())
+      ? ""
+      : d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  };
   return (
-    <div className="space-y-1">
-      {list.map((n) => (
-        <button
-          key={n.id}
-          onClick={() => onOpen(n.id)}
-          className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition ${
-            activeId === n.id ? "bg-accent-soft text-accent2" : "text-muted hover:bg-surface2 hover:text-foreground"
-          }`}
-        >
-          {n.pinned && <span className="text-xs text-accent2">●</span>}
-          <span className="truncate">{n.title || "Untitled"}</span>
-        </button>
-      ))}
+    <div className="space-y-1.5">
+      {list.map((n) => {
+        const active = activeId === n.id;
+        return (
+          <button
+            key={n.id}
+            onClick={() => onOpen(n.id)}
+            className={`w-full rounded-lg border px-3 py-2.5 text-left transition ${
+              active
+                ? "border-accent bg-accent-soft"
+                : "border-border bg-card hover:border-accent"
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              {n.pinned && <span className="shrink-0 text-[10px] text-accent2">●</span>}
+              <span className={`truncate text-sm font-medium ${active ? "text-accent2" : "text-foreground"}`}>
+                {n.title || "Untitled"}
+              </span>
+            </span>
+            <span className="mt-0.5 block text-xs text-dim">{when(n.updated_at)}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
