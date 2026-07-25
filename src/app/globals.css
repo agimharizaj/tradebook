@@ -127,16 +127,16 @@ h3 {
   display: none;
 }
 
-/* Phone sizing: the app is built in rem units, so raising the root font
-   size scales the entire UI (text, padding, buttons) proportionally.
-   17px = ~6% larger than default. 18px was tried and felt too big. */
+/* Phone sizing: the app is built in rem units, so the root font size scales
+   the entire UI proportionally. 16px (browser default) after trying 17px and
+   18px - both felt too large. Raise this one number to scale the phone UI up. */
 @media (max-width: 767px) {
   html {
-    font-size: 17px;
+    font-size: 16px;
   }
 
   /* iOS Safari auto-zooms the page when a focused input is under 16px.
-     1rem here is 17px, comfortably above the zoom threshold. */
+     1rem here is 16px, exactly at the no-zoom threshold. */
   .field,
   .input,
   .jfield {
