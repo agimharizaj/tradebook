@@ -29,6 +29,8 @@ export default function AnalysisPanel({
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<Analysis | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const [symbol, setSymbol] = useState(defaultSymbol);
   const [timeframe, setTimeframe] = useState("1H");
@@ -44,7 +46,7 @@ export default function AnalysisPanel({
     if (error) {
       setErr(
         /relation .* does not exist|chart_analyses/.test(error.message)
-          ? "Run migration 0004_chart_analyses.sql in Supabase."
+          ? "Run migration 0005_chart_analyses.sql in Supabase."
           : error.message
       );
       return;
@@ -130,10 +132,10 @@ export default function AnalysisPanel({
         {adding && (
           <div className="mb-5 space-y-3 rounded-xl border border-border p-4">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Symbol"><input value={symbol} onChange={(e) => setSymbol(e.target.value)} className="afield" /></Field>
-              <Field label="Timeframe"><input value={timeframe} onChange={(e) => setTimeframe(e.target.value)} placeholder="1H, 15m..." className="afield" /></Field>
+              <Field label="Symbol"><input value={symbol} onChange={(e) => setSymbol(e.target.value)} className="jfield" /></Field>
+              <Field label="Timeframe"><input value={timeframe} onChange={(e) => setTimeframe(e.target.value)} placeholder="1H, 15m..." className="jfield" /></Field>
               <Field label="Bias">
-                <select value={direction} onChange={(e) => setDirection(e.target.value)} className="afield">
+                <select value={direction} onChange={(e) => setDirection(e.target.value)} className="jfield">
                   <option value="long">Long</option>
                   <option value="short">Short</option>
                   <option value="neutral">Neutral</option>
@@ -144,7 +146,7 @@ export default function AnalysisPanel({
               </Field>
             </div>
             <Field label="Notes">
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Your read on the setup..." className="afield resize-y" />
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Your read on the setup..." className="jfield resize-y" />
             </Field>
             <div className="flex justify-end gap-2">
               <button onClick={() => setAdding(false)} className="rounded-lg border border-border2 px-4 py-2 text-sm text-muted hover:text-foreground">Cancel</button>
@@ -157,7 +159,14 @@ export default function AnalysisPanel({
 
         <div className="space-y-3">
           {items.map((a) => (
-            <div key={a.id} className="rounded-xl border border-border p-3">
+            <div
+              key={a.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => setViewing(a)}
+              onKeyDown={(e) => { if (e.key === "Enter") setViewing(a); }}
+              className="cursor-pointer rounded-xl border border-border p-3 transition hover:border-accent"
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm">
                   <span className="font-medium">{a.symbol}</span>
@@ -170,23 +179,86 @@ export default function AnalysisPanel({
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-dim">{new Date(a.created_at).toLocaleDateString()}</span>
-                  <button onClick={() => del(a)} className="text-dim hover:text-danger" aria-label="Delete">✕</button>
+                  {confirmingId === a.id ? (
+                    <span className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => { setConfirmingId(null); del(a); }}
+                        className="rounded-md bg-danger/15 px-2.5 py-1.5 text-xs font-medium text-danger transition hover:bg-danger/25"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setConfirmingId(null)}
+                        className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:text-foreground"
+                      >
+                        Cancel
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setConfirmingId(a.id); }}
+                      className="rounded-md p-2 text-muted transition hover:bg-danger/15 hover:text-danger"
+                      aria-label="Delete"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
               </div>
-              {a.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-muted">{a.notes}</p>}
-              {urls[a.id] && (
+              {a.notes && <p className="mt-2 line-clamp-2 whitespace-pre-wrap text-sm text-muted">{a.notes}</p>}
+              {urls[a.id] ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={urls[a.id]} alt="analysis" className="mt-2 max-h-72 rounded-lg border border-border" />
-              )}
+                <img src={urls[a.id]} alt={`${a.symbol} analysis screenshot`} className="mt-2 max-h-40 rounded-lg border border-border" />
+              ) : a.image_path ? (
+                <p className="mt-2 text-xs text-dim">Screenshot attached - open to view.</p>
+              ) : null}
             </div>
           ))}
         </div>
       </div>
 
-      <style>{`
-        .afield{width:100%;border-radius:.5rem;border:1px solid var(--border2);background:var(--surface2);color:var(--foreground);padding:.5rem .65rem;font-size:.85rem;outline:none}
-        .afield:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-      `}</style>
+      {viewing && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setViewing(null)}
+        >
+          <div
+            className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-card p-6 ring-1 ring-border2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-medium" style={{ fontFamily: "var(--font-display)" }}>{viewing.symbol}</span>
+                {viewing.timeframe && <span className="text-sm text-dim">{viewing.timeframe}</span>}
+                {viewing.direction && (
+                  <span className={`rounded px-1.5 py-0.5 text-xs ${viewing.direction === "long" ? "bg-success/15 text-success" : viewing.direction === "short" ? "bg-danger/15 text-danger" : "bg-surface2 text-muted"}`}>
+                    {viewing.direction}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-dim">
+                  {new Date(viewing.created_at).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+                </span>
+                {urls[viewing.id] && (
+                  <a href={urls[viewing.id]} target="_blank" rel="noreferrer" className="text-xs text-accent2 hover:underline">
+                    Open full size
+                  </a>
+                )}
+                <button onClick={() => setViewing(null)} className="rounded-md p-1.5 text-muted hover:text-foreground" aria-label="Close viewer">✕</button>
+              </div>
+            </div>
+            {viewing.notes && <p className="mb-3 whitespace-pre-wrap text-sm text-muted">{viewing.notes}</p>}
+            {urls[viewing.id] ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={urls[viewing.id]} alt={`${viewing.symbol} analysis screenshot`} className="w-full rounded-lg border border-border" />
+            ) : viewing.image_path ? (
+              <p className="text-sm text-dim">Screenshot link expired - close and reopen the log to refresh it.</p>
+            ) : null}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
