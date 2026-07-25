@@ -53,7 +53,7 @@ The approved look is the dark "terminal" concept in `design/tradebook-brand-conc
 - Layout: collapsible sidebar (state in localStorage), viewport-pinned; content scrolls inside. Pinch zoom enabled (no maximumScale).
 - Database: schema + RLS in `supabase/migrations/` (0001 init, 0002 import ext_id, 0003 notes, 0004 traded_on -> timestamptz + commission). Apply 0004 in the Supabase SQL Editor before using MT5 import again.
 - Security: password minimum is 10 in the client; ALSO raise it in Supabase dashboard (Auth -> Passwords, still default 6) and enable leaked-password protection.
-- Accessibility: form labels and primary buttons pass WCAG AA (see brand section); avoid reintroducing `#757C8E` text or `maximumScale: 1`.
+- Accessibility: form labels and primary buttons pass WCAG AA (see brand section); avoid reintroducing `#757C8E` text or `maximumScale: 1`. Light theme (`html[data-theme="light"]` in `globals.css`) is also AA-tuned: dim `#646B7E`, success `#087A52`, danger `#C92F35`, gold `#9A650F`; page bg darker than cards for elevation. Recheck contrast before changing any of these.
 - Shared form input CSS (`.field`/`.input`/`.jfield`) lives in `globals.css`, not per-component style tags.
 - Deploy: pushed to GitHub (`agimharizaj/tradebook`), auto-deploys to Vercel on push to `main`.
 - Industry benchmark: `industry-standards-review.md` (July 2026). Deferred from its list: StrategyWorkspace split, per-trade screenshots, multi-tag setups, time-of-day reports, service worker.

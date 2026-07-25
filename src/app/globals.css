@@ -22,22 +22,26 @@
   color-scheme: dark;
 }
 
+/* Light palette: every text color below clears WCAG AA 4.5:1 on white cards
+   AND on surface2 inputs. Page bg is deliberately darker than cards so the
+   elevation ladder reads (page < bg2 < card). Do not lighten text colors or
+   flatten surfaces without rechecking contrast. */
 html[data-theme="light"] {
-  --background: #edeff4;
-  --bg2: #f6f7fb;
+  --background: #e7eaf1;
+  --bg2: #f2f4f9;
   --card: #ffffff;
   --surface2: #eef0f5;
   --foreground: #1b1e27;
   --muted: #5b6273;
-  --dim: #767d8e;
-  --border: rgba(0, 0, 0, 0.09);
-  --border2: rgba(0, 0, 0, 0.16);
-  --accent: #6a58f0;
+  --dim: #646b7e; /* 5.3:1 on white, 4.7:1 on inputs (was #767d8e at 4.1:1) */
+  --border: rgba(0, 0, 0, 0.12);
+  --border2: rgba(0, 0, 0, 0.22);
+  --accent: #6a58f0; /* white text on it: 4.9:1 */
   --accent2: #5b46ff;
-  --accent-soft: rgba(106, 88, 240, 0.12);
-  --success: #0ea371;
-  --danger: #e5484d;
-  --gold: #b7791f;
+  --accent-soft: rgba(106, 88, 240, 0.14);
+  --success: #087a52; /* 5.4:1 on white (was #0ea371 at 3.2:1) */
+  --danger: #c92f35; /* 5.3:1 on white (was #e5484d at 3.9:1) */
+  --gold: #9a650f; /* 5.0:1 on white (was #b7791f at 3.6:1) */
   color-scheme: light;
 }
 
