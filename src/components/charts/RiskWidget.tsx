@@ -1,9 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { sizeFromRisk, quoteCurrency } from "@/lib/risk";
+import { sizeFromRisk, stopFromLots, riskFromLots, quoteCurrency } from "@/lib/risk";
 import { moneySigned } from "@/lib/format";
+
+type Mode = "size" | "stop" | "risk";
+const MODES: { id: Mode; label: string }[] = [
+  { id: "size", label: "Risk → lot size" },
+  { id: "stop", label: "Lot size → stop" },
+  { id: "risk", label: "Lot size + stop → risk" },
+];
 
 export default function RiskWidget({
   pairLabel,
@@ -14,14 +21,20 @@ export default function RiskWidget({
 }) {
   const pair = pairLabel.split(" ")[0].toUpperCase();
   const supported = pair.includes("/");
+  const base = supported ? pair.split("/")[0] : "";
   const quote = supported ? quoteCurrency(pair) : "";
+  const priceDecimals = pair.includes("JPY") ? 3 : pair.startsWith("XAU") || pair.startsWith("BTC") ? 2 : 5;
 
+  const [mode, setMode] = useState<Mode>("size");
   const [accountSize, setAccountSize] = useState("10000");
   const [riskPct, setRiskPct] = useState("1");
   const [entry, setEntry] = useState("");
   const [stop, setStop] = useState("");
+  const [lots, setLots] = useState("");
+  const [direction, setDirection] = useState<"long" | "short">("long");
   const [cur, setCur] = useState("USD");
   const [conv, setConv] = useState(1);
+  const [livePrice, setLivePrice] = useState<number | null>(null);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const offset = useRef({ x: 0, y: 0 });
@@ -38,18 +51,31 @@ export default function RiskWidget({
     });
   }, []);
 
+  const refresh = useCallback(
+    async (prefill: boolean) => {
+      if (!supported) return;
+      try {
+        const pr = await fetch(`/api/fx?from=${base}&to=${quote}`).then((r) => r.json());
+        if (typeof pr.rate === "number") {
+          setLivePrice(pr.rate);
+          if (prefill) setEntry(pr.rate.toFixed(priceDecimals));
+        }
+      } catch {}
+      if (quote && quote !== cur) {
+        try {
+          const cr = await fetch(`/api/fx?from=${quote}&to=${cur}`).then((r) => r.json());
+          if (typeof cr.rate === "number") setConv(cr.rate);
+        } catch {}
+      } else {
+        setConv(1);
+      }
+    },
+    [supported, base, quote, cur, priceDecimals]
+  );
+
   useEffect(() => {
-    if (!quote || quote === cur) {
-      setConv(1);
-      return;
-    }
-    fetch(`/api/fx?from=${quote}&to=${cur}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (typeof d.rate === "number") setConv(d.rate);
-      })
-      .catch(() => {});
-  }, [quote, cur]);
+    refresh(false);
+  }, [refresh]);
 
   useEffect(() => {
     if (!dragging) return;
@@ -83,64 +109,98 @@ export default function RiskWidget({
     setDragging(true);
   }
 
-  const res = supported
-    ? sizeFromRisk({
-        accountSize: parseFloat(accountSize),
-        riskPct: parseFloat(riskPct),
-        entry: parseFloat(entry),
-        stop: parseFloat(stop),
-        pair,
-        conversion: conv,
-      })
-    : null;
+  const common = { accountSize: parseFloat(accountSize), pair, conversion: conv };
+  let big: [string, string] | null = null;
+  const rows: [string, string][] = [];
+  if (supported) {
+    if (mode === "size") {
+      const r = sizeFromRisk({ ...common, riskPct: parseFloat(riskPct), entry: parseFloat(entry), stop: parseFloat(stop) });
+      if (r) {
+        big = ["Lot size", r.lots.toFixed(2)];
+        rows.push([r.direction === "long" ? "Long" : "Short", `${r.stopPips.toFixed(1)} pips`], ["Risk", moneySigned(r.riskAmount, cur)]);
+      }
+    } else if (mode === "stop") {
+      const r = stopFromLots({ ...common, riskPct: parseFloat(riskPct), lots: parseFloat(lots), entry: parseFloat(entry), direction });
+      if (r) {
+        big = ["Stop-loss", r.stopPrice.toFixed(priceDecimals)];
+        rows.push([direction === "long" ? "Long" : "Short", `${r.stopPips.toFixed(1)} pips`], ["Risk", moneySigned(r.riskAmount, cur)]);
+      }
+    } else {
+      const r = riskFromLots({ ...common, lots: parseFloat(lots), entry: parseFloat(entry), stop: parseFloat(stop) });
+      if (r) {
+        big = ["Risk", moneySigned(r.riskAmount, cur)];
+        rows.push([r.direction === "long" ? "Long" : "Short", `${r.stopPips.toFixed(1)} pips`], ["Risk %", `${r.riskPct.toFixed(2)}%`]);
+      }
+    }
+  }
 
   return (
     <>
       <div
         ref={rootRef}
         style={pos ? { left: pos.x, top: pos.y } : { right: 12, top: 12 }}
-        className="absolute z-20 w-64 rounded-xl border border-border2 bg-card/95 p-3 shadow-xl backdrop-blur max-md:!inset-x-2 max-md:!bottom-2 max-md:!top-auto max-md:w-auto"
+        className="absolute z-20 w-72 rounded-xl border border-border2 bg-card/95 p-3 shadow-xl backdrop-blur max-md:!inset-x-2 max-md:!bottom-2 max-md:!top-auto max-md:w-auto"
       >
-        <div
-          onPointerDown={startDrag}
-          className="mb-2 flex cursor-move select-none items-center justify-between"
-        >
+        <div onPointerDown={startDrag} className="mb-2 flex cursor-move select-none items-center justify-between">
           <span className="text-xs font-medium uppercase tracking-wide text-muted">⋮⋮ Risk · {pair}</span>
-          <button
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={onClose}
-            className="rounded-md p-1.5 text-dim hover:text-foreground"
-            aria-label="Close"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-1">
+            <button onPointerDown={(e) => e.stopPropagation()} onClick={() => refresh(true)} className="rounded-md px-1.5 py-0.5 text-[10px] text-accent2 hover:underline" title="Refresh price">↻ price</button>
+            <button onPointerDown={(e) => e.stopPropagation()} onClick={onClose} className="rounded-md p-1.5 text-dim hover:text-foreground" aria-label="Close">✕</button>
+          </div>
         </div>
 
         {!supported ? (
           <p className="text-xs text-dim">Position sizing isn&apos;t available for this instrument yet.</p>
         ) : (
           <>
+            <select value={mode} onChange={(e) => setMode(e.target.value as Mode)} className="rfield mb-2 w-full">
+              {MODES.map((m) => (<option key={m.id} value={m.id}>{m.label}</option>))}
+            </select>
+
             <div className="grid grid-cols-2 gap-2">
               <Field label={`Account (${cur})`}><input inputMode="decimal" value={accountSize} onChange={(e) => setAccountSize(e.target.value)} className="rfield" /></Field>
-              <Field label="Risk %"><input inputMode="decimal" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} className="rfield" /></Field>
+              {(mode === "size" || mode === "stop") && (
+                <Field label="Risk %"><input inputMode="decimal" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} className="rfield" /></Field>
+              )}
+              {(mode === "stop" || mode === "risk") && (
+                <Field label="Lots"><input inputMode="decimal" value={lots} onChange={(e) => setLots(e.target.value)} className="rfield" /></Field>
+              )}
               <Field label="Entry"><input inputMode="decimal" value={entry} onChange={(e) => setEntry(e.target.value)} className="rfield" /></Field>
-              <Field label="Stop"><input inputMode="decimal" value={stop} onChange={(e) => setStop(e.target.value)} className="rfield" /></Field>
+              {mode === "stop" ? (
+                <Field label="Direction">
+                  <select value={direction} onChange={(e) => setDirection(e.target.value as "long" | "short")} className="rfield">
+                    <option value="long">Long</option>
+                    <option value="short">Short</option>
+                  </select>
+                </Field>
+              ) : (
+                <Field label="Stop"><input inputMode="decimal" value={stop} onChange={(e) => setStop(e.target.value)} className="rfield" /></Field>
+              )}
+              {quote !== cur && (
+                <Field label={`1 ${quote} = ${cur}`}><input inputMode="decimal" value={String(conv)} onChange={(e) => setConv(parseFloat(e.target.value) || 0)} className="rfield" /></Field>
+              )}
             </div>
 
-            <div className="mt-3 border-t border-border pt-2">
-              {res ? (
+            {livePrice != null && (
+              <div className="mt-1 flex items-center gap-2 text-[11px] text-dim">
+                Live ~{livePrice.toFixed(priceDecimals)}
+                <button onClick={() => setEntry(livePrice.toFixed(priceDecimals))} className="text-accent2 hover:underline">use as entry</button>
+              </div>
+            )}
+
+            <div className="mt-2 border-t border-border pt-2">
+              {big ? (
                 <>
                   <div className="flex items-end justify-between">
-                    <span className="text-xs text-muted">Lot size</span>
-                    <span className="font-mono text-2xl font-bold text-accent2">{res.lots.toFixed(2)}</span>
+                    <span className="text-xs text-muted">{big[0]}</span>
+                    <span className="font-mono text-2xl font-bold text-accent2">{big[1]}</span>
                   </div>
                   <div className="mt-1 flex justify-between text-xs text-dim">
-                    <span>{res.direction === "long" ? "Long" : "Short"} · {res.stopPips.toFixed(1)} pips</span>
-                    <span>risk {moneySigned(res.riskAmount, cur)}</span>
+                    {rows.map(([k, v]) => (<span key={k}>{k}: {v}</span>))}
                   </div>
                 </>
               ) : (
-                <p className="text-xs text-dim">Enter entry and stop to size the trade.</p>
+                <p className="text-xs text-dim">Fill the fields to size the trade.</p>
               )}
             </div>
           </>
@@ -149,7 +209,6 @@ export default function RiskWidget({
         <style>{`
           .rfield{width:100%;border-radius:.4rem;border:1px solid var(--border2);background:var(--surface2);color:var(--foreground);padding:.35rem .5rem;font-size:.8rem;font-family:var(--font-mono);outline:none}
           .rfield:focus{border-color:var(--accent)}
-          /* 16px on phones so iOS doesn't zoom the page into the input */
           @media (max-width:767px){ .rfield{ font-size:1rem; padding:.5rem .6rem } }
         `}</style>
       </div>
