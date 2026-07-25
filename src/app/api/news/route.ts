@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const FEEDS = [
-  "https://www.forexlive.com/feed/",
-  "https://www.forexlive.com/feed/news",
+const FEEDS: { url: string; source: string }[] = [
+  { url: "https://www.forexlive.com/feed/", source: "ForexLive" },
+  { url: "https://www.fxstreet.com/rss/news", source: "FXStreet" },
+  { url: "https://www.coindesk.com/arc/outboundfeeds/rss/", source: "CoinDesk" },
 ];
 
 function unwrap(s: string) {
@@ -32,17 +33,17 @@ function htmlToText(h: string) {
 }
 
 export async function GET() {
-  for (const url of FEEDS) {
-    try {
-      const res = await fetch(url, {
+  // Fetch all feeds in parallel; tolerate any subset failing.
+  const results = await Promise.allSettled(
+    FEEDS.map(async (f) => {
+      const res = await fetch(f.url, {
         headers: { "User-Agent": "Mozilla/5.0 (compatible; TradebookBot/1.0)" },
         next: { revalidate: 300 },
       });
-      if (!res.ok) continue;
+      if (!res.ok) throw new Error("feed failed");
       const xml = await res.text();
       const blocks = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)];
-      if (blocks.length === 0) continue;
-      const items = blocks.slice(0, 25).map((m) => {
+      return blocks.slice(0, 40).map((m) => {
         const b = m[1];
         const body = htmlToText(tag(b, "content:encoded") || tag(b, "description"));
         return {
@@ -50,12 +51,24 @@ export async function GET() {
           link: unwrap(tag(b, "link")),
           pubDate: unwrap(tag(b, "pubDate")),
           body: body.slice(0, 5000),
+          source: f.source,
         };
       });
-      return NextResponse.json({ items });
-    } catch {
-      continue;
-    }
+    })
+  );
+
+  const merged = results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
+  const seen = new Set<string>();
+  const items: typeof merged = [];
+  for (const it of merged) {
+    if (!it.link || !it.title || seen.has(it.link)) continue;
+    seen.add(it.link);
+    items.push(it);
   }
-  return NextResponse.json({ items: [], error: "unavailable" }, { status: 502 });
+  items.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+
+  if (items.length === 0) {
+    return NextResponse.json({ items: [], error: "unavailable" }, { status: 502 });
+  }
+  return NextResponse.json({ items: items.slice(0, 150) });
 }

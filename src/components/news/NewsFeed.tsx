@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
-type Item = { title: string; link: string; pubDate: string; body: string };
+type Item = { title: string; link: string; pubDate: string; body: string; source?: string };
 
 function ago(dateStr: string) {
   const t = new Date(dateStr).getTime();
@@ -42,17 +43,64 @@ export default function NewsFeed({ height = 720 }: { height?: number }) {
   const [range, setRange] = useState<RangeKey>("week");
 
   useEffect(() => {
-    fetch("/api/news")
-      .then((r) => r.json())
-      .then((d) => {
-        setItems(d.items ?? []);
-        if (d.error || (d.items ?? []).length === 0) setErr(true);
-        setLoading(false);
-      })
-      .catch(() => {
-        setErr(true);
-        setLoading(false);
-      });
+    (async () => {
+      let live: Item[] = [];
+      try {
+        const d = await fetch("/api/news").then((r) => r.json());
+        live = d.items ?? [];
+      } catch {
+        // fall through to the archive
+      }
+
+      // RSS feeds only carry ~2 days, so the app archives every headline it
+      // sees (migration 0007) and merges the archive back in. Week/Month
+      // filters get deeper the longer the app runs.
+      const supabase = createClient();
+      try {
+        const { data: u } = await supabase.auth.getUser();
+        if (u.user && live.length) {
+          const rows = live.map((it) => ({
+            user_id: u.user!.id,
+            link: it.link,
+            title: it.title,
+            source: it.source ?? null,
+            body: (it.body || "").slice(0, 2000),
+            published_at: Number.isNaN(new Date(it.pubDate).getTime())
+              ? null
+              : new Date(it.pubDate).toISOString(),
+          }));
+          // Fire-and-forget; fails silently before the migration runs.
+          supabase
+            .from("news_items")
+            .upsert(rows, { onConflict: "user_id,link", ignoreDuplicates: true })
+            .then(() => {});
+        }
+        const { data: arch } = await supabase
+          .from("news_items")
+          .select("link, title, source, body, published_at")
+          .order("published_at", { ascending: false })
+          .limit(600);
+        const seen = new Set(live.map((i) => i.link));
+        (arch ?? []).forEach((a) => {
+          if (a.link && !seen.has(a.link)) {
+            live.push({
+              title: a.title,
+              link: a.link,
+              source: a.source ?? undefined,
+              pubDate: a.published_at ?? "",
+              body: a.body ?? "",
+            });
+          }
+        });
+      } catch {
+        // archive unavailable: live feed alone still works
+      }
+
+      live.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+      setItems(live);
+      if (live.length === 0) setErr(true);
+      setLoading(false);
+    })();
   }, []);
 
   const maxHours = RANGES.find((r) => r.key === range)?.hours ?? Infinity;
@@ -121,7 +169,9 @@ export default function NewsFeed({ height = 720 }: { height?: number }) {
                     >
                       <span className="text-sm font-medium leading-snug">{it.title}</span>
                       <span className="flex shrink-0 items-center gap-1.5">
-                        <span className="text-[11px] text-dim">{ago(it.pubDate)}</span>
+                        <span className="text-[11px] text-dim">
+                          {[it.source, ago(it.pubDate)].filter(Boolean).join(" · ")}
+                        </span>
                         <svg
                           width="14"
                           height="14"
