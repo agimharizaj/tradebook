@@ -143,11 +143,11 @@ input[type="time"] {
 }
 
 /* Phone sizing: the app is built in rem units, so the root font size scales
-   the entire UI proportionally. 16px (browser default) after trying 17px and
-   18px - both felt too large. Raise this one number to scale the phone UI up. */
+   the entire UI proportionally. Restored to 17px (~6% up) by request after
+   trying 16px (too small) and 18px (too large). */
 @media (max-width: 767px) {
   html {
-    font-size: 16px;
+    font-size: 17px;
   }
 
   /* iOS Safari auto-zooms the page when a focused input is under 16px.
