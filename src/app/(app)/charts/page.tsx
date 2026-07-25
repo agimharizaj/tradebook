@@ -111,7 +111,8 @@ export default function ChartsPage() {
         </div>
       )}
 
-      <div className="relative flex-1">
+      {/* id used by AnalysisPanel to crop self-tab screen captures to the chart */}
+      <div id="tv-chart-area" className="relative flex-1">
         <TradingViewChart symbol={tv} studies={studies} />
         {showRisk && (
           <div className="absolute right-3 top-3 z-10">

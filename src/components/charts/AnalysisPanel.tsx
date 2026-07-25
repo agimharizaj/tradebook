@@ -39,6 +39,79 @@ export default function AnalysisPanel({
   const [direction, setDirection] = useState("neutral");
   const [notes, setNotes] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [capturing, setCapturing] = useState(false);
+
+  function attach(f: File | null) {
+    setFile(f);
+    setPreview((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return f ? URL.createObjectURL(f) : null;
+    });
+  }
+
+  // Grab the chart via the browser Screen Capture API. The TradingView iframe
+  // is cross-origin, so this permission prompt is the only way to read its
+  // pixels. The panel hides itself during capture so the chart is visible.
+  async function captureChart() {
+    setErr(null);
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      setErr("Screen capture is not supported in this browser. Attach a screenshot manually.");
+      return;
+    }
+    setCapturing(true);
+    let stream: MediaStream | null = null;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: false,
+        // Chrome hints: offer "This Tab" first and allow capturing ourselves.
+        ...( { preferCurrentTab: true, selfBrowserSurface: "include" } as object),
+      } as MediaStreamConstraints);
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.muted = true;
+      await new Promise<void>((res) => { video.onloadedmetadata = () => res(); });
+      await video.play();
+      // Let the first real frame paint before sampling.
+      await new Promise((res) => setTimeout(res, 250));
+
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d")!;
+      const chart = document.getElementById("tv-chart-area");
+      const scaleX = video.videoWidth / window.innerWidth;
+      const scaleY = video.videoHeight / window.innerHeight;
+      // Crop to the chart only when the capture is clearly this tab
+      // (uniform scale close to the devicePixelRatio); otherwise keep it all.
+      const selfTab = chart && Math.abs(scaleX - scaleY) < 0.02 && scaleX >= 0.9;
+      if (selfTab) {
+        const r = chart.getBoundingClientRect();
+        canvas.width = Math.round(r.width * scaleX);
+        canvas.height = Math.round(r.height * scaleY);
+        ctx.drawImage(
+          video,
+          Math.round(r.left * scaleX), Math.round(r.top * scaleY),
+          canvas.width, canvas.height,
+          0, 0, canvas.width, canvas.height
+        );
+      } else {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+      }
+      const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/png"));
+      if (blob) {
+        attach(new File([blob], `chart-${symbol.replace(/\W/g, "")}-${Date.now()}.png`, { type: "image/png" }));
+      } else {
+        setErr("Could not read the captured frame. Attach a screenshot manually.");
+      }
+    } catch {
+      // User dismissed the share prompt - not an error.
+    } finally {
+      stream?.getTracks().forEach((t) => t.stop());
+      setCapturing(false);
+    }
+  }
 
   const load = useCallback(async () => {
     const { data, error } = await supabase
@@ -119,7 +192,7 @@ export default function AnalysisPanel({
       return;
     }
     setNotes("");
-    setFile(null);
+    attach(null);
     setAdding(false);
     load();
   }
@@ -132,7 +205,7 @@ export default function AnalysisPanel({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 ${capturing ? "invisible" : ""}`}
       onClick={onClose}
     >
       <div
@@ -164,13 +237,40 @@ export default function AnalysisPanel({
                 </select>
               </Field>
               <Field label="Screenshot (recommended)">
-                <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="text-xs text-muted" />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={captureChart}
+                    disabled={capturing}
+                    className="rounded-lg border border-border2 px-3 py-1.5 text-xs font-medium text-muted transition hover:border-accent hover:text-foreground disabled:opacity-50"
+                  >
+                    {capturing ? "Capturing..." : "Capture chart"}
+                  </button>
+                  <label className="cursor-pointer text-xs text-accent2 hover:underline">
+                    or attach a file
+                    <input type="file" accept="image/*" onChange={(e) => attach(e.target.files?.[0] ?? null)} className="hidden" />
+                  </label>
+                </div>
                 <span className="mt-1 block text-xs text-dim">
-                  The chart cannot restore your drawings later - the screenshot is
-                  what you will reopen.
+                  Pick &quot;This Tab&quot; in the share prompt and the app crops to the
+                  chart for you. Drawings cannot be restored later - the
+                  screenshot is what you will reopen.
                 </span>
               </Field>
             </div>
+            {preview && (
+              <div className="flex items-start gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={preview} alt="Screenshot to attach" className="max-h-36 rounded-lg border border-border" />
+                <button
+                  type="button"
+                  onClick={() => attach(null)}
+                  className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:border-danger hover:text-danger"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
             <Field label="Notes">
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Your read on the setup..." className="jfield resize-y" />
             </Field>
