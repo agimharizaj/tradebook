@@ -61,12 +61,16 @@ export function sizeFromRisk(i: SizeInput) {
   const pipValue = pipValuePerLot(pair, conversion);
   const riskAmount = accountSize * (riskPct / 100);
   const stopPips = Math.abs(entry - stop) / pip;
-  const lots = floorToLotStep(riskAmount / (stopPips * pipValue));
+  const lotsExact = riskAmount / (stopPips * pipValue);
+  const lots = floorToLotStep(lotsExact);
   return {
     direction: entry > stop ? ("long" as const) : ("short" as const),
     riskAmount,
     stopPips,
     lots,
+    // Unfloored size, so the UI can explain a 0.00 result (stop too wide
+    // for the 0.01-lot minimum) instead of looking broken.
+    lotsExact,
     units: lots * contractFor(pair),
   };
 }

@@ -142,6 +142,17 @@ export default function RiskPage() {
         conversion: conv,
       });
       if (!r) return null;
+      if (r.lots <= 0) {
+        return {
+          rows: [
+            ["Direction", r.direction === "long" ? "Long" : "Short"],
+            ["Stop distance", `${r.stopPips.toFixed(1)} pips`],
+            ["Needed size", `${r.lotsExact.toFixed(3)} lots (min 0.01)`],
+          ] as [string, string][],
+          big: ["Lot size", "0.00"] as [string, string],
+          extra: [["Fix", "tighten the stop or raise risk %"]] as [string, string][],
+        };
+      }
       return {
         rows: [
           ["Direction", r.direction === "long" ? "Long" : "Short"],
@@ -204,12 +215,20 @@ export default function RiskPage() {
             Enter your account risk and trade levels to size the position correctly.
           </p>
         </div>
-        <button
-          onClick={() => refreshMarket(true)}
-          className="self-start rounded-lg border border-border2 px-3 py-2 text-xs text-muted transition hover:border-accent hover:text-foreground sm:shrink-0"
-        >
-          {fxLoading ? "Refreshing..." : "Refresh prices"}
-        </button>
+        <div className="flex gap-2 self-start sm:shrink-0">
+          <button
+            onClick={() => { setEntry(""); setStop(""); setLots(""); }}
+            className="rounded-lg border border-border2 px-3 py-2 text-xs text-muted transition hover:border-accent hover:text-foreground"
+          >
+            Clear figures
+          </button>
+          <button
+            onClick={() => refreshMarket(true)}
+            className="rounded-lg border border-border2 px-3 py-2 text-xs text-muted transition hover:border-accent hover:text-foreground"
+          >
+            {fxLoading ? "Refreshing..." : "Refresh prices"}
+          </button>
+        </div>
       </div>
 
       <div className="mt-5 grid gap-1 rounded-xl border border-border2 bg-card p-1 sm:flex sm:flex-wrap">

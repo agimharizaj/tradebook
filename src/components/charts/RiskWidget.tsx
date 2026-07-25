@@ -130,7 +130,11 @@ export default function RiskWidget({
       const r = sizeFromRisk({ ...common, riskPct: parseFloat(riskPct), entry: parseFloat(entry), stop: parseFloat(stop) });
       if (r) {
         big = ["Lot size", r.lots.toFixed(2)];
-        rows.push([r.direction === "long" ? "Long" : "Short", `${r.stopPips.toFixed(1)} pips`], ["Risk", moneySigned(-r.riskAmount, cur)]);
+        if (r.lots <= 0) {
+          rows.push(["Stop too wide", `needs ${r.lotsExact.toFixed(3)} lots, min 0.01`]);
+        } else {
+          rows.push([r.direction === "long" ? "Long" : "Short", `${r.stopPips.toFixed(1)} pips`], ["Risk", moneySigned(-r.riskAmount, cur)]);
+        }
       }
     } else if (mode === "stop") {
       const r = stopFromLots({ ...common, riskPct: parseFloat(riskPct), lots: parseFloat(lots), entry: parseFloat(entry), direction });
@@ -200,6 +204,13 @@ export default function RiskWidget({
                 <button onClick={() => setEntry(livePrice.toFixed(priceDecimals))} className="text-accent2 hover:underline">use as entry</button>
               </div>
             )}
+
+            <button
+              onClick={() => { setEntry(""); setStop(""); setLots(""); }}
+              className="mt-2 w-full rounded-md border border-border2 px-2 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground"
+            >
+              Clear figures
+            </button>
 
             <div className="mt-2 border-t border-border pt-2">
               {big ? (
