@@ -18,6 +18,12 @@ export default function Combobox({
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
 
+  function choose(o: string) {
+    setQuery(o);
+    setOpen(false);
+    onSelect(o);
+  }
+
   const filtered = query.trim()
     ? options.filter((o) => o.toLowerCase().includes(query.toLowerCase())).slice(0, 8)
     : options.slice(0, 8);
@@ -43,12 +49,13 @@ export default function Combobox({
             <button
               key={o}
               type="button"
+              // preventDefault keeps the input from blurring before the tap
+              // registers; click is the cross-device fallback (older iOS).
               onPointerDown={(e) => {
                 e.preventDefault();
-                setQuery(o);
-                setOpen(false);
-                onSelect(o);
+                choose(o);
               }}
+              onClick={() => choose(o)}
               className="block w-full px-3 py-2 text-left text-sm text-foreground transition hover:bg-surface2"
             >
               {o}

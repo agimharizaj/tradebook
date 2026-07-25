@@ -97,8 +97,11 @@ export default function RiskPage() {
     [base, quote, accountCurrency, priceDecimals]
   );
 
-  // Pair change: clear the previous trade levels and prefill entry with the new price.
+  // Pair change: clear all previous trade levels immediately (a stale EUR/USD
+  // stop against a BTC/USD price would size the trade wildly wrong), then
+  // prefill entry with the new live price.
   useEffect(() => {
+    setEntry("");
     setStop("");
     setLots("");
     refreshMarket(true);

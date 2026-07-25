@@ -184,7 +184,15 @@ export default function ProfileForm({
               <Combobox
                 value={form.country}
                 options={COUNTRIES}
-                onType={(v) => set("country", v)}
+                onType={(v) => {
+                  // Fill the dial code even when the name is typed in full
+                  // instead of picked from the dropdown.
+                  const match = COUNTRIES.find(
+                    (c) => c.toLowerCase() === v.trim().toLowerCase()
+                  );
+                  if (match) onCountry(match);
+                  else set("country", v);
+                }}
                 onSelect={(v) => onCountry(v)}
                 placeholder="Search country"
               />
