@@ -77,6 +77,7 @@ export default function BlockEditor({
   const [blocks, setBlocks] = useState<Block[]>(() => parse(initial));
   const refs = useRef<Record<string, HTMLTextAreaElement | null>>({});
   const focusId = useRef<string | null>(null);
+  const lastFocus = useRef<string | null>(null);
   const first = useRef(true);
   const [dragId, setDragId] = useState<string | null>(null);
 
@@ -173,6 +174,32 @@ export default function BlockEditor({
     if (a.image_path) add.push({ id: uid(), type: "img", text: a.image_path });
     setBlocks((bs) => [...bs, ...add]);
     setShowAnalyses(false);
+  }
+
+  // Curated emoji strip: inserts at the cursor of the last-focused block,
+  // or appends a text block when nothing is focused. The OS emoji keyboard
+  // works in every field too; this is the one-click path while journaling.
+  const EMOJIS = ["✅","❌","⚠️","🔥","📈","📉","💰","🎯","🧠","😤","😌","🚀","🐂","🐻","💡","⭐","❗","⏰","📌","👀","💪","🤝"];
+  const [showEmoji, setShowEmoji] = useState(false);
+
+  function insertEmoji(em: string) {
+    const id = lastFocus.current;
+    const el = id ? refs.current[id] : null;
+    if (id && el) {
+      const start = el.selectionStart ?? el.value.length;
+      const end = el.selectionEnd ?? el.value.length;
+      const next = el.value.slice(0, start) + em + el.value.slice(end);
+      update(id, { text: next });
+      requestAnimationFrame(() => {
+        el.focus();
+        const pos = start + em.length;
+        el.setSelectionRange(pos, pos);
+      });
+    } else {
+      const nb: Block = { id: uid(), type: "text", text: em };
+      focusId.current = nb.id;
+      setBlocks((bs) => [...bs, nb]);
+    }
   }
 
   function startPalDrag(e: React.PointerEvent) {
@@ -353,6 +380,7 @@ export default function BlockEditor({
                   grow(e.target);
                 }}
                 onKeyDown={(e) => onKeyDown(e, b)}
+                onFocus={() => { lastFocus.current = b.id; }}
                 placeholder={b.type === "h" ? "Heading" : isSticky ? "Sticky note" : "Type here..."}
                 className={`w-full resize-none border-none bg-transparent outline-none placeholder:text-dim ${
                   b.type === "h"
@@ -443,6 +471,23 @@ export default function BlockEditor({
         </div>
       )}
 
+      {showEmoji && (
+        <div className="flex flex-wrap gap-1 rounded-xl border border-border2 bg-surface2/60 p-2">
+          {EMOJIS.map((em) => (
+            <button
+              key={em}
+              // preventDefault keeps the focused textarea focused so the
+              // emoji lands at the cursor.
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={() => insertEmoji(em)}
+              className="rounded-md p-1.5 text-lg transition hover:bg-surface2"
+            >
+              {em}
+            </button>
+          ))}
+        </div>
+      )}
+
       {palFloating ? (
         /* Floating palette: drag anywhere by the ⋮⋮ handle, dock to put it back. */
         <div
@@ -474,6 +519,14 @@ export default function BlockEditor({
             + Analysis
           </button>
           <button
+            onClick={() => setShowEmoji((v) => !v)}
+            aria-pressed={showEmoji}
+            className={`rounded-md border px-2.5 py-1.5 text-xs transition ${showEmoji ? "border-accent bg-accent-soft" : "border-border2 text-muted hover:border-accent"}`}
+            title="Insert emoji"
+          >
+            😀
+          </button>
+          <button
             onClick={() => setFloating(false)}
             className="ml-1 rounded-md px-2 py-1.5 text-xs text-dim transition hover:text-foreground"
             title="Dock the palette back under the note"
@@ -498,6 +551,14 @@ export default function BlockEditor({
             className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground"
           >
             + Analysis
+          </button>
+          <button
+            onClick={() => setShowEmoji((v) => !v)}
+            aria-pressed={showEmoji}
+            className={`rounded-md border px-2.5 py-1.5 text-xs transition ${showEmoji ? "border-accent bg-accent-soft" : "border-border2 text-muted hover:border-accent"}`}
+            title="Insert emoji"
+          >
+            😀
           </button>
           <button
             onClick={() => setFloating(true)}
