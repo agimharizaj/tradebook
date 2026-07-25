@@ -72,10 +72,10 @@ export default function NewsPage() {
         <h2 className="mb-2 px-1 pt-1 text-sm font-medium uppercase tracking-wide text-muted">Forex heatmap</h2>
         <TVWidget
           src="https://s3.tradingview.com/external-embedding/embed-widget-forex-heat-map.js"
-          height={640}
+          height={420}
           config={{
             currencies: ["EUR", "USD", "JPY", "GBP", "CHF", "AUD", "CAD", "NZD"],
-            isTransparent: false,
+            isTransparent: true,
             colorTheme: theme,
             locale: "en",
           }}
