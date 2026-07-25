@@ -34,6 +34,13 @@ export default function NewsPage() {
   const theme = useAppTheme();
   const mobile = useIsMobile();
   const tall = mobile ? 480 : 720;
+  // TradingView's calendar always lists upcoming events; the one filter it
+  // supports from outside is importance, so that's the toggle we expose.
+  const [highOnly, setHighOnly] = useState(false);
+  // Send widget symbol clicks to our own Charts page instead of tradingview.com.
+  const [origin, setOrigin] = useState("");
+  useEffect(() => setOrigin(window.location.origin), []);
+  const largeChartUrl = origin ? `${origin}/charts` : undefined;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
@@ -57,6 +64,7 @@ export default function NewsPage() {
             isTransparent: false,
             displayMode: "adaptive",
             locale: "en",
+            largeChartUrl,
           }}
         />
       </div>
@@ -68,7 +76,29 @@ export default function NewsPage() {
         </div>
 
         <div className="rounded-2xl bg-card p-3 ring-1 ring-border">
-          <h2 className="mb-2 px-1 pt-1 text-sm font-medium uppercase tracking-wide text-muted">Economic calendar</h2>
+          <div className="mb-2 flex items-center justify-between gap-2 px-1 pt-1">
+            <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Economic calendar</h2>
+            <div
+              className="flex items-center gap-0.5 rounded-lg border border-border2 bg-surface2/60 p-0.5"
+              role="group"
+              aria-label="Event importance"
+            >
+              {([
+                { on: false, label: "All impact" },
+                { on: true, label: "High only" },
+              ] as const).map((o) => (
+                <button
+                  key={o.label}
+                  onClick={() => setHighOnly(o.on)}
+                  className={`rounded-md px-2 py-1 text-xs font-medium transition ${
+                    highOnly === o.on ? "bg-accent text-white" : "text-muted hover:text-foreground"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <TVWidget
             src="https://s3.tradingview.com/external-embedding/embed-widget-events.js"
             height={tall}
@@ -76,7 +106,7 @@ export default function NewsPage() {
               colorTheme: theme,
               isTransparent: false,
               locale: "en",
-              importanceFilter: "0,1",
+              importanceFilter: highOnly ? "1" : "0,1",
               currencyFilter: "USD,EUR,GBP,JPY,AUD,CAD,CHF,NZD",
             }}
           />
@@ -93,6 +123,7 @@ export default function NewsPage() {
             isTransparent: false,
             colorTheme: theme,
             locale: "en",
+            largeChartUrl,
           }}
         />
       </div>

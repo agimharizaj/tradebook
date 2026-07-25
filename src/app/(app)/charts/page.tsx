@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import TradingViewChart from "@/components/charts/TradingViewChart";
@@ -41,8 +41,26 @@ export default function ChartsPage() {
     .filter((p): p is { label: string; tv: string } => !!p.tv);
   const [tv, setTv] = useState("FX:EURUSD");
 
-  // If the saved watchlist loads without the current symbol, jump to its first.
+  // Deep link from TradingView widgets (news page ticker/heatmap):
+  // /charts?tvwidgetsymbol=FX:EURUSD opens that symbol here.
+  const deepLinked = useRef(false);
   useEffect(() => {
+    const sym = new URLSearchParams(window.location.search).get("tvwidgetsymbol");
+    if (!sym) return;
+    const m = PAIR_CATALOG.find(
+      (p) => p.tv.toUpperCase() === sym.toUpperCase() ||
+        p.label.replace("/", "") === sym.split(":").pop()?.toUpperCase()
+    );
+    if (m) {
+      deepLinked.current = true;
+      setTv(m.tv);
+    }
+  }, []);
+
+  // If the saved watchlist loads without the current symbol, jump to its
+  // first - unless a deep link chose the symbol deliberately.
+  useEffect(() => {
+    if (deepLinked.current) return;
     if (pairs.length && !pairs.some((p) => p.tv === tv)) setTv(pairs[0].tv);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchlist]);
