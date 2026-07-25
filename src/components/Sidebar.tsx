@@ -81,17 +81,31 @@ export default function Sidebar({ email, name }: { email: string; name?: string 
     <>
     <aside
       style={{ width: collapsed ? 64 : width }}
-      className={`relative hidden h-screen shrink-0 flex-col border-r border-border bg-background md:flex ${
+      className={`relative hidden h-dvh shrink-0 flex-col border-r border-border bg-background md:flex ${
         dragging ? "" : "transition-[width] duration-200"
       }`}
     >
-      <Link
-        href="/dashboard"
-        className={`flex h-16 items-center px-3 transition hover:opacity-80 ${collapsed ? "justify-center" : "gap-2.5"}`}
-      >
-        <LogoMark size={32} className="shrink-0 rounded-lg shadow-[0_6px_18px_rgba(124,108,255,0.35)]" />
-        {!collapsed && <span className="font-display text-[17px] font-semibold">Tradebook</span>}
-      </Link>
+      <div className={`flex shrink-0 items-center ${collapsed ? "flex-col gap-0.5 py-2" : "h-16 justify-between pr-1"}`}>
+        <Link
+          href="/dashboard"
+          className={`flex items-center px-3 transition hover:opacity-80 ${collapsed ? "justify-center" : "gap-2.5"}`}
+        >
+          <LogoMark size={32} className="shrink-0 rounded-lg shadow-[0_6px_18px_rgba(124,108,255,0.35)]" />
+          {!collapsed && <span className="font-display text-[17px] font-semibold">Tradebook</span>}
+        </Link>
+        {/* Short landscape viewports: the footer toggle can be hard to spot,
+            so the collapse control also lives up here where it is always visible. */}
+        <button
+          onClick={toggle}
+          title={collapsed ? "Expand" : "Collapse"}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="hidden items-center justify-center rounded-lg p-2 text-muted transition hover:bg-surface2 hover:text-foreground [@media(max-height:500px)]:flex"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d={collapsed ? "M9 6l6 6-6 6" : "M15 6l-6 6 6 6"} />
+          </svg>
+        </button>
+      </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-2">
         {NAV.map((item) => (
