@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
-type BlockType = "text" | "h" | "todo" | "bullet" | "number" | "sticky" | "date";
+// "img" blocks hold a storage path in `text` (entry-models bucket) and are
+// created by "Send to Notebook" on a chart analysis, not from the palette.
+type BlockType = "text" | "h" | "todo" | "bullet" | "number" | "sticky" | "date" | "img";
 type Block = { id: string; type: BlockType; text: string; checked?: boolean; color?: string };
 
 const STICKY_COLORS: { key: string; c: string }[] = [
@@ -12,6 +15,27 @@ const STICKY_COLORS: { key: string; c: string }[] = [
   { key: "red", c: "var(--danger)" },
   { key: "blue", c: "#3b82f6" },
 ];
+// Resolves a private-bucket path to a fresh signed URL on render, so the
+// stored note never contains an expiring link.
+function StorageImage({ path }: { path: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    createClient()
+      .storage.from("entry-models")
+      .createSignedUrl(path, 3600)
+      .then(({ data }) => {
+        if (live) setUrl(data?.signedUrl ?? null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [path]);
+  if (!url) return <span className="w-full py-2 text-xs text-dim">Loading screenshot...</span>;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={url} alt="Chart screenshot" className="my-1 w-full max-w-xl rounded-lg border border-border" />;
+}
+
 function stickyStyle(color?: string) {
   const c = STICKY_COLORS.find((s) => s.key === color)?.c ?? "var(--gold)";
   return {
@@ -272,7 +296,9 @@ export default function BlockEditor({
               <span className="mt-1.5 shrink-0 font-mono text-sm text-muted">{num}.</span>
             )}
 
-            {b.type === "date" ? (
+            {b.type === "img" ? (
+              <StorageImage path={b.text} />
+            ) : b.type === "date" ? (
               <input
                 type="date"
                 value={b.text}

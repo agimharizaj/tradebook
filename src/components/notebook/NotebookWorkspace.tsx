@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { usePairs } from "@/lib/usePairs";
+import AnalysisPanel from "@/components/charts/AnalysisPanel";
 import BlockEditor from "./BlockEditor";
 
 type NoteRow = { id: string; title: string; updated_at: string; pinned: boolean };
@@ -40,6 +41,7 @@ export default function NotebookWorkspace() {
   const [note, setNote] = useState<Note | null>(null);
   const [status, setStatus] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showLog, setShowLog] = useState(false);
   const dirty = useRef(false);
 
   const loadList = useCallback(async () => {
@@ -196,7 +198,15 @@ export default function NotebookWorkspace() {
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 self-start overflow-y-auto border-r border-border p-4 md:block">
         <div className="mb-3 flex items-center justify-between">
           <span className="text-xs font-medium uppercase tracking-wide text-dim">Notes</span>
-          <button onClick={newNote} className="rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-white">+ New</button>
+          <span className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowLog(true)}
+              className="rounded-md border border-border2 px-2.5 py-1 text-xs font-medium text-muted transition hover:border-accent hover:text-foreground"
+            >
+              Analysis
+            </button>
+            <button onClick={newNote} className="rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-white">+ New</button>
+          </span>
         </div>
         <NoteList list={list} activeId={note?.id} onOpen={openNote} />
       </aside>
@@ -204,6 +214,12 @@ export default function NotebookWorkspace() {
       <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
         <div className="mb-4 flex gap-2 overflow-x-auto pb-1 md:hidden">
           <button onClick={newNote} className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white">+ New</button>
+          <button
+            onClick={() => setShowLog(true)}
+            className="shrink-0 rounded-lg border border-border2 px-3 py-1.5 text-xs font-medium text-muted"
+          >
+            Analysis
+          </button>
           {list.map((n) => (
             <button
               key={n.id}
@@ -274,6 +290,16 @@ export default function NotebookWorkspace() {
           </div>
         )}
       </main>
+
+      {showLog && (
+        <AnalysisPanel
+          defaultSymbol={watchlist[0] ?? "EUR/USD"}
+          onClose={() => {
+            setShowLog(false);
+            loadList();
+          }}
+        />
+      )}
 
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">

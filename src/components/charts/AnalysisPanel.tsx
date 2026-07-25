@@ -38,6 +38,7 @@ export default function AnalysisPanel({
   const [err, setErr] = useState<string | null>(null);
   const [viewing, setViewing] = useState<Analysis | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [sentToNotebook, setSentToNotebook] = useState(false);
 
   const [symbol, setSymbol] = useState(defaultSymbol);
   const [timeframe, setTimeframe] = useState(defaultTimeframe ?? "1H");
@@ -156,6 +157,35 @@ export default function AnalysisPanel({
     load();
   }
 
+  // Copy an analysis into the Notebook as a note: heading, bias, notes and
+  // the screenshot (as an img block resolving the same storage path).
+  async function sendToNotebook(a: Analysis) {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) {
+      setErr("Not signed in.");
+      return;
+    }
+    const blocks = [
+      { id: uid(), type: "h", text: `${a.symbol}${a.timeframe ? ` ${a.timeframe}` : ""} analysis` },
+      ...(a.direction ? [{ id: uid(), type: "text", text: `Bias: ${a.direction}` }] : []),
+      ...(a.notes ? [{ id: uid(), type: "text", text: a.notes }] : []),
+      ...(a.image_path ? [{ id: uid(), type: "img", text: a.image_path }] : []),
+    ];
+    const title = `${a.symbol} analysis ${new Date(a.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`;
+    const row = { user_id: u.user.id, title, content: JSON.stringify({ blocks }) };
+    // Try tagging the note with the pair; retry untagged if migration 0006
+    // has not run yet.
+    let { error } = await supabase.from("notes").insert({ ...row, pair: a.symbol });
+    if (error && /pair/i.test(error.message)) {
+      ({ error } = await supabase.from("notes").insert(row));
+    }
+    if (error) {
+      setErr(`Could not save note: ${error.message}`);
+      return;
+    }
+    setSentToNotebook(true);
+  }
+
   async function del(a: Analysis) {
     if (a.image_path) await supabase.storage.from(BUCKET).remove([a.image_path]);
     await supabase.from("chart_analyses").delete().eq("id", a.id);
@@ -255,8 +285,8 @@ export default function AnalysisPanel({
               key={a.id}
               role="button"
               tabIndex={0}
-              onClick={() => setViewing(a)}
-              onKeyDown={(e) => { if (e.key === "Enter") setViewing(a); }}
+              onClick={() => { setViewing(a); setSentToNotebook(false); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { setViewing(a); setSentToNotebook(false); } }}
               className="cursor-pointer rounded-xl border border-border p-3 transition hover:border-accent"
             >
               <div className="flex items-center justify-between">
@@ -340,6 +370,13 @@ export default function AnalysisPanel({
                     Load on chart
                   </button>
                 )}
+                <button
+                  onClick={() => sendToNotebook(viewing)}
+                  disabled={sentToNotebook}
+                  className="rounded-md border border-border2 px-2.5 py-1 text-xs font-medium text-muted transition hover:border-accent hover:text-foreground disabled:opacity-60"
+                >
+                  {sentToNotebook ? "Saved to Notebook" : "Send to Notebook"}
+                </button>
                 {urls[viewing.id] && (
                   <a href={urls[viewing.id]} target="_blank" rel="noreferrer" className="text-xs text-accent2 hover:underline">
                     Open full size
