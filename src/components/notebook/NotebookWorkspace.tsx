@@ -36,12 +36,23 @@ export default function NotebookWorkspace() {
 
   async function newNote() {
     const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    const { data } = await supabase
+    if (!u.user) {
+      setStatus("Not signed in.");
+      return;
+    }
+    const { data, error } = await supabase
       .from("notes")
       .insert({ user_id: u.user.id, title: "Untitled", content: "" })
       .select("*")
       .single();
+    if (error) {
+      setStatus(
+        /relation .* does not exist|notes/.test(error.message)
+          ? "Notes table missing. Run migration 0003_notes.sql in Supabase."
+          : `Error: ${error.message}`
+      );
+      return;
+    }
     if (data) {
       dirty.current = false;
       setNote({ id: data.id, title: data.title, content: data.content ?? "", pinned: false });
@@ -115,6 +126,7 @@ export default function NotebookWorkspace() {
             <h1 className="text-2xl">Notebook</h1>
             <p className="mt-2 text-muted">Think before you trade. Review before you repeat.</p>
             <button onClick={newNote} className="mt-5 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white">+ New note</button>
+            {status && <p className="mt-3 text-sm text-danger">{status}</p>}
             {list.length > 0 && (
               <div className="mt-6 space-y-2 md:hidden">
                 {list.map((n) => (

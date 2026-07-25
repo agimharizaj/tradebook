@@ -6,14 +6,35 @@ export default function NewsPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
       <h1 className="text-2xl">News</h1>
-      <p className="mt-1 text-muted">Live market headlines and the economic calendar.</p>
+      <p className="mt-1 text-muted">Live market headlines, calendar, and cross-rates.</p>
+
+      <div className="mt-5 overflow-hidden rounded-2xl ring-1 ring-border">
+        <TVWidget
+          src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js"
+          height={78}
+          config={{
+            symbols: [
+              { proName: "FX:EURUSD", title: "EUR/USD" },
+              { proName: "FX:GBPUSD", title: "GBP/USD" },
+              { proName: "FX:USDJPY", title: "USD/JPY" },
+              { proName: "OANDA:XAUUSD", title: "Gold" },
+              { proName: "COINBASE:BTCUSD", title: "BTC" },
+              { proName: "OANDA:US30USD", title: "US30" },
+            ],
+            colorTheme: "dark",
+            isTransparent: true,
+            displayMode: "adaptive",
+            locale: "en",
+          }}
+        />
+      </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <div className="rounded-2xl bg-card p-3 ring-1 ring-border">
           <h2 className="mb-2 px-2 pt-1 text-sm font-medium uppercase tracking-wide text-muted">Market news</h2>
           <TVWidget
             src="https://s3.tradingview.com/external-embedding/embed-widget-timeline.js"
-            height={620}
+            height={720}
             config={{
               feedMode: "market",
               market: "forex",
@@ -31,7 +52,7 @@ export default function NewsPage() {
           <h2 className="mb-2 px-2 pt-1 text-sm font-medium uppercase tracking-wide text-muted">Economic calendar</h2>
           <TVWidget
             src="https://s3.tradingview.com/external-embedding/embed-widget-events.js"
-            height={620}
+            height={720}
             config={{
               colorTheme: "dark",
               isTransparent: true,
@@ -43,6 +64,22 @@ export default function NewsPage() {
             }}
           />
         </div>
+      </div>
+
+      <div className="mt-6 rounded-2xl bg-card p-3 ring-1 ring-border">
+        <h2 className="mb-2 px-2 pt-1 text-sm font-medium uppercase tracking-wide text-muted">Forex heatmap</h2>
+        <TVWidget
+          src="https://s3.tradingview.com/external-embedding/embed-widget-forex-heat-map.js"
+          height={420}
+          config={{
+            currencies: ["EUR", "USD", "JPY", "GBP", "CHF", "AUD", "CAD", "NZD"],
+            isTransparent: true,
+            colorTheme: "dark",
+            locale: "en",
+            width: "100%",
+            height: "100%",
+          }}
+        />
       </div>
     </div>
   );
