@@ -129,10 +129,10 @@ h3 {
 
 /* Phone sizing: the app is built in rem units, so raising the root font
    size scales the entire UI (text, padding, buttons) proportionally.
-   17px = ~6% larger than default. Tune this one number to taste. */
+   18px = ~12% larger than default. Tune this one number to taste. */
 @media (max-width: 767px) {
   html {
-    font-size: 17px;
+    font-size: 18px;
   }
 
   /* iOS Safari auto-zooms the page when a focused input is under 16px.
