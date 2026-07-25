@@ -62,6 +62,86 @@ function parse(content: string): Block[] {
 }
 const serialize = (blocks: Block[]) => JSON.stringify({ blocks });
 
+// Read-only rendering of a note: no textareas, drag handles or delete
+// buttons. To-dos stay tickable (written through onChange), matching how
+// the strategy view keeps its checklists live.
+export function NoteView({ content, onChange }: { content: string; onChange: (c: string) => void }) {
+  const blocks = parse(content);
+  let num = 0;
+  const toggle = (id: string) =>
+    onChange(serialize(blocks.map((b) => (b.id === id ? { ...b, checked: !b.checked } : b))));
+  return (
+    <div className="space-y-2">
+      {blocks.map((b) => {
+        const n = b.type === "number" ? ++num : (num = 0);
+        if (b.type === "img") return <StorageImage key={b.id} path={b.text} />;
+        if (b.type === "date") {
+          const d = new Date(`${b.text}T00:00:00`);
+          return (
+            <p key={b.id} className="font-mono text-sm text-muted">
+              {Number.isNaN(d.getTime()) ? b.text : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
+            </p>
+          );
+        }
+        if (b.type === "todo") {
+          return (
+            <button key={b.id} onClick={() => toggle(b.id)} className="flex w-full items-start gap-2.5 text-left text-[15px]">
+              <span
+                className={`mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition ${
+                  b.checked ? "border-success bg-success text-background" : "border-border2 hover:border-accent"
+                }`}
+              >
+                {b.checked && (
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12l5 5L20 7" />
+                  </svg>
+                )}
+              </span>
+              <span className={`whitespace-pre-wrap ${b.checked ? "text-muted line-through" : ""}`}>{b.text}</span>
+            </button>
+          );
+        }
+        if (!b.text.trim()) return <div key={b.id} className="h-4" />;
+        if (b.type === "h") {
+          return (
+            <h2 key={b.id} className="pt-2 text-xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
+              {b.text}
+            </h2>
+          );
+        }
+        if (b.type === "sticky") {
+          return (
+            <div key={b.id} className="whitespace-pre-wrap rounded-lg border p-3 text-[15px] leading-relaxed" style={stickyStyle(b.color)}>
+              {b.text}
+            </div>
+          );
+        }
+        if (b.type === "bullet") {
+          return (
+            <p key={b.id} className="flex gap-2 text-[15px] leading-relaxed">
+              <span className="text-muted">•</span>
+              <span className="whitespace-pre-wrap">{b.text}</span>
+            </p>
+          );
+        }
+        if (b.type === "number") {
+          return (
+            <p key={b.id} className="flex gap-2 text-[15px] leading-relaxed">
+              <span className="font-mono text-sm leading-6 text-muted">{n}.</span>
+              <span className="whitespace-pre-wrap">{b.text}</span>
+            </p>
+          );
+        }
+        return (
+          <p key={b.id} className="whitespace-pre-wrap text-[15px] leading-relaxed">
+            {b.text}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 const ADD: { type: BlockType; label: string }[] = [
   { type: "text", label: "Text" },
   { type: "h", label: "Heading" },

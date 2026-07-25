@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { usePairs } from "@/lib/usePairs";
 import AnalysisPanel from "@/components/charts/AnalysisPanel";
-import BlockEditor from "./BlockEditor";
+import BlockEditor, { NoteView } from "./BlockEditor";
 
 type NoteRow = { id: string; title: string; updated_at: string; created_at: string; pinned: boolean };
 // pair is undefined until migration 0006 adds the column; updates only send
@@ -56,6 +56,8 @@ export default function NotebookWorkspace() {
   const [note, setNote] = useState<Note | null>(null);
   const [status, setStatus] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Notes open read-only, like strategies; Edit switches to the block editor.
+  const [noteMode, setNoteMode] = useState<"view" | "edit">("view");
   const [showLog, setShowLog] = useState(false);
   const [q, setQ] = useState("");
   const [fromDate, setFromDate] = useState("");
@@ -169,6 +171,7 @@ export default function NotebookWorkspace() {
     if (!data) return;
     dirty.current = false;
     setStatus("");
+    setNoteMode("view");
     setNote({
       id: data.id,
       title: data.title ?? "",
@@ -203,6 +206,7 @@ export default function NotebookWorkspace() {
     }
     if (data) {
       dirty.current = false;
+      setNoteMode("edit");
       setNote({ id: data.id, title: data.title, content: data.content ?? "", pinned: false });
       loadList();
     }
@@ -398,42 +402,66 @@ export default function NotebookWorkspace() {
               Notes
             </button>
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <input
-                value={note.title}
-                onChange={(e) => edit({ title: e.target.value })}
-                onFocus={(e) => {
-                  if (note.title === "Untitled" || note.title === defaultTitle()) e.target.select();
-                }}
-                placeholder="Note title"
-                className="min-w-0 flex-1 basis-full border-none bg-transparent text-2xl font-semibold outline-none placeholder:text-dim sm:basis-auto"
-                style={{ fontFamily: "var(--font-display)" }}
-              />
-              <select
-                value={note.pair ?? ""}
-                onChange={(e) => edit({ pair: e.target.value })}
-                className="rounded-lg border border-border2 bg-surface2 px-2 py-2 text-xs text-muted outline-none focus:border-accent"
-                aria-label="Pair"
-                title="Tag this note with a pair (edit the list in Profile)"
-              >
-                <option value="">No pair</option>
-                {watchlist.map((pr) => (<option key={pr} value={pr}>{pr}</option>))}
-                {note.pair && !watchlist.includes(note.pair) && (
-                  <option value={note.pair}>{note.pair}</option>
-                )}
-              </select>
-              <Link href="/profile/pairs" className="text-[11px] text-accent2 hover:underline">Edit</Link>
+              {noteMode === "edit" ? (
+                <input
+                  value={note.title}
+                  onChange={(e) => edit({ title: e.target.value })}
+                  onFocus={(e) => {
+                    if (note.title === "Untitled" || note.title === defaultTitle()) e.target.select();
+                  }}
+                  placeholder="Note title"
+                  className="min-w-0 flex-1 basis-full border-none bg-transparent text-2xl font-semibold outline-none placeholder:text-dim sm:basis-auto"
+                  style={{ fontFamily: "var(--font-display)" }}
+                />
+              ) : (
+                <h1 className="min-w-0 flex-1 basis-full truncate text-2xl font-semibold sm:basis-auto" style={{ fontFamily: "var(--font-display)" }}>
+                  {note.title || "Untitled"}
+                </h1>
+              )}
+              {noteMode === "edit" ? (
+                <>
+                  <select
+                    value={note.pair ?? ""}
+                    onChange={(e) => edit({ pair: e.target.value })}
+                    className="rounded-lg border border-border2 bg-surface2 px-2 py-2 text-xs text-muted outline-none focus:border-accent"
+                    aria-label="Pair"
+                    title="Tag this note with a pair (edit the list in Profile)"
+                  >
+                    <option value="">No pair</option>
+                    {watchlist.map((pr) => (<option key={pr} value={pr}>{pr}</option>))}
+                    {note.pair && !watchlist.includes(note.pair) && (
+                      <option value={note.pair}>{note.pair}</option>
+                    )}
+                  </select>
+                  <Link href="/profile/pairs" className="text-[11px] text-accent2 hover:underline">Edit</Link>
+                </>
+              ) : (
+                note.pair && (
+                  <span className="rounded-md border border-border2 px-2 py-1 font-mono text-xs text-muted">{note.pair}</span>
+                )
+              )}
               <span className="text-xs text-dim">{status}</span>
+              <button
+                onClick={() => setNoteMode((m) => (m === "view" ? "edit" : "view"))}
+                className={`rounded-lg border px-2.5 py-2 text-sm transition ${noteMode === "edit" ? "border-accent text-accent2" : "border-border2 text-muted hover:border-accent hover:text-foreground"}`}
+              >
+                {noteMode === "edit" ? "Done" : "Edit"}
+              </button>
               <button onClick={togglePin} title="Pin" className={`rounded-lg border px-2.5 py-2 text-sm ${note.pinned ? "border-accent text-accent2" : "border-border2 text-muted"}`}>
                 {note.pinned ? "Pinned" : "Pin"}
               </button>
               <button onClick={() => setConfirmDelete(true)} className="rounded-lg border border-border2 px-2.5 py-2 text-sm text-muted transition hover:border-danger hover:text-danger">Delete</button>
             </div>
             <div className="min-h-[60vh] rounded-xl border border-border bg-card p-5">
-              <BlockEditor
-                key={note.id}
-                initial={note.content}
-                onChange={(c) => edit({ content: c })}
-              />
+              {noteMode === "edit" ? (
+                <BlockEditor
+                  key={note.id}
+                  initial={note.content}
+                  onChange={(c) => edit({ content: c })}
+                />
+              ) : (
+                <NoteView content={note.content} onChange={(c) => edit({ content: c })} />
+              )}
             </div>
           </div>
         )}
