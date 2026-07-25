@@ -283,7 +283,10 @@ export default function NotebookWorkspace() {
         <NoteList list={filteredList} activeId={note?.id} onOpen={openNote} />
       </aside>
 
-      <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
+      {/* min-w-0: without it the horizontally scrolling chip strip sets this
+          flex item's minimum width and the whole page overflows the phone
+          viewport (search bar and cards bleed off the right edge). */}
+      <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">
         <div className="mb-2 md:hidden">
           <input
             value={q}

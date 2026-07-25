@@ -33,7 +33,7 @@ function StorageImage({ path }: { path: string }) {
   }, [path]);
   if (!url) return <span className="w-full py-2 text-xs text-dim">Loading screenshot...</span>;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={url} alt="Chart screenshot" className="my-1 w-full max-w-xl rounded-lg border border-border" />;
+  return <img src={url} alt="Chart screenshot" className="my-1 h-auto w-full min-w-0 max-w-xl rounded-lg border border-border" />;
 }
 
 function stickyStyle(color?: string) {
