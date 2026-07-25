@@ -119,6 +119,14 @@ h3 {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+/* Hide scrollbars on horizontally scrolling nav strips */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* iOS Safari auto-zooms the page when a focused input is under 16px.
    Keep all inputs at 16px on phones to prevent it. */
 @media (max-width: 767px) {
