@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import Combobox from "@/components/Combobox";
+import { withCommas } from "@/lib/format";
 import ThemeToggle from "@/components/ThemeToggle";
 
 type Meta = Record<string, unknown>;
@@ -64,7 +65,7 @@ export default function ProfileForm({
       (DIAL[str(meta, "country")] ? `${DIAL[str(meta, "country")]} ` : ""),
     broker: str(meta, "broker"),
     account_currency: str(meta, "account_currency") || "USD",
-    account_size: str(meta, "account_size"),
+    account_size: withCommas(str(meta, "account_size")),
     default_risk_pct: str(meta, "default_risk_pct"),
     experience: str(meta, "experience"),
     trading_style: str(meta, "trading_style"),
@@ -115,7 +116,13 @@ export default function ProfileForm({
     const { pairs: _pairs, ...metaRest } = meta;
     void _pairs;
     const { error } = await supabase.auth.updateUser({
-      data: { ...metaRest, ...form, display_name: fullName || str(meta, "display_name") },
+      data: {
+        ...metaRest,
+        ...form,
+        // Store raw digits: parseFloat("10,000") reads as 10 downstream.
+        account_size: form.account_size.replace(/,/g, ""),
+        display_name: fullName || str(meta, "display_name"),
+      },
     });
     setSavingDetails(false);
     setMsg(error ? { t: "err", text: error.message } : { t: "ok", text: "Profile saved." });
@@ -266,7 +273,7 @@ export default function ProfileForm({
                 ))}
               </datalist>
             </Field>
-            <Field label="Account size"><input inputMode="decimal" value={form.account_size} onChange={(e) => set("account_size", e.target.value)} placeholder="10000" className="field" /></Field>
+            <Field label="Account size"><input inputMode="decimal" value={form.account_size} onChange={(e) => set("account_size", withCommas(e.target.value))} placeholder="10,000" className="field" /></Field>
             <Field label="Default risk % / trade"><input inputMode="decimal" value={form.default_risk_pct} onChange={(e) => set("default_risk_pct", e.target.value)} placeholder="1" className="field" /></Field>
             <Field label="Experience">
               <select value={form.experience} onChange={(e) => set("experience", e.target.value)} className="field">

@@ -12,6 +12,7 @@ import {
 
 import Link from "next/link";
 import { isSizable } from "@/lib/pairs";
+import { numFromInput, withCommas } from "@/lib/format";
 import { usePairs } from "@/lib/usePairs";
 const CURRENCIES = [
   "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD",
@@ -120,7 +121,7 @@ export default function RiskPage() {
         setAccountCurrency(m.account_currency);
       }
       if (typeof m.account_size === "string" && m.account_size) {
-        setAccountSize(m.account_size);
+        setAccountSize(withCommas(m.account_size));
       }
       if (typeof m.default_risk_pct === "string" && m.default_risk_pct) {
         setRiskPct(m.default_risk_pct);
@@ -129,7 +130,7 @@ export default function RiskPage() {
   }, []);
 
   const result = useMemo(() => {
-    const size = parseFloat(accountSize);
+    const size = numFromInput(accountSize);
     const conv = parseFloat(conversion);
 
     if (mode === "size") {
@@ -146,7 +147,7 @@ export default function RiskPage() {
         return {
           rows: [
             ["Direction", r.direction === "long" ? "Long" : "Short"],
-            ["Stop distance", `${r.stopPips.toFixed(1)} pips`],
+            ["Stop distance", `${r.stopPips.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pips`],
             ["Needed size", `${r.lotsExact.toFixed(3)} lots (min 0.01)`],
           ] as [string, string][],
           big: ["Lot size", "0.00"] as [string, string],
@@ -156,8 +157,8 @@ export default function RiskPage() {
       return {
         rows: [
           ["Direction", r.direction === "long" ? "Long" : "Short"],
-          ["Risk amount", `${r.riskAmount.toFixed(0)} ${accountCurrency}`],
-          ["Stop distance", `${r.stopPips.toFixed(1)} pips`],
+          ["Risk amount", `${Math.round(r.riskAmount).toLocaleString()} ${accountCurrency}`],
+          ["Stop distance", `${r.stopPips.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pips`],
         ] as [string, string][],
         big: ["Lot size", r.lots.toFixed(2)] as [string, string],
         extra: [["Units", r.units.toLocaleString(undefined, { maximumFractionDigits: 0 })]] as [string, string][],
@@ -178,8 +179,8 @@ export default function RiskPage() {
       return {
         rows: [
           ["Direction", direction === "long" ? "Long" : "Short"],
-          ["Risk amount", `${r.riskAmount.toFixed(0)} ${accountCurrency}`],
-          ["Stop distance", `${r.stopPips.toFixed(1)} pips`],
+          ["Risk amount", `${Math.round(r.riskAmount).toLocaleString()} ${accountCurrency}`],
+          ["Stop distance", `${r.stopPips.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pips`],
         ] as [string, string][],
         big: ["Stop-loss price", r.stopPrice.toFixed(priceDecimals)] as [string, string],
         extra: [] as [string, string][],
@@ -198,10 +199,10 @@ export default function RiskPage() {
     return {
       rows: [
         ["Direction", r.direction === "long" ? "Long" : "Short"],
-        ["Stop distance", `${r.stopPips.toFixed(1)} pips`],
+        ["Stop distance", `${r.stopPips.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pips`],
         ["Risk %", `${r.riskPct.toFixed(2)}%`],
       ] as [string, string][],
-      big: ["Risk amount", `${r.riskAmount.toFixed(0)} ${accountCurrency}`] as [string, string],
+      big: ["Risk amount", `${Math.round(r.riskAmount).toLocaleString()} ${accountCurrency}`] as [string, string],
       extra: [] as [string, string][],
     };
   }, [mode, pair, accountCurrency, accountSize, conversion, riskPct, entry, stop, lots, direction, priceDecimals]);
@@ -292,7 +293,7 @@ export default function RiskPage() {
               </datalist>
             </Field>
             <Field label="Account size">
-              <input type="number" inputMode="decimal" value={accountSize} onChange={(e) => setAccountSize(e.target.value)} className="input" />
+              <input inputMode="decimal" value={accountSize} onChange={(e) => setAccountSize(withCommas(e.target.value))} className="input" />
             </Field>
           </div>
 

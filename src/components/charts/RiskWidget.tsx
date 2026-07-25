@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { sizeFromRisk, stopFromLots, riskFromLots, quoteCurrency } from "@/lib/risk";
-import { moneySigned } from "@/lib/format";
+import { moneySigned, numFromInput, withCommas } from "@/lib/format";
 
 type Mode = "size" | "stop" | "risk";
 const MODES: { id: Mode; label: string }[] = [
@@ -45,7 +45,7 @@ export default function RiskWidget({
     const s = createClient();
     s.auth.getUser().then(({ data }) => {
       const m = data.user?.user_metadata ?? {};
-      if (typeof m.account_size === "string" && m.account_size) setAccountSize(m.account_size);
+      if (typeof m.account_size === "string" && m.account_size) setAccountSize(withCommas(m.account_size));
       if (typeof m.default_risk_pct === "string" && m.default_risk_pct) setRiskPct(m.default_risk_pct);
       if (typeof m.account_currency === "string" && m.account_currency) setCur(m.account_currency);
     });
@@ -122,7 +122,7 @@ export default function RiskWidget({
     setDragging(true);
   }
 
-  const common = { accountSize: parseFloat(accountSize), pair, conversion: conv };
+  const common = { accountSize: numFromInput(accountSize), pair, conversion: conv };
   let big: [string, string] | null = null;
   const rows: [string, string][] = [];
   if (supported) {
@@ -133,20 +133,20 @@ export default function RiskWidget({
         if (r.lots <= 0) {
           rows.push(["Stop too wide", `needs ${r.lotsExact.toFixed(3)} lots, min 0.01`]);
         } else {
-          rows.push([r.direction === "long" ? "Long" : "Short", `${r.stopPips.toFixed(1)} pips`], ["Risk", moneySigned(-r.riskAmount, cur)]);
+          rows.push([r.direction === "long" ? "Long" : "Short", `${r.stopPips.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pips`], ["Risk", moneySigned(-r.riskAmount, cur)]);
         }
       }
     } else if (mode === "stop") {
       const r = stopFromLots({ ...common, riskPct: parseFloat(riskPct), lots: parseFloat(lots), entry: parseFloat(entry), direction });
       if (r) {
         big = ["Stop-loss", r.stopPrice.toFixed(priceDecimals)];
-        rows.push([direction === "long" ? "Long" : "Short", `${r.stopPips.toFixed(1)} pips`], ["Risk", moneySigned(-r.riskAmount, cur)]);
+        rows.push([direction === "long" ? "Long" : "Short", `${r.stopPips.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pips`], ["Risk", moneySigned(-r.riskAmount, cur)]);
       }
     } else {
       const r = riskFromLots({ ...common, lots: parseFloat(lots), entry: parseFloat(entry), stop: parseFloat(stop) });
       if (r) {
         big = ["Risk", moneySigned(-r.riskAmount, cur)];
-        rows.push([r.direction === "long" ? "Long" : "Short", `${r.stopPips.toFixed(1)} pips`], ["Risk %", `${r.riskPct.toFixed(2)}%`]);
+        rows.push([r.direction === "long" ? "Long" : "Short", `${r.stopPips.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pips`], ["Risk %", `${r.riskPct.toFixed(2)}%`]);
       }
     }
   }
@@ -175,7 +175,7 @@ export default function RiskWidget({
             </select>
 
             <div className="grid grid-cols-2 gap-2">
-              <Field label={`Account (${cur})`}><input inputMode="decimal" value={accountSize} onChange={(e) => setAccountSize(e.target.value)} className="rfield" /></Field>
+              <Field label={`Account (${cur})`}><input inputMode="decimal" value={accountSize} onChange={(e) => setAccountSize(withCommas(e.target.value))} className="rfield" /></Field>
               {(mode === "size" || mode === "stop") && (
                 <Field label="Risk %"><input inputMode="decimal" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} className="rfield" /></Field>
               )}
