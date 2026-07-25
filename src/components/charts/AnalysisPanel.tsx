@@ -205,11 +205,11 @@ export default function AnalysisPanel({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 ${capturing ? "invisible" : ""}`}
+      className={`fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4 ${capturing ? "invisible" : ""}`}
       onClick={onClose}
     >
       <div
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-card p-6 ring-1 ring-border2"
+        className="max-h-[85dvh] w-full max-w-2xl overflow-y-auto rounded-t-2xl bg-card p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] ring-1 ring-border2 sm:rounded-2xl sm:pb-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
@@ -218,7 +218,7 @@ export default function AnalysisPanel({
             {!adding && (
               <button onClick={() => setAdding(true)} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white">+ Save analysis</button>
             )}
-            <button onClick={onClose} className="text-muted hover:text-foreground" aria-label="Close">✕</button>
+            <button onClick={onClose} className="rounded-md p-2 text-muted hover:text-foreground" aria-label="Close">✕</button>
           </div>
         </div>
 
@@ -236,8 +236,9 @@ export default function AnalysisPanel({
                   <option value="neutral">Neutral</option>
                 </select>
               </Field>
+              <div className="col-span-2">
               <Field label="Screenshot (recommended)">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={captureChart}
@@ -257,6 +258,7 @@ export default function AnalysisPanel({
                   screenshot is what you will reopen.
                 </span>
               </Field>
+              </div>
             </div>
             {preview && (
               <div className="flex items-start gap-3">
@@ -345,15 +347,15 @@ export default function AnalysisPanel({
 
       {viewing && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4"
           onClick={() => setViewing(null)}
         >
           <div
-            className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-card p-6 ring-1 ring-border2"
+            className="max-h-[90dvh] w-full max-w-4xl overflow-y-auto rounded-t-2xl bg-card p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] ring-1 ring-border2 sm:rounded-2xl sm:p-6 sm:pb-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-y-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-lg font-medium" style={{ fontFamily: "var(--font-display)" }}>{viewing.symbol}</span>
                 {viewing.timeframe && <span className="text-sm text-dim">{viewing.timeframe}</span>}
                 {viewing.direction && (
@@ -362,7 +364,7 @@ export default function AnalysisPanel({
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3 gap-y-2">
                 <span className="text-xs text-dim">
                   {new Date(viewing.created_at).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
                 </span>

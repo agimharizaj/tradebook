@@ -3,6 +3,13 @@ import { cookies } from "next/headers";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
+const cookieOptions = {
+  maxAge: 60 * 60 * 24 * 365,
+  sameSite: "lax" as const,
+  path: "/",
+  ...(process.env.NODE_ENV === "production" ? { secure: true } : {}),
+};
+
 // Supabase client for use in Server Components, Route Handlers, and Server Actions.
 export async function createClient() {
   const cookieStore = await cookies();
@@ -11,6 +18,7 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions,
       cookies: {
         getAll() {
           return cookieStore.getAll();

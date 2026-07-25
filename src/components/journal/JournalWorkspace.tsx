@@ -420,8 +420,8 @@ function DayModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-card p-6 ring-1 ring-border2">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4">
+      <div className="max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-card p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] ring-1 ring-border2 sm:rounded-2xl sm:pb-6">
         <div className="mb-4 flex items-start justify-between">
           <h2 className="text-lg" style={{ fontFamily: "var(--font-display)" }}>{heading}</h2>
           <button onClick={onClose} className="text-muted hover:text-foreground" aria-label="Close">✕</button>

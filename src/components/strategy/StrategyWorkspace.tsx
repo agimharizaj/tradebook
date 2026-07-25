@@ -506,9 +506,10 @@ export default function StrategyWorkspace() {
                       alt="entry model"
                       className="h-full w-full object-cover"
                     />
+                    {/* Always visible on touch; hover-reveal only on desktop */}
                     <button
                       onClick={() => removeImage(m.key, m.path)}
-                      className="absolute right-1 top-1 rounded bg-black/70 px-1.5 text-xs text-white opacity-0 transition group-hover:opacity-100"
+                      className="absolute right-1 top-1 rounded bg-black/70 px-2 py-1 text-xs text-white transition md:opacity-0 md:group-hover:opacity-100"
                     >
                       Remove
                     </button>
@@ -875,6 +876,8 @@ function OrderedList({
                 : ""
             } ${dragIdx === idx ? "opacity-40" : ""}`}
           >
+            {/* Desktop: drag handle. Touch: HTML5 drag never fires on iOS, so
+                phones get explicit up/down buttons instead. */}
             <span
               draggable
               onDragStart={(e) => {
@@ -886,11 +889,29 @@ function OrderedList({
                 setDragIdx(null);
                 setOverIdx(null);
               }}
-              className="shrink-0 cursor-grab select-none px-1 text-dim hover:text-foreground active:cursor-grabbing"
+              className="hidden shrink-0 cursor-grab select-none px-1.5 text-dim hover:text-foreground active:cursor-grabbing md:inline"
               aria-label="Drag to reorder"
               title="Drag to reorder"
             >
               ⋮⋮
+            </span>
+            <span className="flex shrink-0 flex-col md:hidden">
+              <button
+                onClick={() => onReorder(idx, idx - 1)}
+                disabled={idx === 0}
+                className="px-2 py-0.5 text-xs text-dim disabled:opacity-30"
+                aria-label="Move up"
+              >
+                ▲
+              </button>
+              <button
+                onClick={() => onReorder(idx, idx + 1)}
+                disabled={idx === items.length - 1}
+                className="px-2 py-0.5 text-xs text-dim disabled:opacity-30"
+                aria-label="Move down"
+              >
+                ▼
+              </button>
             </span>
             {numbered && (
               <span
@@ -916,7 +937,7 @@ function OrderedList({
             />
             <button
               onClick={() => onRemove(it.key)}
-              className="shrink-0 px-2 text-sm text-dim hover:text-danger"
+              className="shrink-0 rounded-md p-2 text-sm text-dim hover:text-danger"
               aria-label="Remove"
             >
               ✕

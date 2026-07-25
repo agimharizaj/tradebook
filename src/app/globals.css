@@ -118,3 +118,13 @@ h3 {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
+
+/* iOS Safari auto-zooms the page when a focused input is under 16px.
+   Keep all inputs at 16px on phones to prevent it. */
+@media (max-width: 767px) {
+  .field,
+  .input,
+  .jfield {
+    font-size: 1rem;
+  }
+}

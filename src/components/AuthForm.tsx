@@ -119,14 +119,14 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               placeholder="First name"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
-              className="w-full rounded-lg border border-border2 bg-surface2 px-3 py-2.5 text-sm outline-none transition focus:border-accent"
+              className="w-full rounded-lg border border-border2 bg-surface2 px-3 py-2.5 text-base outline-none sm:text-sm transition focus:border-accent"
             />
             <input
               type="text"
               placeholder="Last name"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
-              className="w-full rounded-lg border border-border2 bg-surface2 px-3 py-2.5 text-sm outline-none transition focus:border-accent"
+              className="w-full rounded-lg border border-border2 bg-surface2 px-3 py-2.5 text-base outline-none sm:text-sm transition focus:border-accent"
             />
           </div>
         )}
@@ -136,7 +136,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           placeholder="you@email.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-lg border border-border2 bg-surface2 px-3 py-2.5 text-sm outline-none transition focus:border-accent"
+          className="w-full rounded-lg border border-border2 bg-surface2 px-3 py-2.5 text-base outline-none sm:text-sm transition focus:border-accent"
         />
         <input
           type="password"
@@ -145,7 +145,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-lg border border-border2 bg-surface2 px-3 py-2.5 text-sm outline-none transition focus:border-accent"
+          className="w-full rounded-lg border border-border2 bg-surface2 px-3 py-2.5 text-base outline-none sm:text-sm transition focus:border-accent"
         />
         <button
           type="submit"

@@ -3,6 +3,13 @@ import { NextResponse, type NextRequest } from "next/server";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
+const cookieOptions = {
+  maxAge: 60 * 60 * 24 * 365,
+  sameSite: "lax" as const,
+  path: "/",
+  ...(process.env.NODE_ENV === "production" ? { secure: true } : {}),
+};
+
 // Refreshes the auth session on every request and guards protected routes.
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -11,6 +18,7 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions,
       cookies: {
         getAll() {
           return request.cookies.getAll();
