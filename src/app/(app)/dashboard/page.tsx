@@ -73,6 +73,12 @@ export default async function DashboardPage() {
       <h1 className="text-2xl">{name ? `Welcome back, ${name.split(" ")[0]}` : "Dashboard"}</h1>
       <p className="mt-1 text-muted">Your trading workspace at a glance.</p>
 
+      {loadError && (
+        <p className="mt-4 rounded-lg border border-danger/40 bg-danger/10 px-4 py-2.5 text-sm text-danger">
+          Could not load trades: {loadError.message}. The stats below may be incomplete.
+        </p>
+      )}
+
       <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <Stat label="Net PnL" value={moneySigned(net, cur)} tone={net >= 0 ? "up" : "down"} />
         <Stat
@@ -120,6 +126,16 @@ export default async function DashboardPage() {
                 <Mini label="Avg loss" value={moneySigned(avgLoss, cur)} tone="down" />
                 <Mini label="Best" value={moneySigned(best, cur)} tone="up" />
                 <Mini label="Worst" value={moneySigned(worst, cur)} tone="down" />
+                <Mini
+                  label="Max drawdown"
+                  value={maxDd > 0 ? moneySigned(-maxDd, cur) : moneySigned(0, cur)}
+                  tone={maxDd > 0 ? "down" : undefined}
+                />
+                <Mini
+                  label="Max drawdown %"
+                  value={curveStart > 0 && maxDd > 0 ? `-${maxDdPct.toFixed(2)}%` : "—"}
+                  tone={maxDd > 0 && curveStart > 0 ? "down" : undefined}
+                />
               </div>
             </div>
           </div>

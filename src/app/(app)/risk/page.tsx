@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  baseCurrency,
+  quoteCurrency,
+  sizeFromRisk,
+  stopFromLots,
+  riskFromLots,
+} from "@/lib/risk";
 
 const PAIRS = [
   "EUR/USD", "GBP/USD", "AUD/USD", "NZD/USD",
@@ -13,21 +20,6 @@ const CURRENCIES = [
   "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD",
   "SGD", "HKD", "SEK", "NOK", "DKK", "PLN", "ZAR", "AED",
 ];
-const CONTRACT_SIZE = 100_000;
-const GOLD_CONTRACT = 100;
-
-function pipSizeFor(pair: string) {
-  if (pair.startsWith("BTC")) return 1; // size BTC by price distance directly
-  if (pair.startsWith("XAU")) return 0.1;
-  return pair.includes("JPY") ? 0.01 : 0.0001;
-}
-function contractFor(pair: string) {
-  if (pair.startsWith("BTC")) return 1;
-  if (pair.startsWith("XAU")) return GOLD_CONTRACT;
-  return CONTRACT_SIZE;
-}
-const baseCurrency = (pair: string) => pair.split("/")[0];
-const quoteCurrency = (pair: string) => pair.split("/")[1];
 
 type Mode = "size" | "stop" | "risk";
 const MODES: { id: Mode; label: string }[] = [
@@ -134,63 +126,66 @@ export default function RiskPage() {
   const result = useMemo(() => {
     const size = parseFloat(accountSize);
     const conv = parseFloat(conversion);
-    const contract = contractFor(pair);
-    const pip = pipSizeFor(pair);
-    const pipValueAccount = pip * contract * conv;
-    if (Number.isNaN(size) || size <= 0 || Number.isNaN(conv)) return null;
 
     if (mode === "size") {
-      const risk = parseFloat(riskPct);
-      const e = parseFloat(entry);
-      const s = parseFloat(stop);
-      if ([risk, e, s].some(Number.isNaN) || risk <= 0 || e === s) return null;
-      const riskAmount = size * (risk / 100);
-      const stopPips = Math.abs(e - s) / pip;
-      const lotsOut = riskAmount / (stopPips * pipValueAccount);
+      const r = sizeFromRisk({
+        accountSize: size,
+        riskPct: parseFloat(riskPct),
+        entry: parseFloat(entry),
+        stop: parseFloat(stop),
+        pair,
+        conversion: conv,
+      });
+      if (!r) return null;
       return {
         rows: [
-          ["Direction", e > s ? "Long" : "Short"],
-          ["Risk amount", `${riskAmount.toFixed(0)} ${accountCurrency}`],
-          ["Stop distance", `${stopPips.toFixed(1)} pips`],
+          ["Direction", r.direction === "long" ? "Long" : "Short"],
+          ["Risk amount", `${r.riskAmount.toFixed(0)} ${accountCurrency}`],
+          ["Stop distance", `${r.stopPips.toFixed(1)} pips`],
         ] as [string, string][],
-        big: ["Lot size", lotsOut.toFixed(2)] as [string, string],
-        extra: [["Units", (lotsOut * contract).toLocaleString(undefined, { maximumFractionDigits: 0 })]] as [string, string][],
+        big: ["Lot size", r.lots.toFixed(2)] as [string, string],
+        extra: [["Units", r.units.toLocaleString(undefined, { maximumFractionDigits: 0 })]] as [string, string][],
       };
     }
 
     if (mode === "stop") {
-      const risk = parseFloat(riskPct);
-      const l = parseFloat(lots);
-      const e = parseFloat(entry);
-      if ([risk, l, e].some(Number.isNaN) || risk <= 0 || l <= 0) return null;
-      const riskAmount = size * (risk / 100);
-      const stopPips = riskAmount / (l * pipValueAccount);
-      const stopPrice = direction === "long" ? e - stopPips * pip : e + stopPips * pip;
+      const r = stopFromLots({
+        accountSize: size,
+        riskPct: parseFloat(riskPct),
+        lots: parseFloat(lots),
+        entry: parseFloat(entry),
+        direction,
+        pair,
+        conversion: conv,
+      });
+      if (!r) return null;
       return {
         rows: [
           ["Direction", direction === "long" ? "Long" : "Short"],
-          ["Risk amount", `${riskAmount.toFixed(0)} ${accountCurrency}`],
-          ["Stop distance", `${stopPips.toFixed(1)} pips`],
+          ["Risk amount", `${r.riskAmount.toFixed(0)} ${accountCurrency}`],
+          ["Stop distance", `${r.stopPips.toFixed(1)} pips`],
         ] as [string, string][],
-        big: ["Stop-loss price", stopPrice.toFixed(priceDecimals)] as [string, string],
+        big: ["Stop-loss price", r.stopPrice.toFixed(priceDecimals)] as [string, string],
         extra: [] as [string, string][],
       };
     }
 
-    const l = parseFloat(lots);
-    const e = parseFloat(entry);
-    const s = parseFloat(stop);
-    if ([l, e, s].some(Number.isNaN) || l <= 0 || e === s) return null;
-    const stopPips = Math.abs(e - s) / pip;
-    const riskAmount = l * stopPips * pipValueAccount;
-    const riskPctOut = (riskAmount / size) * 100;
+    const r = riskFromLots({
+      accountSize: size,
+      lots: parseFloat(lots),
+      entry: parseFloat(entry),
+      stop: parseFloat(stop),
+      pair,
+      conversion: conv,
+    });
+    if (!r) return null;
     return {
       rows: [
-        ["Direction", e > s ? "Long" : "Short"],
-        ["Stop distance", `${stopPips.toFixed(1)} pips`],
-        ["Risk %", `${riskPctOut.toFixed(2)}%`],
+        ["Direction", r.direction === "long" ? "Long" : "Short"],
+        ["Stop distance", `${r.stopPips.toFixed(1)} pips`],
+        ["Risk %", `${r.riskPct.toFixed(2)}%`],
       ] as [string, string][],
-      big: ["Risk amount", `${riskAmount.toFixed(0)} ${accountCurrency}`] as [string, string],
+      big: ["Risk amount", `${r.riskAmount.toFixed(0)} ${accountCurrency}`] as [string, string],
       extra: [] as [string, string][],
     };
   }, [mode, pair, accountCurrency, accountSize, conversion, riskPct, entry, stop, lots, direction, priceDecimals]);
@@ -247,6 +242,12 @@ export default function RiskPage() {
             ) : (
               <span className="mt-1 block text-xs text-dim">
                 Live price unavailable, enter manually.
+              </span>
+            )}
+            {pair.startsWith("XAU") && (
+              <span className="mt-1 block text-xs text-dim">
+                Gold pip here = a $0.10 move. Some calculators count $0.01, so
+                their pip figure is 10x; the lot size is identical either way.
               </span>
             )}
           </Field>
@@ -332,10 +333,6 @@ export default function RiskPage() {
         </div>
       </div>
 
-      <style>{`
-        .input{width:100%;border-radius:.5rem;border:1px solid var(--border2);background:var(--surface2);color:var(--foreground);padding:.6rem .75rem;font-size:.9rem;font-family:var(--font-mono);outline:none;transition:border-color .15s,box-shadow .15s}
-        .input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-      `}</style>
     </div>
   );
 }

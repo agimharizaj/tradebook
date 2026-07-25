@@ -521,10 +521,6 @@ function DayModal({
         )}
       </div>
 
-      <style>{`
-        .jfield{width:100%;border-radius:.5rem;border:1px solid var(--border2);background:var(--surface2);color:var(--foreground);padding:.5rem .65rem;font-size:.85rem;outline:none}
-        .jfield:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-      `}</style>
     </div>
   );
 }

@@ -7,12 +7,15 @@
   --surface2: #2b3240;
   --foreground: #e7e9ef;
   --muted: #9aa0b0;
-  --dim: #757c8e;
+  /* #939AAD is the darkest grey that clears WCAG AA 4.5:1 on every surface,
+     including inputs (#2B3240). Do not darken without rechecking contrast. */
+  --dim: #939aad;
   --border: rgba(255, 255, 255, 0.08);
   --border2: rgba(255, 255, 255, 0.15);
-  --accent: #7c6cff;
+  /* #6A58F0 keeps white button text at 4.9:1 (AA). The old #7C6CFF failed at 3.9:1. */
+  --accent: #6a58f0;
   --accent2: #ab9dff;
-  --accent-soft: rgba(124, 108, 255, 0.16);
+  --accent-soft: rgba(106, 88, 240, 0.18);
   --success: #22d39a;
   --danger: #ff6274;
   --gold: #f3c57c;
@@ -58,4 +61,36 @@ h3 {
 
 ::selection {
   background: var(--accent-soft);
+}
+
+/* Shared form input styles. .field = default, .input = numeric (monospace),
+   .jfield = compact (journal modals). Previously copy-pasted per component. */
+.field,
+.input,
+.jfield {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  color: var(--foreground);
+  padding: 0.6rem 0.75rem;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.input {
+  font-family: var(--font-mono);
+}
+
+.jfield {
+  padding: 0.5rem 0.65rem;
+  font-size: 0.85rem;
+}
+
+.field:focus,
+.input:focus,
+.jfield:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }

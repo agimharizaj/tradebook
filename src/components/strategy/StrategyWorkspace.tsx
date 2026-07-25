@@ -603,10 +603,6 @@ export default function StrategyWorkspace() {
         </div>
       )}
 
-      <style>{`
-        .field{width:100%;border-radius:.5rem;border:1px solid var(--border2);background:var(--surface2);color:var(--foreground);padding:.6rem .75rem;font-size:.9rem;outline:none;transition:border-color .15s,box-shadow .15s}
-        .field:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-      `}</style>
     </div>
   );
 }

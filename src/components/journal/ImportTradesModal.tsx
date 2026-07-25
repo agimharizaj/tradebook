@@ -75,11 +75,20 @@ function normalizeSymbol(raw: string) {
   return raw.trim();
 }
 function parseDate(raw: string): string | null {
+  let date: string | null = null;
   const iso = raw.match(/(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
-  if (iso) return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
-  const dmy = raw.match(/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})/);
-  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
-  return null;
+  if (iso) date = `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
+  else {
+    const dmy = raw.match(/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})/);
+    if (dmy) date = `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+  }
+  if (!date) return null;
+  // Keep the close time when the report has one (MT5: "2026.07.21 14:33:12").
+  const time = raw.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (time) {
+    return `${date} ${time[1].padStart(2, "0")}:${time[2]}:${time[3] ?? "00"}`;
+  }
+  return date;
 }
 function num(s: string | undefined): number | null {
   if (!s) return null;
@@ -141,6 +150,7 @@ export default function ImportTradesModal({
           direction: dir.includes("buy") ? "long" : dir.includes("sell") ? "short" : dir.includes("long") ? "long" : dir.includes("short") ? "short" : null,
           size_lots: num(col(r, "lots")),
           pnl: profit == null ? null : Math.round((profit + commissions + swap) * 100) / 100,
+          commission: commissions || swap ? Math.round((commissions + swap) * 100) / 100 : null,
           entry_price: num(col(r, "entry")),
           exit_price: num(col(r, "exit")),
           ext_id: (col(r, "ticket") ?? "").trim() || null,
@@ -242,7 +252,7 @@ export default function ImportTradesModal({
                   <tbody>
                     {trades.slice(0, 10).map((t, i) => (
                       <tr key={i} className="border-t border-border">
-                        <td className="p-2" style={{ fontFamily: "var(--font-mono)" }}>{t.traded_on}</td>
+                        <td className="p-2" style={{ fontFamily: "var(--font-mono)" }}>{t.traded_on.slice(0, 16)}</td>
                         <td className="p-2">{t.pair}</td>
                         <td className="p-2">{t.direction ?? "-"}</td>
                         <td className="p-2" style={{ fontFamily: "var(--font-mono)" }}>{t.size_lots ?? "-"}</td>
@@ -276,10 +286,6 @@ export default function ImportTradesModal({
         )}
       </div>
 
-      <style>{`
-        .jfield{width:100%;border-radius:.5rem;border:1px solid var(--border2);background:var(--surface2);color:var(--foreground);padding:.5rem .65rem;font-size:.85rem;outline:none}
-        .jfield:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-      `}</style>
     </div>
   );
 }

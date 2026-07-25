@@ -37,7 +37,7 @@ The approved look is the dark "terminal" concept in `design/tradebook-brand-conc
 
 - Fonts: Space Grotesk (display/headings), Inter (body/UI), JetBrains Mono (all numbers).
 - Core colors (lifted blue-charcoal ladder, never pure black): sidebar/page `#161A23`, app content canvas `#1C212C`, cards `#222834`, inputs/hover `#2B3240`, borders `rgba(255,255,255,.08)` and `.15`. Text `#E7E9EF`, muted `#9AA0B0`, dim `#757C8E`. Elevation ascends: sidebar < content < card < input.
-- Accents: violet `#7C6CFF` (primary/brand, `#AB9DFF` lighter), teal-green `#22D39A` (profit/positive), red `#FF6274` (loss/negative), gold `#F3C57C` (premium highlight).
+- Accents: violet `#6A58F0` (primary/brand, chosen so white button text passes WCAG AA at 4.9:1; `#AB9DFF` lighter for text accents), teal-green `#22D39A` (profit/positive), red `#FF6274` (loss/negative), gold `#F3C57C` (premium highlight). Dim text is `#939AAD` (AA on all surfaces); do not darken either without rechecking contrast.
 - Rationale: leading trading UIs avoid pure black (halation, eye strain over long sessions) and use a deep blue-slate base with a clear elevation ladder, one accent, off-white text. See research in git history / brand concept.
 - Feel: institutional trading terminal, flat surfaces, subtle glow only on primary actions, numbers always monospace. No busy gradients on content, no clutter.
 
@@ -46,13 +46,17 @@ The approved look is the dark "terminal" concept in `design/tradebook-brand-conc
 - Phase 1 (auth): DONE. Email + password and Google SSO, protected shell, sign out.
 - Phase 2 (strategy builder): DONE. `/strategy` with read-only view + Edit mode, drag-reorder, checkboxes tickable in view, entry-model screenshot upload, risk controls, delete confirm modal.
 - Phase 3 (journal): DONE. `/journal` monthly calendar, per-day trade add/list/delete modal, monthly + weekly summaries.
-- Phase 4 (risk calculator): DONE. `/risk` with 3 modes (segmented switcher) and live FX via `/api/fx` (Frankfurter/ECB, keyless) auto-filling pair price + conversion rate. Gold (XAU) stays manual.
-- Dashboard: real stats pulled from trades.
-- Profile: `/profile` display name, password change (current+new) in a separate Security section.
-- Layout: collapsible sidebar (state in localStorage), viewport-pinned; content scrolls inside.
-- Database: full schema + RLS for all phases in `supabase/migrations/0001_init.sql`.
-- Deploy: not yet pushed to GitHub/Vercel. Runs locally against real Supabase.
-- TODO: signup form should prompt for display name.
+- Phase 4 (risk calculator): DONE. `/risk` with 3 modes (segmented switcher) and live prices via `/api/fx` (Frankfurter/ECB for fiat, CoinGecko for BTC, gold-api.com for XAU, all keyless). Pure sizing math lives in `src/lib/risk.ts` (lot output floors to 0.01 steps). Changing pair clears entry/SL/lots and prefills entry with the live price.
+- Dashboard: real stats pulled from trades, incl. profit factor, equity curve, max drawdown. Read errors surface as a banner.
+- Journal: true expectancy (win% x avg win - loss% x avg loss) plus separate Avg R; two-step delete confirmation; MT5 import keeps close time and stores commission+swap in `trades.commission` (pnl stays net).
+- Profile: `/profile` display name, password change (current+new) in a separate Security section. Signup collects first/last name.
+- Layout: collapsible sidebar (state in localStorage), viewport-pinned; content scrolls inside. Pinch zoom enabled (no maximumScale).
+- Database: schema + RLS in `supabase/migrations/` (0001 init, 0002 import ext_id, 0003 notes, 0004 traded_on -> timestamptz + commission). Apply 0004 in the Supabase SQL Editor before using MT5 import again.
+- Security: password minimum is 10 in the client; ALSO raise it in Supabase dashboard (Auth -> Passwords, still default 6) and enable leaked-password protection.
+- Accessibility: form labels and primary buttons pass WCAG AA (see brand section); avoid reintroducing `#757C8E` text or `maximumScale: 1`.
+- Shared form input CSS (`.field`/`.input`/`.jfield`) lives in `globals.css`, not per-component style tags.
+- Deploy: pushed to GitHub (`agimharizaj/tradebook`), auto-deploys to Vercel on push to `main`.
+- Industry benchmark: `industry-standards-review.md` (July 2026). Deferred from its list: StrategyWorkspace split, per-trade screenshots, multi-tag setups, time-of-day reports, service worker.
 
 ## Phase roadmap (build in order, ship each before the next)
 
