@@ -3,7 +3,22 @@
 import { useEffect, useRef, useState } from "react";
 
 type BlockType = "text" | "h" | "todo" | "bullet" | "number" | "sticky" | "date";
-type Block = { id: string; type: BlockType; text: string; checked?: boolean };
+type Block = { id: string; type: BlockType; text: string; checked?: boolean; color?: string };
+
+const STICKY_COLORS: { key: string; c: string }[] = [
+  { key: "gold", c: "var(--gold)" },
+  { key: "violet", c: "var(--accent)" },
+  { key: "teal", c: "var(--success)" },
+  { key: "red", c: "var(--danger)" },
+  { key: "blue", c: "#3b82f6" },
+];
+function stickyStyle(color?: string) {
+  const c = STICKY_COLORS.find((s) => s.key === color)?.c ?? "var(--gold)";
+  return {
+    borderColor: `color-mix(in srgb, ${c} 40%, transparent)`,
+    background: `color-mix(in srgb, ${c} 12%, transparent)`,
+  };
+}
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -132,7 +147,8 @@ export default function BlockEditor({
               if (dragId) move(dragId, b.id);
               setDragId(null);
             }}
-            className={`group flex items-start gap-1 rounded-lg ${isSticky ? "border border-gold/40 bg-gold/10 p-2" : ""}`}
+            className={`group flex items-start gap-1 rounded-lg ${isSticky ? "border p-2" : ""}`}
+            style={isSticky ? stickyStyle(b.color) : undefined}
           >
             <span
               draggable
@@ -189,6 +205,20 @@ export default function BlockEditor({
               />
             )}
 
+            {isSticky && (
+              <div className="mt-1.5 flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
+                {STICKY_COLORS.map((s) => (
+                  <button
+                    key={s.key}
+                    onClick={() => update(b.id, { color: s.key })}
+                    title={s.key}
+                    aria-label={`Sticky ${s.key}`}
+                    className={`h-3.5 w-3.5 rounded-full border ${(b.color ?? "gold") === s.key ? "border-foreground" : "border-border2"}`}
+                    style={{ background: s.c }}
+                  />
+                ))}
+              </div>
+            )}
             <button
               onClick={() => remove(b.id)}
               className="mt-1 px-1 text-sm text-dim opacity-0 transition hover:text-danger group-hover:opacity-100"

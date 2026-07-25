@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type TVWindow = {
   TradingView?: { widget: new (opts: Record<string, unknown>) => unknown };
@@ -8,6 +8,16 @@ type TVWindow = {
 
 export default function TradingViewChart({ symbol }: { symbol: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    const read = () =>
+      setTheme((document.documentElement.dataset.theme as "dark" | "light") || "dark");
+    read();
+    const obs = new MutationObserver(read);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => obs.disconnect();
+  }, []);
 
   useEffect(() => {
     const el = ref.current;
@@ -21,7 +31,7 @@ export default function TradingViewChart({ symbol }: { symbol: string }) {
         container_id: "tv_chart",
         symbol,
         interval: "60",
-        theme: "dark",
+        theme,
         style: "1",
         locale: "en",
         autosize: true,
@@ -30,7 +40,7 @@ export default function TradingViewChart({ symbol }: { symbol: string }) {
         allow_symbol_change: true,
         withdateranges: true,
         details: false,
-        backgroundColor: "#161A23",
+        backgroundColor: theme === "dark" ? "#161A23" : "#ffffff",
       });
     };
 
@@ -44,7 +54,7 @@ export default function TradingViewChart({ symbol }: { symbol: string }) {
       script.onload = create;
       document.body.appendChild(script);
     }
-  }, [symbol]);
+  }, [symbol, theme]);
 
   return <div id="tv_chart" ref={ref} className="h-full w-full" />;
 }
