@@ -46,7 +46,10 @@ export default function TradingViewChart({
         autosize: true,
         timezone: "Etc/UTC",
         hide_side_toolbar: false,
-        allow_symbol_change: true,
+        // Our own toolbar owns pair + timeframe, and the camera button in it
+        // replaces TradingView's screenshot, so the whole top bar goes.
+        hide_top_toolbar: true,
+        allow_symbol_change: false,
         withdateranges: true,
         details: false,
         studies: JSON.parse(studiesKey) as string[],

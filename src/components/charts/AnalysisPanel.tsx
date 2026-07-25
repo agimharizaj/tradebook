@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { captureChartArea } from "@/lib/captureChart";
 import { usePairs } from "@/lib/usePairs";
 
 type Analysis = {
@@ -54,67 +55,21 @@ export default function AnalysisPanel({
     });
   }
 
-  // Grab the chart via the browser Screen Capture API. The TradingView iframe
-  // is cross-origin, so this permission prompt is the only way to read its
-  // pixels. The panel hides itself during capture so the chart is visible.
+  // Grab the chart via the shared Screen Capture helper. The panel hides
+  // itself during capture so the chart is visible behind the share prompt.
   async function captureChart() {
     setErr(null);
-    if (!navigator.mediaDevices?.getDisplayMedia) {
-      setErr("Screen capture is not supported in this browser. Attach a screenshot manually.");
-      return;
-    }
     setCapturing(true);
-    let stream: MediaStream | null = null;
-    try {
-      stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: false,
-        // Chrome hints: offer "This Tab" first and allow capturing ourselves.
-        ...( { preferCurrentTab: true, selfBrowserSurface: "include" } as object),
-      } as MediaStreamConstraints);
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      video.muted = true;
-      await new Promise<void>((res) => { video.onloadedmetadata = () => res(); });
-      await video.play();
-      // Let the first real frame paint before sampling.
-      await new Promise((res) => setTimeout(res, 250));
-
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d")!;
-      const chart = document.getElementById("tv-chart-area");
-      const scaleX = video.videoWidth / window.innerWidth;
-      const scaleY = video.videoHeight / window.innerHeight;
-      // Crop to the chart only when the capture is clearly this tab
-      // (uniform scale close to the devicePixelRatio); otherwise keep it all.
-      const selfTab = chart && Math.abs(scaleX - scaleY) < 0.02 && scaleX >= 0.9;
-      if (selfTab) {
-        const r = chart.getBoundingClientRect();
-        canvas.width = Math.round(r.width * scaleX);
-        canvas.height = Math.round(r.height * scaleY);
-        ctx.drawImage(
-          video,
-          Math.round(r.left * scaleX), Math.round(r.top * scaleY),
-          canvas.width, canvas.height,
-          0, 0, canvas.width, canvas.height
-        );
-      } else {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0);
-      }
-      const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/png"));
-      if (blob) {
-        attach(new File([blob], `chart-${symbol.replace(/\W/g, "")}-${Date.now()}.png`, { type: "image/png" }));
-      } else {
-        setErr("Could not read the captured frame. Attach a screenshot manually.");
-      }
-    } catch {
-      // User dismissed the share prompt - not an error.
-    } finally {
-      stream?.getTracks().forEach((t) => t.stop());
-      setCapturing(false);
+    const r = await captureChartArea();
+    setCapturing(false);
+    if (r.ok) {
+      attach(new File([r.blob], `chart-${symbol.replace(/\W/g, "")}-${Date.now()}.png`, { type: "image/png" }));
+    } else if (r.reason === "unsupported") {
+      setErr("Screen capture is not supported in this browser. Attach a screenshot manually.");
+    } else if (r.reason === "failed") {
+      setErr("Could not read the captured frame. Attach a screenshot manually.");
     }
+    // cancelled: user dismissed the prompt, not an error
   }
 
   const load = useCallback(async () => {

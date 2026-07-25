@@ -7,6 +7,7 @@ import TradingViewChart from "@/components/charts/TradingViewChart";
 import AnalysisPanel from "@/components/charts/AnalysisPanel";
 import RiskWidget from "@/components/charts/RiskWidget";
 import { PAIR_CATALOG, tvSymbolFor } from "@/lib/pairs";
+import { captureChartArea } from "@/lib/captureChart";
 import { usePairs } from "@/lib/usePairs";
 
 const STUDIES: { id: string; label: string }[] = [
@@ -80,6 +81,22 @@ export default function ChartsPage() {
     });
   }, []);
 
+  // Replaces TradingView's hidden top-toolbar camera: capture the chart
+  // (cropped when "This Tab" is picked) and download it as a PNG.
+  const [snapping, setSnapping] = useState(false);
+  async function snapshot() {
+    setSnapping(true);
+    const r = await captureChartArea();
+    setSnapping(false);
+    if (!r.ok) return; // cancelled or unsupported: nothing to download
+    const url = URL.createObjectURL(r.blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `chart-${current.replace(/\W/g, "")}-${tfLabel}-${Date.now()}.png`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
   function toggle(id: string) {
     setStudies((cur) => {
       const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
@@ -144,6 +161,18 @@ export default function ChartsPage() {
           className="shrink-0 whitespace-nowrap rounded-lg border border-border2 px-3 py-2 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground"
         >
           Analysis log
+        </button>
+        <button
+          onClick={snapshot}
+          disabled={snapping}
+          title="Download a chart screenshot"
+          aria-label="Download a chart screenshot"
+          className="shrink-0 rounded-lg border border-border2 px-3 py-2 text-muted transition hover:border-accent hover:text-foreground disabled:opacity-50"
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+            <circle cx="12" cy="13" r="3" />
+          </svg>
         </button>
         <span className="hidden shrink-0 text-xs text-dim lg:inline">
           Drawing tools (fib, long/short, trendlines) are in the left toolbar.
