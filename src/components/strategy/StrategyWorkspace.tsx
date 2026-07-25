@@ -511,7 +511,7 @@ export default function StrategyWorkspace() {
                   )}
                 </select>
                 <span className="mt-1 block text-xs">
-                  <Link href="/profile#pairs" className="text-accent2 hover:underline">Edit pairs</Link>
+                  <Link href="/profile/pairs" className="text-accent2 hover:underline">Edit pairs</Link>
                 </span>
               </Section>
             </div>

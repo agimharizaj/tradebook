@@ -257,7 +257,7 @@ export default function NotebookWorkspace() {
                   <option value={note.pair}>{note.pair}</option>
                 )}
               </select>
-              <Link href="/profile#pairs" className="text-[11px] text-accent2 hover:underline">Edit</Link>
+              <Link href="/profile/pairs" className="text-[11px] text-accent2 hover:underline">Edit</Link>
               <span className="text-xs text-dim">{status}</span>
               <button onClick={togglePin} title="Pin" className={`rounded-lg border px-2.5 py-2 text-sm ${note.pinned ? "border-accent text-accent2" : "border-border2 text-muted"}`}>
                 {note.pinned ? "Pinned" : "Pin"}

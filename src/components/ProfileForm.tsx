@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
 import Combobox from "@/components/Combobox";
-import { DEFAULT_PAIRS, PAIR_CATALOG, PAIR_CATEGORIES } from "@/lib/pairs";
 import ThemeToggle from "@/components/ThemeToggle";
 
 type Meta = Record<string, unknown>;
@@ -72,33 +72,6 @@ export default function ProfileForm({
   });
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  // Active pair watchlist: drives every pair dropdown in the app.
-  // Saved immediately on toggle (auth metadata merge, no Save button needed).
-  const [pairs, setPairs] = useState<string[]>(() => {
-    const p = meta.pairs;
-    if (Array.isArray(p)) {
-      const valid = p.filter(
-        (x): x is string => typeof x === "string" && PAIR_CATALOG.some((c) => c.label === x)
-      );
-      if (valid.length) return valid;
-    }
-    return DEFAULT_PAIRS;
-  });
-  const [pairsMsg, setPairsMsg] = useState<string | null>(null);
-
-  async function togglePair(label: string) {
-    const next = pairs.includes(label)
-      ? pairs.filter((x) => x !== label)
-      : [...PAIR_CATALOG.filter((c) => [...pairs, label].includes(c.label)).map((c) => c.label)];
-    if (next.length === 0) {
-      setPairsMsg("Keep at least one pair.");
-      return;
-    }
-    setPairs(next);
-    setPairsMsg(null);
-    const { error } = await supabase.auth.updateUser({ data: { pairs: next } });
-    setPairsMsg(error ? `Could not save: ${error.message}` : "Saved.");
-  }
 
   function onCountry(v: string) {
     const newDial = DIAL[v] ?? "";
@@ -137,8 +110,12 @@ export default function ProfileForm({
   async function saveDetails() {
     setSavingDetails(true);
     setMsg(null);
+    // Exclude pairs: it is managed on /profile/pairs and resending the
+    // page-load snapshot here could overwrite newer changes.
+    const { pairs: _pairs, ...metaRest } = meta;
+    void _pairs;
     const { error } = await supabase.auth.updateUser({
-      data: { ...meta, ...form, pairs, display_name: fullName || str(meta, "display_name") },
+      data: { ...metaRest, ...form, display_name: fullName || str(meta, "display_name") },
     });
     setSavingDetails(false);
     setMsg(error ? { t: "err", text: error.message } : { t: "ok", text: "Profile saved." });
@@ -256,41 +233,21 @@ export default function ProfileForm({
           </div>
         </Section>
 
-        <div id="pairs">
-          <Section title="Trading pairs">
-            <p className="mb-3 text-sm text-muted">
-              Your watchlist. These appear in every pair dropdown across the app
-              (charts, risk, journal, analysis). Changes save automatically.
-            </p>
-            {pairsMsg && (
-              <p className={`mb-3 text-xs ${pairsMsg === "Saved." ? "text-success" : "text-danger"}`}>{pairsMsg}</p>
-            )}
-            <div className="space-y-4">
-              {PAIR_CATEGORIES.map((cat) => (
-                <div key={cat}>
-                  <div className="mb-1.5 text-xs text-dim">{cat}</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {PAIR_CATALOG.filter((c) => c.cat === cat).map((c) => {
-                      const on = pairs.includes(c.label);
-                      return (
-                        <button
-                          key={c.label}
-                          onClick={() => togglePair(c.label)}
-                          className={`rounded-full border px-3 py-1.5 font-mono text-xs transition ${
-                            on
-                              ? "border-accent bg-accent-soft text-accent2"
-                              : "border-border2 text-muted hover:border-accent hover:text-foreground"
-                          }`}
-                        >
-                          {on ? "★ " : "☆ "}{c.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+        <div className="rounded-2xl bg-card p-6 ring-1 ring-border">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted">Trading pairs</div>
+              <p className="mt-1 text-sm text-muted">
+                The watchlist behind every pair dropdown in the app.
+              </p>
             </div>
-          </Section>
+            <Link
+              href="/profile/pairs"
+              className="shrink-0 rounded-lg border border-border2 px-4 py-2 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground"
+            >
+              Manage pairs
+            </Link>
+          </div>
         </div>
 
         <Section title="Trading profile">

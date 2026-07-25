@@ -86,7 +86,7 @@ export default function ChartsPage() {
           ))}
         </select>
         <Link
-          href="/profile#pairs"
+          href="/profile/pairs"
           className="shrink-0 whitespace-nowrap text-xs text-accent2 hover:underline"
           title="Add or remove pairs"
         >

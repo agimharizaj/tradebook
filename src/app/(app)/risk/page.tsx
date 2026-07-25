@@ -235,7 +235,7 @@ export default function RiskPage() {
               {sizablePairs.map((p) => (<option key={p}>{p}</option>))}
             </select>
             <span className="mt-1 block text-xs">
-              <Link href="/profile#pairs" className="text-accent2 hover:underline">Edit pairs</Link>
+              <Link href="/profile/pairs" className="text-accent2 hover:underline">Edit pairs</Link>
             </span>
             {livePrice != null ? (
               <span className="mt-1 flex items-center gap-2 text-xs text-dim">

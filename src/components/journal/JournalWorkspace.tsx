@@ -494,7 +494,7 @@ function DayModal({
                   {watchlist.map((p) => (<option key={p} value={p} />))}
                 </datalist>
                 <span className="mt-0.5 block text-[11px]">
-                  <Link href="/profile#pairs" className="text-accent2 hover:underline">Edit pairs</Link>
+                  <Link href="/profile/pairs" className="text-accent2 hover:underline">Edit pairs</Link>
                 </span>
               </Field>
               <Field label="Direction">
