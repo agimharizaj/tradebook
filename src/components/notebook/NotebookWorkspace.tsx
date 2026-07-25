@@ -60,6 +60,20 @@ export default function NotebookWorkspace() {
     [supabase]
   );
 
+  // Flush a pending (debounced) save immediately so switching notes within
+  // the 700ms autosave window never drops the last keystrokes.
+  const flushSave = useCallback(
+    async (n: Note | null) => {
+      if (!n || !dirty.current || isEmptyNote(n)) return;
+      await supabase
+        .from("notes")
+        .update({ title: n.title || "Untitled", content: n.content })
+        .eq("id", n.id);
+      dirty.current = false;
+    },
+    [supabase]
+  );
+
   // Also discard an untouched note when leaving the page entirely.
   const noteRef = useRef<Note | null>(null);
   useEffect(() => {
@@ -68,14 +82,25 @@ export default function NotebookWorkspace() {
   useEffect(() => {
     return () => {
       const n = noteRef.current;
-      if (n && isEmptyNote(n)) {
-        createClient().from("notes").delete().eq("id", n.id).then(() => {});
+      if (!n) return;
+      const c = createClient();
+      if (isEmptyNote(n)) {
+        c.from("notes").delete().eq("id", n.id).then(() => {});
+      } else if (dirty.current) {
+        // Leaving the page with a save still debounced: write it now.
+        c.from("notes")
+          .update({ title: n.title || "Untitled", content: n.content })
+          .eq("id", n.id)
+          .then(() => {});
       }
     };
   }, []);
 
   async function openNote(id: string) {
-    if (note && note.id !== id) discardIfEmpty(note);
+    if (note && note.id !== id) {
+      discardIfEmpty(note);
+      flushSave(note);
+    }
     const { data } = await supabase.from("notes").select("*").eq("id", id).single();
     if (!data) return;
     dirty.current = false;
@@ -87,6 +112,7 @@ export default function NotebookWorkspace() {
     // Reuse the current note if it is still untouched instead of stacking
     // empty "Untitled" rows.
     if (note && isEmptyNote(note)) return;
+    flushSave(note);
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) {
       setStatus("Not signed in.");

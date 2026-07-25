@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type ListItem = { key: string; id?: string; text: string; checked: boolean };
@@ -56,6 +56,10 @@ export default function StrategyWorkspace() {
   const [status, setStatus] = useState<string | null>(null);
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Unsaved-edit guard: clicking another plan (or +New) with unsaved changes
+  // prompts to save or discard instead of silently dropping the draft.
+  const dirtyEdit = useRef(false);
+  const [pendingNav, setPendingNav] = useState<{ kind: "open"; id: string } | { kind: "new" } | null>(null);
 
   const loadList = useCallback(async () => {
     const { data } = await supabase
@@ -72,6 +76,11 @@ export default function StrategyWorkspace() {
   }, [loadList]);
 
   async function openStrategy(id: string) {
+    if (mode === "edit" && dirtyEdit.current && draft) {
+      setPendingNav({ kind: "open", id });
+      return;
+    }
+    dirtyEdit.current = false;
     setStatus(null);
     const { data: s } = await supabase
       .from("strategies")
@@ -136,17 +145,24 @@ export default function StrategyWorkspace() {
   }
 
   function newStrategy() {
+    if (mode === "edit" && dirtyEdit.current && draft) {
+      setPendingNav({ kind: "new" });
+      return;
+    }
+    dirtyEdit.current = false;
     setStatus(null);
     setDraft({ ...emptyDraft(), name: `Strategy ${new Date().toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}` });
     setMode("edit");
   }
 
   function patch(p: Partial<Draft>) {
+    if (mode === "edit") dirtyEdit.current = true;
     setDraft((d) => (d ? { ...d, ...p } : d));
   }
 
   type Sec = "charting" | "entry" | "rules" | "exit";
   function updateSec(sec: Sec, fn: (arr: ListItem[]) => ListItem[]) {
+    if (mode === "edit") dirtyEdit.current = true;
     setDraft((d) => (d ? { ...d, [sec]: fn(d[sec]) } : d));
   }
   function addItem(sec: Sec) {
@@ -293,13 +309,16 @@ export default function StrategyWorkspace() {
     }
 
     setSaving(false);
+    dirtyEdit.current = false;
     if (sid) await openStrategy(sid);
     setStatus("Saved.");
     loadList();
+    return true;
 
     function fail(msg: string) {
       setStatus(`Save failed: ${msg}`);
       setSaving(false);
+      return false;
     }
   }
 
@@ -429,6 +448,7 @@ export default function StrategyWorkspace() {
               <div className="flex shrink-0 gap-2">
                 <button
                   onClick={() => {
+                    dirtyEdit.current = false;
                     if (draft.id) openStrategy(draft.id);
                     else setDraft(null);
                   }}
@@ -579,6 +599,50 @@ export default function StrategyWorkspace() {
           </div>
         )}
       </main>
+
+      {pendingNav && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-card p-6 ring-1 ring-border2">
+            <h2 className="text-lg">Save changes?</h2>
+            <p className="mt-2 text-sm text-muted">
+              You have unsaved edits to &ldquo;{draft?.name || "this plan"}&rdquo;.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setPendingNav(null)}
+                className="rounded-lg border border-border2 px-4 py-2 text-sm text-muted transition hover:text-foreground"
+              >
+                Keep editing
+              </button>
+              <button
+                onClick={() => {
+                  const nav = pendingNav;
+                  setPendingNav(null);
+                  dirtyEdit.current = false;
+                  if (nav.kind === "open") openStrategy(nav.id);
+                  else newStrategy();
+                }}
+                className="rounded-lg border border-border2 px-4 py-2 text-sm text-danger transition hover:border-danger"
+              >
+                Discard
+              </button>
+              <button
+                onClick={async () => {
+                  const nav = pendingNav;
+                  setPendingNav(null);
+                  const ok = await save();
+                  if (!ok) return;
+                  if (nav.kind === "open") openStrategy(nav.id);
+                  else newStrategy();
+                }}
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
