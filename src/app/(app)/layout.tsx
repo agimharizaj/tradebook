@@ -22,10 +22,10 @@ export default async function AppLayout({
     "";
 
   return (
-    // dvh under-measures in iOS standalone PWAs (it reserves space for
-    // browser UI that never exists there), stranding the tab bar above a
-    // dead strip. Standalone uses plain 100vh, which is stable there.
-    <div className="flex h-dvh overflow-hidden [@media(display-mode:standalone)]:h-screen">
+    // Viewport units misbehave in iOS standalone PWAs (dvh under-measures,
+    // vh over-measures). globals.css pins html/body to the exact visible
+    // area in standalone, so the shell inherits that via h-full there.
+    <div className="flex h-dvh overflow-hidden [@media(display-mode:standalone)]:h-full">
       <Sidebar email={user.email ?? ""} name={displayName} />
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Browser tabs get the logo header for orientation. The installed
