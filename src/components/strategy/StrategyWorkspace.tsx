@@ -110,6 +110,11 @@ export default function StrategyWorkspace() {
   // While the confirm dialog is open: Enter deletes, Escape cancels.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && pendingRef.current && !isTypingTarget()) {
+        e.preventDefault();
+        undoDelete();
+        return;
+      }
       if (confirmDelete) {
         if (e.key === "Enter") {
           e.preventDefault();
@@ -378,15 +383,51 @@ export default function StrategyWorkspace() {
     }
   }
 
-  async function performDelete() {
+  // Confirmed deletes get a 5s grace period: the strategy disappears from
+  // the UI immediately but the row is only removed when the toast expires,
+  // so Undo restores it fully intact (criteria, images, risk controls).
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string } | null>(null);
+  const pendingRef = useRef<{ id: string; timer: ReturnType<typeof setTimeout> } | null>(null);
+
+  function finalizePendingDelete() {
+    const p = pendingRef.current;
+    if (!p) return;
+    clearTimeout(p.timer);
+    pendingRef.current = null;
+    createClient().from("strategies").delete().eq("id", p.id).then(() => {});
+  }
+  // Leaving the page with a delete still pending: make it real.
+  useEffect(() => () => finalizePendingDelete(), []);
+
+  function performDelete() {
     setConfirmDelete(false);
     if (!draft?.id) {
       setDraft(null);
       return;
     }
-    await supabase.from("strategies").delete().eq("id", draft.id);
+    finalizePendingDelete();
+    const id = draft.id;
+    const label = draft.name || "Untitled strategy";
+    dirtyEdit.current = false;
     setDraft(null);
+    setList((ls) => ls.filter((x) => x.id !== id));
+    const timer = setTimeout(() => {
+      pendingRef.current = null;
+      setPendingDelete(null);
+      supabase.from("strategies").delete().eq("id", id).then(() => {});
+    }, 5000);
+    pendingRef.current = { id, timer };
+    setPendingDelete({ id, label });
+  }
+
+  function undoDelete() {
+    const p = pendingRef.current;
+    if (!p) return;
+    clearTimeout(p.timer);
+    pendingRef.current = null;
+    setPendingDelete(null);
     loadList();
+    openStrategy(p.id);
   }
 
   return (
@@ -724,6 +765,13 @@ export default function StrategyWorkspace() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {pendingDelete && (
+        <div className="fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap rounded-xl border border-border2 bg-card px-4 py-2.5 shadow-xl md:bottom-6">
+          <span className="max-w-[60vw] truncate text-sm text-muted">Deleted &ldquo;{pendingDelete.label}&rdquo;</span>
+          <button onClick={undoDelete} className="text-sm font-medium text-accent2 hover:underline">Undo</button>
         </div>
       )}
 

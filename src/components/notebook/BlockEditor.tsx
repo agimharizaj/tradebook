@@ -166,6 +166,7 @@ export default function BlockEditor({
   }
 
   function insertAnalysis(a: AnalysisRow) {
+    snapshot();
     const add: Block[] = [
       { id: uid(), type: "h", text: `${a.symbol}${a.timeframe ? ` ${a.timeframe}` : ""} analysis` },
     ];
@@ -233,10 +234,52 @@ export default function BlockEditor({
     }
   });
 
+  // ---- Undo/redo (Cmd+Z / Cmd+Shift+Z) ----
+  // Whole-list snapshots taken before every mutation. Typing within a
+  // second collapses into one undo step; structural changes (add, delete,
+  // reorder, insert) always get their own step. The browser's native
+  // per-textarea undo is overridden so history covers block operations too.
+  const blocksRef = useRef(blocks);
+  blocksRef.current = blocks;
+  const past = useRef<Block[][]>([]);
+  const future = useRef<Block[][]>([]);
+  const lastSnap = useRef(0);
+
+  function snapshot(groupTyping = false) {
+    const now = Date.now();
+    if (groupTyping && now - lastSnap.current < 1000 && past.current.length) return;
+    past.current.push(blocksRef.current);
+    if (past.current.length > 200) past.current.shift();
+    future.current = [];
+    lastSnap.current = now;
+  }
+  function undo() {
+    const prev = past.current.pop();
+    if (!prev) return;
+    future.current.push(blocksRef.current);
+    focusId.current = null;
+    setBlocks(prev);
+  }
+  function redo() {
+    const next = future.current.pop();
+    if (!next) return;
+    past.current.push(blocksRef.current);
+    focusId.current = null;
+    setBlocks(next);
+  }
+  function onHistoryKeys(e: React.KeyboardEvent) {
+    if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
+    e.preventDefault();
+    if (e.shiftKey) redo();
+    else undo();
+  }
+
   function update(id: string, patch: Partial<Block>) {
+    snapshot(true);
     setBlocks((bs) => bs.map((b) => (b.id === id ? { ...b, ...patch } : b)));
   }
   function addAfter(id: string, type: BlockType) {
+    snapshot();
     const nb: Block = { id: uid(), type, text: "", checked: false };
     focusId.current = nb.id;
     setBlocks((bs) => {
@@ -247,11 +290,13 @@ export default function BlockEditor({
     });
   }
   function append(type: BlockType) {
+    snapshot();
     const nb: Block = { id: uid(), type, text: "", checked: false };
     focusId.current = nb.id;
     setBlocks((bs) => [...bs, nb]);
   }
   function remove(id: string, focusPrev = false) {
+    snapshot();
     setBlocks((bs) => {
       if (bs.length === 1) return [{ id: uid(), type: "text", text: "" }];
       const i = bs.findIndex((b) => b.id === id);
@@ -260,6 +305,7 @@ export default function BlockEditor({
     });
   }
   function move(from: string, to: string) {
+    snapshot();
     setBlocks((bs) => {
       const fi = bs.findIndex((b) => b.id === from);
       const ti = bs.findIndex((b) => b.id === to);
@@ -272,6 +318,7 @@ export default function BlockEditor({
   }
   // Touch fallback: HTML5 drag never fires on iOS.
   function moveBy(id: string, delta: -1 | 1) {
+    snapshot();
     setBlocks((bs) => {
       const i = bs.findIndex((b) => b.id === id);
       const j = i + delta;
@@ -303,7 +350,7 @@ export default function BlockEditor({
   let numCount = 0;
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1" onKeyDown={onHistoryKeys}>
       {blocks.map((b) => {
         const num = b.type === "number" ? ++numCount : (numCount = 0);
         const isSticky = b.type === "sticky";

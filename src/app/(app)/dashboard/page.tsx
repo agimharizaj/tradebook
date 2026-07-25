@@ -149,11 +149,6 @@ export default async function DashboardPage() {
         </p>
       )}
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
-        <Card title="Strategy" body="Build and refine your trading playbooks." href="/strategy" />
-        <Card title="Journal" body="Log trades and review your performance." href="/journal" />
-        <Card title="Risk" body="Size positions by your account risk." href="/risk" />
-      </div>
     </div>
   );
 }
@@ -183,14 +178,5 @@ function Mini({ label, value, tone }: { label: string; value: string; tone?: "up
         {value}
       </div>
     </div>
-  );
-}
-
-function Card({ title, body, href }: { title: string; body: string; href: string }) {
-  return (
-    <Link href={href} className="rounded-2xl bg-card p-5 ring-1 ring-border transition hover:ring-accent">
-      <h2 className="font-medium">{title}</h2>
-      <p className="mt-1 text-sm text-muted">{body}</p>
-    </Link>
   );
 }

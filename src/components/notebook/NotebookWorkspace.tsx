@@ -88,6 +88,11 @@ export default function NotebookWorkspace() {
   // While the confirm dialog is open: Enter deletes, Escape cancels.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && pendingRef.current && !isTypingTarget()) {
+        e.preventDefault();
+        undoDelete();
+        return;
+      }
       if (confirmDelete) {
         if (e.key === "Enter") {
           e.preventDefault();
@@ -235,12 +240,48 @@ export default function NotebookWorkspace() {
     loadList();
   }
 
-  async function performDelete() {
+  // Confirmed deletes get a 5s grace period: the note disappears from the
+  // UI immediately but the row is only removed when the toast expires, so
+  // Undo restores it fully intact (same id, same content).
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string } | null>(null);
+  const pendingRef = useRef<{ id: string; timer: ReturnType<typeof setTimeout> } | null>(null);
+
+  function finalizePendingDelete() {
+    const p = pendingRef.current;
+    if (!p) return;
+    clearTimeout(p.timer);
+    pendingRef.current = null;
+    createClient().from("notes").delete().eq("id", p.id).then(() => {});
+  }
+  // Leaving the page with a delete still pending: make it real.
+  useEffect(() => () => finalizePendingDelete(), []);
+
+  function performDelete() {
     setConfirmDelete(false);
     if (!note) return;
-    await supabase.from("notes").delete().eq("id", note.id);
+    finalizePendingDelete();
+    const id = note.id;
+    const label = note.title || "Untitled";
+    dirty.current = false;
     setNote(null);
+    setList((ls) => ls.filter((x) => x.id !== id));
+    const timer = setTimeout(() => {
+      pendingRef.current = null;
+      setPendingDelete(null);
+      supabase.from("notes").delete().eq("id", id).then(() => {});
+    }, 5000);
+    pendingRef.current = { id, timer };
+    setPendingDelete({ id, label });
+  }
+
+  function undoDelete() {
+    const p = pendingRef.current;
+    if (!p) return;
+    clearTimeout(p.timer);
+    pendingRef.current = null;
+    setPendingDelete(null);
     loadList();
+    openNote(p.id);
   }
 
   return (
@@ -393,6 +434,13 @@ export default function NotebookWorkspace() {
             loadList();
           }}
         />
+      )}
+
+      {pendingDelete && (
+        <div className="fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap rounded-xl border border-border2 bg-card px-4 py-2.5 shadow-xl md:bottom-6">
+          <span className="max-w-[60vw] truncate text-sm text-muted">Deleted &ldquo;{pendingDelete.label}&rdquo;</span>
+          <button onClick={undoDelete} className="text-sm font-medium text-accent2 hover:underline">Undo</button>
+        </div>
       )}
 
       {confirmDelete && (

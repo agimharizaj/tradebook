@@ -48,6 +48,8 @@ The approved look is the dark "terminal" concept in `design/tradebook-brand-conc
 - Phase 3 (journal): DONE. `/journal` monthly calendar, per-day trade add/list/delete modal, monthly + weekly summaries.
 - Phase 4 (risk calculator): DONE. `/risk` with 3 modes (segmented switcher) and live prices via `/api/fx` (Frankfurter/ECB for fiat, CoinGecko for BTC, gold-api.com for XAU, all keyless). Pure sizing math lives in `src/lib/risk.ts` (lot output floors to 0.01 steps). Changing pair clears entry/SL/lots and prefills entry with the live price.
 - Dashboard: real stats pulled from trades, incl. profit factor, equity curve, max drawdown. Read errors surface as a banner.
+- Undo: BlockEditor has Cmd+Z / Cmd+Shift+Z whole-list snapshot history (typing grouped ~1s, native textarea undo overridden). Note/strategy deletes soft-delete with a 5s "Deleted - Undo" toast; the DB row is removed only when the toast expires or on unmount (finalizePendingDelete). Backspace/Delete opens the confirm dialog (Enter confirms, Escape cancels) outside text fields.
+- Dashboard is stats + charts only (nav link cards removed); checked strategy entry/exit criteria render struck through.
 - Journal: true expectancy (win% x avg win - loss% x avg loss) plus separate Avg R; two-step delete confirmation; MT5 import keeps close time and stores commission+swap in `trades.commission` (pnl stays net).
 - Profile: `/profile` display name, password change (current+new) in a separate Security section. Signup collects first/last name.
 - Layout: collapsible sidebar (state in localStorage), viewport-pinned; content scrolls inside. Pinch zoom enabled (no maximumScale).
