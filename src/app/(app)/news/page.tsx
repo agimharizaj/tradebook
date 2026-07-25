@@ -1,6 +1,7 @@
 "use client";
 
 import TVWidget from "@/components/TVWidget";
+import NewsFeed from "@/components/news/NewsFeed";
 
 export default function NewsPage() {
   return (
@@ -30,26 +31,13 @@ export default function NewsPage() {
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl bg-card p-3 ring-1 ring-border">
-          <h2 className="mb-2 px-2 pt-1 text-sm font-medium uppercase tracking-wide text-muted">Market news</h2>
-          <TVWidget
-            src="https://s3.tradingview.com/external-embedding/embed-widget-timeline.js"
-            height={720}
-            config={{
-              feedMode: "market",
-              market: "forex",
-              isTransparent: true,
-              displayMode: "regular",
-              colorTheme: "dark",
-              locale: "en",
-              width: "100%",
-              height: "100%",
-            }}
-          />
+        <div className="rounded-2xl bg-card p-4 ring-1 ring-border">
+          <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">Market news</h2>
+          <NewsFeed height={720} />
         </div>
 
         <div className="rounded-2xl bg-card p-3 ring-1 ring-border">
-          <h2 className="mb-2 px-2 pt-1 text-sm font-medium uppercase tracking-wide text-muted">Economic calendar</h2>
+          <h2 className="mb-2 px-1 pt-1 text-sm font-medium uppercase tracking-wide text-muted">Economic calendar</h2>
           <TVWidget
             src="https://s3.tradingview.com/external-embedding/embed-widget-events.js"
             height={720}
@@ -59,25 +47,21 @@ export default function NewsPage() {
               locale: "en",
               importanceFilter: "0,1",
               currencyFilter: "USD,EUR,GBP,JPY,AUD,CAD,CHF,NZD",
-              width: "100%",
-              height: "100%",
             }}
           />
         </div>
       </div>
 
       <div className="mt-6 rounded-2xl bg-card p-3 ring-1 ring-border">
-        <h2 className="mb-2 px-2 pt-1 text-sm font-medium uppercase tracking-wide text-muted">Forex heatmap</h2>
+        <h2 className="mb-2 px-1 pt-1 text-sm font-medium uppercase tracking-wide text-muted">Forex heatmap</h2>
         <TVWidget
           src="https://s3.tradingview.com/external-embedding/embed-widget-forex-heat-map.js"
-          height={420}
+          height={640}
           config={{
             currencies: ["EUR", "USD", "JPY", "GBP", "CHF", "AUD", "CAD", "NZD"],
             isTransparent: true,
             colorTheme: "dark",
             locale: "en",
-            width: "100%",
-            height: "100%",
           }}
         />
       </div>

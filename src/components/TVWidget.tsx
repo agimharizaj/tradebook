@@ -12,12 +12,13 @@ export default function TVWidget({
   height?: number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const cfg = JSON.stringify(config);
+  // Force an exact numeric height so the widget never overflows its tile.
+  const cfg = JSON.stringify({ ...config, width: "100%", height });
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.innerHTML = '<div class="tradingview-widget-container__widget"></div>';
+    el.innerHTML = '<div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div>';
     const script = document.createElement("script");
     script.src = src;
     script.async = true;
@@ -29,5 +30,11 @@ export default function TVWidget({
     };
   }, [src, cfg]);
 
-  return <div ref={ref} className="tradingview-widget-container" style={{ height }} />;
+  return (
+    <div
+      ref={ref}
+      className="tradingview-widget-container overflow-hidden rounded-lg"
+      style={{ height, width: "100%" }}
+    />
+  );
 }
