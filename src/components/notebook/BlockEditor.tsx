@@ -247,6 +247,8 @@ export default function BlockEditor({
   };
   const [showAnalyses, setShowAnalyses] = useState(false);
   const [analyses, setAnalyses] = useState<AnalysisRow[]>([]);
+  // Second step when an analysis has multiple charts: pick which to insert.
+  const [imgPick, setImgPick] = useState<{ a: AnalysisRow; imgs: { path: string; url: string; on: boolean }[] } | null>(null);
 
   async function openAnalyses() {
     const { data } = await createClient()
@@ -258,17 +260,41 @@ export default function BlockEditor({
     setShowAnalyses(true);
   }
 
-  function insertAnalysis(a: AnalysisRow) {
+  const analysisImages = (a: AnalysisRow) => [
+    ...(a.image_path ? [a.image_path] : []),
+    ...(a.extra_images ?? []),
+  ];
+
+  // imgs: which charts to include (defaults to all of them).
+  function insertAnalysis(a: AnalysisRow, imgs?: string[]) {
     snapshot();
     const add: Block[] = [
       { id: uid(), type: "h", text: `${a.symbol}${a.timeframe ? ` ${a.timeframe}` : ""} analysis` },
     ];
     if (a.direction) add.push({ id: uid(), type: "text", text: `Bias: ${a.direction}` });
     if (a.notes) add.push({ id: uid(), type: "text", text: a.notes });
-    if (a.image_path) add.push({ id: uid(), type: "img", text: a.image_path });
-    for (const pth of a.extra_images ?? []) add.push({ id: uid(), type: "img", text: pth });
+    for (const pth of imgs ?? analysisImages(a)) add.push({ id: uid(), type: "img", text: pth });
     setBlocks((bs) => [...bs, ...add]);
     setShowAnalyses(false);
+    setImgPick(null);
+  }
+
+  // Single-chart analyses insert immediately; multi-chart ones open the
+  // chart picker with everything preselected.
+  async function chooseAnalysis(a: AnalysisRow) {
+    const paths = analysisImages(a);
+    if (paths.length <= 1) {
+      insertAnalysis(a);
+      return;
+    }
+    const c = createClient();
+    const signed = await Promise.all(
+      paths.map((pth) => c.storage.from("entry-models").createSignedUrl(pth, 3600))
+    );
+    setImgPick({
+      a,
+      imgs: paths.map((pth, i) => ({ path: pth, url: signed[i]?.data?.signedUrl ?? "", on: true })),
+    });
   }
 
   // Curated emoji strip: inserts at the cursor of the last-focused block,
@@ -652,7 +678,7 @@ export default function BlockEditor({
       {showAnalyses && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
-          onClick={() => setShowAnalyses(false)}
+          onClick={() => { setShowAnalyses(false); setImgPick(null); }}
         >
           <div
             className="max-h-[70dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-card p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] ring-1 ring-border2 sm:rounded-2xl sm:pb-4"
@@ -670,7 +696,56 @@ export default function BlockEditor({
                 ✕
               </button>
             </div>
-            {analyses.length === 0 ? (
+            {imgPick ? (
+              <div>
+                <p className="mb-2 text-xs text-dim">
+                  {imgPick.a.symbol} has {imgPick.imgs.length} charts. Tap to include or exclude, then insert.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {imgPick.imgs.map((im, i) => (
+                    <button
+                      key={im.path}
+                      onClick={() =>
+                        setImgPick((cur) =>
+                          cur
+                            ? { ...cur, imgs: cur.imgs.map((x, j) => (j === i ? { ...x, on: !x.on } : x)) }
+                            : cur
+                        )
+                      }
+                      className={`relative overflow-hidden rounded-lg border-2 transition ${im.on ? "border-accent" : "border-border opacity-50"}`}
+                    >
+                      {im.url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={im.url} alt="Chart" className="h-24 w-full object-cover" />
+                      ) : (
+                        <span className="flex h-24 items-center justify-center text-xs text-dim">Preview unavailable</span>
+                      )}
+                      <span
+                        className={`absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-xs ${
+                          im.on ? "bg-accent text-white" : "bg-black/50 text-white/70"
+                        }`}
+                      >
+                        {im.on ? "✓" : ""}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-3 flex justify-between">
+                  <button
+                    onClick={() => setImgPick(null)}
+                    className="rounded-lg border border-border2 px-3 py-2 text-sm text-muted hover:text-foreground"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={() => insertAnalysis(imgPick.a, imgPick.imgs.filter((x) => x.on).map((x) => x.path))}
+                    className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white"
+                  >
+                    Insert ({imgPick.imgs.filter((x) => x.on).length} chart{imgPick.imgs.filter((x) => x.on).length === 1 ? "" : "s"})
+                  </button>
+                </div>
+              </div>
+            ) : analyses.length === 0 ? (
               <p className="text-sm text-dim">
                 No saved analyses yet. Save one from Charts, then insert it here.
               </p>
@@ -679,7 +754,7 @@ export default function BlockEditor({
                 {analyses.map((a) => (
                   <button
                     key={a.id}
-                    onClick={() => insertAnalysis(a)}
+                    onClick={() => chooseAnalysis(a)}
                     className="flex w-full items-center justify-between gap-2 rounded-lg border border-border px-3 py-2.5 text-left transition hover:border-accent"
                   >
                     <span className="flex min-w-0 items-center gap-2">
