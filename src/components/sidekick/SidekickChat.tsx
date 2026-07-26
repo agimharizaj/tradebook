@@ -54,9 +54,12 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Guards the auto-load + manual loads against wiping an in-flight reply.
+  const busyRef = useRef(false);
 
   const loadConversation = useCallback(
     async (id: string) => {
+      if (busyRef.current) return;
       setActiveId(id);
       setConfirmDeleteId(null);
       const { data, error } = await supabase
@@ -181,6 +184,7 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
     const sentStrategyId = attach ? strategyId : "";
     setAttach(null);
     setBusy(true);
+    busyRef.current = true;
 
     // Persist the user message in the background (failures never block chat).
     const convoIdPromise = ensureConversation(userMsg.text)
@@ -192,8 +196,12 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
 
     const update = (text: string, error = false) =>
       setMessages((cur) => {
+        // Replace the streaming placeholder; if anything replaced the thread
+        // meanwhile, append instead of overwriting someone else's message.
         const next = [...cur];
-        next[next.length - 1] = { role: "model", text, error };
+        const last = next[next.length - 1];
+        if (last && last.role === "model") next[next.length - 1] = { role: "model", text, error };
+        else next.push({ role: "model", text, error });
         return next;
       });
 
@@ -242,6 +250,7 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
       update("Couldn't reach Sidekick. Check your connection and try again.", true);
     } finally {
       setBusy(false);
+      busyRef.current = false;
     }
   }
 
@@ -335,7 +344,9 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
           <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6 md:px-6">
             <div className="flex gap-3">
               <Avatar />
-              <div className="rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed">
+              <div className="min-w-0">
+                <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-dim">Sidekick · AI</div>
+                <div className="rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed">
                 <p>
                   I&apos;m your trading analyst. I can see your journal, strategies and stats, and I&apos;ll
                   hold you to your own rules. I analyse; I never signal.
@@ -345,6 +356,7 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
                   rule-compliance check. I keep roughly the last 100k tokens of each conversation
                   in mind, along with a fresh snapshot of your data on every message.
                 </p>
+                </div>
               </div>
             </div>
 
@@ -372,13 +384,18 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
                 </div>
               ) : (
                 <div key={i} className="flex gap-3">
-                  <Avatar />
-                  <div
-                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl border px-4 py-3 text-sm leading-relaxed ${
-                      m.error ? "border-danger/40 bg-danger/10 text-danger" : "border-border bg-card"
-                    }`}
-                  >
-                    {m.text || <TypingDots />}
+                  <Avatar pulsing={busy && i === messages.length - 1} />
+                  <div className="min-w-0 max-w-[85%]">
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-dim">
+                      Sidekick{busy && i === messages.length - 1 && !m.text ? " · thinking" : " · AI"}
+                    </div>
+                    <div
+                      className={`whitespace-pre-wrap rounded-2xl border px-4 py-3 text-sm leading-relaxed ${
+                        m.error ? "border-danger/40 bg-danger/10 text-danger" : "border-border bg-card"
+                      }`}
+                    >
+                      {m.text || <TypingDots />}
+                    </div>
                   </div>
                 </div>
               )
@@ -483,9 +500,13 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
   );
 }
 
-function Avatar() {
+function Avatar({ pulsing = false }: { pulsing?: boolean }) {
   return (
-    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent shadow-[0_4px_14px_rgba(106,88,240,0.35)]">
+    <div
+      className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent shadow-[0_4px_14px_rgba(106,88,240,0.35)] ${
+        pulsing ? "animate-pulse" : ""
+      }`}
+    >
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" />
         <circle cx="12" cy="12" r="3.5" />
