@@ -5,9 +5,11 @@ export const dynamic = "force-dynamic";
 // Give long replies room; Vercel Fluid compute allows up to 300s on Hobby.
 export const maxDuration = 300;
 
-// Current stable Gemini Flash (free tier via Google AI Studio). One place to
-// change when Google ships the next stable.
-const MODEL = "gemini-3.6-flash";
+// Lightweight, non-reasoning model: Sidekick summarises pre-computed stats
+// and compares rules, which needs speed and reliability, not deep reasoning.
+// Starts writing in ~1-2s (the 3.6 reasoning model thought for 60s+ and hit
+// Vercel's clock), higher free-tier daily allowance, vision included.
+const MODEL = "gemini-3.1-flash-lite";
 
 type ClientMessage = {
   role: "user" | "model";
@@ -221,17 +223,9 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         system_instruction: { parts: [{ text: systemInstruction }] },
         contents,
-        // Roomy cap: Gemini 3.x spends hidden "thinking" tokens from this
-        // same budget, so a tight limit truncates visible answers mid-word.
-        // thinkingLevel low: default (dynamic) thinking regularly ran past
-        // 60s on data-heavy prompts and got the function killed before the
-        // first word. Low keeps answers starting in seconds; quality for
-        // stats-and-rules questions is unaffected.
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 32768,
-          thinkingConfig: { thinkingLevel: "low" },
-        },
+        // No thinkingConfig: flash-lite defaults to minimal thinking, and
+        // sending the field to a model that doesn't support it is a 400.
+        generationConfig: { temperature: 0.4, maxOutputTokens: 32768 },
       }),
     },
     20_000
