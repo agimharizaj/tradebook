@@ -124,6 +124,42 @@ h3 {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+/* Split field: a static segment (e.g. auto-filled phone dial code) visually
+   separated from the editable part, styled as one control. */
+.field-split {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field-split:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.field-split > .field-prefix {
+  display: flex;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  border-right: 1px solid var(--border2);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.field-split > input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.6rem 0.75rem;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 0.9rem;
+  outline: none;
+}
+
 /* iOS gives date inputs an intrinsic width that overflows their card;
    force them to behave like every other field. */
 input[type="date"],
@@ -186,7 +222,9 @@ input[type="time"] {
      1rem here is 16px, exactly at the no-zoom threshold. */
   .field,
   .input,
-  .jfield {
+  .jfield,
+  .field-split > input,
+  .field-split > .field-prefix {
     font-size: 1rem;
   }
 }

@@ -109,6 +109,12 @@ export default function ProfileForm({
 
   const fullName = `${form.first_name} ${form.last_name}`.trim();
 
+  // Phone renders as [dial code | number] when a prefix exists. The stored
+  // value stays a single string ("+39 692..."), so onCountry's prefix swap
+  // and everything downstream keep working unchanged.
+  const phonePrefix = form.phone.match(/^\+\d{1,4}/)?.[0] ?? "";
+  const phoneRest = form.phone.replace(/^\+\d{1,4}\s*/, "");
+
   async function saveDetails() {
     setSavingDetails(true);
     setMsg(null);
@@ -205,7 +211,23 @@ export default function ProfileForm({
             <Field label="First name"><input value={form.first_name} onChange={(e) => set("first_name", e.target.value)} className="field" /></Field>
             <Field label="Last name"><input value={form.last_name} onChange={(e) => set("last_name", e.target.value)} className="field" /></Field>
             <Field label="Date of birth"><input type="date" value={form.dob} onChange={(e) => set("dob", e.target.value)} className="field" /></Field>
-            <Field label="Phone"><input type="tel" inputMode="tel" value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+44..." className="field" /></Field>
+            <Field label="Phone">
+              {phonePrefix ? (
+                <div className="field-split">
+                  <span className="field-prefix" title="Set by your country">{phonePrefix}</span>
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    value={phoneRest}
+                    onChange={(e) => set("phone", `${phonePrefix} ${e.target.value}`)}
+                    placeholder="7911 123456"
+                    aria-label={`Phone number, prefix ${phonePrefix}`}
+                  />
+                </div>
+              ) : (
+                <input type="tel" inputMode="tel" value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+44..." className="field" />
+              )}
+            </Field>
             <Field label="Country">
               <Combobox
                 value={form.country}
