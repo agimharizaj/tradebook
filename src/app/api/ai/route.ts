@@ -2,8 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { buildAiContext } from "@/lib/ai-context";
 
 export const dynamic = "force-dynamic";
-// Streaming responses can outlive the default timeout on slow days.
-export const maxDuration = 60;
+// Give long replies room; Vercel Fluid compute allows up to 300s on Hobby.
+export const maxDuration = 300;
 
 // Current stable Gemini Flash (free tier via Google AI Studio). One place to
 // change when Google ships the next stable.
@@ -223,7 +223,15 @@ export async function POST(request: Request) {
         contents,
         // Roomy cap: Gemini 3.x spends hidden "thinking" tokens from this
         // same budget, so a tight limit truncates visible answers mid-word.
-        generationConfig: { temperature: 0.4, maxOutputTokens: 32768 },
+        // thinkingLevel low: default (dynamic) thinking regularly ran past
+        // 60s on data-heavy prompts and got the function killed before the
+        // first word. Low keeps answers starting in seconds; quality for
+        // stats-and-rules questions is unaffected.
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 32768,
+          thinkingConfig: { thinkingLevel: "low" },
+        },
       }),
     },
     20_000
