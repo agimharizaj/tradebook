@@ -5,7 +5,10 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Tradebook",
     short_name: "Tradebook",
     description: "Your trading playbooks, journal, and risk control in one place.",
-    start_url: "/",
+    // Straight into the app: the installed PWA should never route through
+    // the public landing page (auth layout still bounces signed-out users
+    // to /login).
+    start_url: "/dashboard",
     display: "standalone",
     background_color: "#161A23",
     theme_color: "#161A23",
