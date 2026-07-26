@@ -187,7 +187,7 @@ export default async function Home({
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div>
             <h2 className="text-2xl md:text-3xl" style={{ fontFamily: "var(--font-display)" }}>
-              Try the engine before you sign up.
+              The sizing engine, live on this page.
             </h2>
             <p className="mt-4 max-w-md leading-relaxed text-muted">
               This is the actual sizing math from the app, running in your

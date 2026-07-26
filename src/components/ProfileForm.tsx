@@ -377,23 +377,19 @@ export default function ProfileForm({
             md, so the phone needs its own way out. Desktop keeps the single
             sidebar button. */}
         <div className="rounded-2xl bg-card p-6 ring-1 ring-border md:hidden">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="text-xs font-medium uppercase tracking-wide text-muted">Session</div>
-              <p className="mt-1 text-sm text-muted">Signed in as {email}</p>
-            </div>
-            <form action="/auth/signout" method="post">
-              <button
-                type="submit"
-                className="flex shrink-0 items-center gap-2 rounded-lg border border-border2 px-4 py-2 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-                </svg>
-                Sign out
-              </button>
-            </form>
-          </div>
+          <div className="text-xs font-medium uppercase tracking-wide text-muted">Session</div>
+          <p className="mt-1 break-all text-sm text-muted">Signed in as {email}</p>
+          <form action="/auth/signout" method="post" className="mt-4">
+            <button
+              type="submit"
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-border2 px-4 py-2.5 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+              </svg>
+              Sign out
+            </button>
+          </form>
         </div>
       </div>
 
