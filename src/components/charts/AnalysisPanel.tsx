@@ -12,8 +12,12 @@ type Analysis = {
   direction: string | null;
   notes: string | null;
   image_path: string | null;
+  // optional until migration 0008 adds the column
+  extra_images?: string[] | null;
   created_at: string;
 };
+
+type NoteBlock = { id: string; type: string; text: string };
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const BUCKET = "entry-models";
@@ -33,6 +37,8 @@ export default function AnalysisPanel({
   const watchlist = usePairs();
   const [items, setItems] = useState<Analysis[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
+  // signed URLs for extra_images, keyed by storage path
+  const [extraUrls, setExtraUrls] = useState<Record<string, string>>({});
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -104,6 +110,18 @@ export default function AnalysisPanel({
       if (u) map[r.id] = u;
     });
     setUrls(map);
+    const extraPaths = rows.flatMap((r) => r.extra_images ?? []);
+    if (extraPaths.length) {
+      const signedExtra = await Promise.all(
+        extraPaths.map((pth) => supabase.storage.from(BUCKET).createSignedUrl(pth, 3600))
+      );
+      const em: Record<string, string> = {};
+      extraPaths.forEach((pth, i) => {
+        const u = signedExtra[i]?.data?.signedUrl;
+        if (u) em[pth] = u;
+      });
+      setExtraUrls(em);
+    }
   }, [supabase]);
 
   useEffect(() => {
@@ -189,6 +207,7 @@ export default function AnalysisPanel({
       ...(a.direction ? [{ id: uid(), type: "text", text: `Bias: ${a.direction}` }] : []),
       ...(a.notes ? [{ id: uid(), type: "text", text: a.notes }] : []),
       ...(a.image_path ? [{ id: uid(), type: "img", text: a.image_path }] : []),
+      ...(a.extra_images ?? []).map((pth) => ({ id: uid(), type: "img", text: pth })),
     ];
   }
 
@@ -201,32 +220,37 @@ export default function AnalysisPanel({
     setRecentNotes((data as { id: string; title: string; updated_at: string }[]) ?? []);
   }
 
-  // Create a brand new note from the analysis.
-  async function sendToNewNote(a: Analysis) {
+  // Create a brand new note holding the given blocks (pair tag retried
+  // without the column if migration 0006 has not run yet).
+  async function createNoteWithBlocks(title: string, blocks: NoteBlock[], pairTag?: string) {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) {
       setErr("Not signed in.");
-      return;
+      return false;
     }
-    const title = `${a.symbol} analysis ${new Date(a.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`;
-    const row = { user_id: u.user.id, title, content: JSON.stringify({ blocks: analysisBlocks(a) }) };
-    // Try tagging the note with the pair; retry untagged if migration 0006
-    // has not run yet.
-    let { error } = await supabase.from("notes").insert({ ...row, pair: a.symbol });
-    if (error && /pair/i.test(error.message)) {
+    // pair is spread conditionally (typed as a partial) so the union the
+    // client infers stays a single object shape.
+    const row: { user_id: string; title: string; content: string; pair?: string } = {
+      user_id: u.user.id,
+      title,
+      content: JSON.stringify({ blocks }),
+      ...(pairTag ? { pair: pairTag } : {}),
+    };
+    let { error } = await supabase.from("notes").insert(row);
+    if (error && pairTag && /pair/i.test(error.message)) {
+      delete row.pair;
       ({ error } = await supabase.from("notes").insert(row));
     }
     if (error) {
       setErr(`Could not save note: ${error.message}`);
-      return;
+      return false;
     }
-    setSendPicker(false);
-    setSentToNotebook(true);
+    return true;
   }
 
-  // Append the analysis to an existing note. The note is re-read immediately
+  // Append blocks to an existing note. The note is re-read immediately
   // before writing so a stale copy never clobbers newer edits.
-  async function appendToNote(a: Analysis, noteId: string) {
+  async function appendBlocksToNote(noteId: string, add: NoteBlock[]) {
     const { data: n, error: readErr } = await supabase
       .from("notes")
       .select("content")
@@ -234,9 +258,9 @@ export default function AnalysisPanel({
       .single();
     if (readErr || !n) {
       setErr("Could not open that note.");
-      return;
+      return false;
     }
-    let blocks: { id: string; type: string; text: string }[] = [];
+    let blocks: NoteBlock[] = [];
     try {
       const j = JSON.parse(n.content ?? "");
       if (j && Array.isArray(j.blocks)) blocks = j.blocks;
@@ -246,18 +270,117 @@ export default function AnalysisPanel({
     }
     const { error } = await supabase
       .from("notes")
-      .update({ content: JSON.stringify({ blocks: [...blocks, ...analysisBlocks(a)] }) })
+      .update({ content: JSON.stringify({ blocks: [...blocks, ...add] }) })
       .eq("id", noteId);
     if (error) {
       setErr(`Could not update note: ${error.message}`);
-      return;
+      return false;
     }
+    return true;
+  }
+
+  async function sendToNewNote(a: Analysis) {
+    const title = `${a.symbol} analysis ${new Date(a.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`;
+    if (!(await createNoteWithBlocks(title, analysisBlocks(a), a.symbol))) return;
     setSendPicker(false);
     setSentToNotebook(true);
   }
 
+  async function appendToNote(a: Analysis, noteId: string) {
+    if (!(await appendBlocksToNote(noteId, analysisBlocks(a)))) return;
+    setSendPicker(false);
+    setSentToNotebook(true);
+  }
+
+  // ---- Snap to note: capture the chart and file it in a note directly,
+  // without creating an analysis log entry. ----
+  const [snapPath, setSnapPath] = useState<string | null>(null);
+  const [snapBusy, setSnapBusy] = useState(false);
+
+  const stampNow = () => {
+    const d = new Date();
+    return `${d.toLocaleDateString(undefined, { day: "numeric", month: "short" })} ${d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}`;
+  };
+
+  async function captureToStorage(prefix: string): Promise<string | null> {
+    setErr(null);
+    setCapturing(true);
+    const r = await captureChartArea();
+    setCapturing(false);
+    if (!r.ok) {
+      if (r.reason === "unsupported") setErr("Screen capture is not supported in this browser.");
+      else if (r.reason === "failed") setErr("Could not read the captured frame.");
+      return null;
+    }
+    setSnapBusy(true);
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) {
+      setErr("Not signed in.");
+      setSnapBusy(false);
+      return null;
+    }
+    const path = `${u.user.id}/analysis/${prefix}-${uid()}.png`;
+    const { error } = await supabase.storage.from(BUCKET).upload(path, r.blob, { contentType: "image/png" });
+    setSnapBusy(false);
+    if (error) {
+      setErr(`Upload failed: ${error.message}`);
+      return null;
+    }
+    return path;
+  }
+
+  async function snapChart() {
+    setInfo(null);
+    const path = await captureToStorage("snap");
+    if (!path) return;
+    setSnapPath(path);
+    loadRecentNotes();
+  }
+
+  const snapBlocks = (path: string): NoteBlock[] => [
+    { id: uid(), type: "text", text: `${symbol} chart - ${stampNow()}` },
+    { id: uid(), type: "img", text: path },
+  ];
+
+  async function snapToNewNote() {
+    if (!snapPath) return;
+    if (!(await createNoteWithBlocks(`${symbol} chart ${stampNow()}`, snapBlocks(snapPath), symbol))) return;
+    setSnapPath(null);
+    setNoteQuery("");
+    setInfo("Chart sent to a new note.");
+  }
+
+  async function snapToNote(noteId: string, title: string) {
+    if (!snapPath) return;
+    if (!(await appendBlocksToNote(noteId, snapBlocks(snapPath)))) return;
+    setSnapPath(null);
+    setNoteQuery("");
+    setInfo(`Chart added to "${title || "Untitled"}".`);
+  }
+
+  // ---- Add another chart to an already-saved analysis. ----
+  async function addChartTo(a: Analysis) {
+    const path = await captureToStorage("extra");
+    if (!path) return;
+    const extras = [...(a.extra_images ?? []), path];
+    const { error } = await supabase.from("chart_analyses").update({ extra_images: extras }).eq("id", a.id);
+    if (error) {
+      setErr(
+        /extra_images/.test(error.message)
+          ? "Run migration 0008_analysis_extra_images.sql in Supabase to attach more charts."
+          : error.message
+      );
+      return;
+    }
+    const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
+    if (signed?.signedUrl) setExtraUrls((m) => ({ ...m, [path]: signed.signedUrl }));
+    setViewing((v) => (v && v.id === a.id ? { ...v, extra_images: extras } : v));
+    load();
+  }
+
   async function del(a: Analysis) {
-    if (a.image_path) await supabase.storage.from(BUCKET).remove([a.image_path]);
+    const paths = [...(a.image_path ? [a.image_path] : []), ...(a.extra_images ?? [])];
+    if (paths.length) await supabase.storage.from(BUCKET).remove(paths);
     await supabase.from("chart_analyses").delete().eq("id", a.id);
     load();
   }
@@ -274,6 +397,14 @@ export default function AnalysisPanel({
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg" style={{ fontFamily: "var(--font-display)" }}>Analysis log</h2>
           <div className="flex items-center gap-2">
+            <button
+              onClick={snapChart}
+              disabled={snapBusy}
+              className="rounded-lg border border-border2 px-3 py-2 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground disabled:opacity-50"
+              title="Capture the chart and send it straight to a note (no log entry)"
+            >
+              {snapBusy ? "Uploading..." : "Snap to note"}
+            </button>
             {!adding && (
               <button onClick={() => { setAdding(true); setInfo(null); }} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white">+ Save analysis</button>
             )}
@@ -283,6 +414,48 @@ export default function AnalysisPanel({
 
         {err && <p className="mb-3 text-sm text-danger">{err}</p>}
         {info && !err && <p className="mb-3 text-sm text-success">{info}</p>}
+
+        {snapPath && (
+          <div className="mb-4 rounded-xl border border-border2 bg-surface2/50 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs text-dim">Chart captured. Add it to which note?</span>
+              <button
+                onClick={() => { setSnapPath(null); setNoteQuery(""); }}
+                className="rounded-md px-2 py-1 text-xs text-muted hover:text-foreground"
+              >
+                Cancel
+              </button>
+            </div>
+            <input
+              value={noteQuery}
+              onChange={(e) => setNoteQuery(e.target.value)}
+              placeholder="Search notes..."
+              className="jfield mb-2"
+            />
+            <div className="max-h-56 space-y-1 overflow-y-auto">
+              <button
+                onClick={snapToNewNote}
+                className="block w-full rounded-md px-2.5 py-2 text-left text-sm font-medium text-accent2 transition hover:bg-surface2"
+              >
+                + New note
+              </button>
+              {recentNotes
+                .filter((n) => !noteQuery.trim() || (n.title || "Untitled").toLowerCase().includes(noteQuery.toLowerCase()))
+                .map((n) => (
+                  <button
+                    key={n.id}
+                    onClick={() => snapToNote(n.id, n.title)}
+                    className="flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-sm text-foreground transition hover:bg-surface2"
+                  >
+                    <span className="truncate">{n.title || "Untitled"}</span>
+                    <span className="shrink-0 text-xs text-dim">
+                      {new Date(n.updated_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+                    </span>
+                  </button>
+                ))}
+            </div>
+          </div>
+        )}
 
         {adding && (
           <div className="mb-5 space-y-3 rounded-xl border border-border p-4">
@@ -426,6 +599,9 @@ export default function AnalysisPanel({
                 <div className="flex items-center gap-2 text-sm">
                   <span className="font-medium">{a.symbol}</span>
                   {a.timeframe && <span className="text-dim">{a.timeframe}</span>}
+                  {(a.extra_images?.length ?? 0) > 0 && (
+                    <span className="rounded bg-surface2 px-1.5 py-0.5 text-xs text-muted">+{a.extra_images!.length} chart{a.extra_images!.length === 1 ? "" : "s"}</span>
+                  )}
                   {a.direction && (
                     <span className={`rounded px-1.5 py-0.5 text-xs ${a.direction === "long" ? "bg-success/15 text-success" : a.direction === "short" ? "bg-danger/15 text-danger" : "bg-surface2 text-muted"}`}>
                       {a.direction}
@@ -504,6 +680,14 @@ export default function AnalysisPanel({
                   </button>
                 )}
                 <button
+                  onClick={() => addChartTo(viewing)}
+                  disabled={snapBusy}
+                  className="rounded-md border border-border2 px-2.5 py-1 text-xs font-medium text-muted transition hover:border-accent hover:text-foreground disabled:opacity-50"
+                  title="Capture the chart and attach it to this analysis"
+                >
+                  {snapBusy ? "Uploading..." : "+ Add chart"}
+                </button>
+                <button
                   onClick={() => {
                     if (sentToNotebook) return;
                     setSendPicker((v) => {
@@ -568,6 +752,12 @@ export default function AnalysisPanel({
                 cannot restore drawings, so attach a screenshot when saving to
                 keep the visual.
               </p>
+            )}
+            {(viewing.extra_images ?? []).map((pth) =>
+              extraUrls[pth] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={pth} src={extraUrls[pth]} alt="Additional chart" className="mt-3 w-full rounded-lg border border-border" />
+              ) : null
             )}
           </div>
         </div>
