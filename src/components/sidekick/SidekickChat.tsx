@@ -63,6 +63,9 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
       // Switching away cancels any in-flight reply (its text so far is saved).
       console.info("[sidekick] switching to conversation", id);
       abortRef.current?.abort();
+      // Unlock immediately; don't wait for the aborted request to unwind.
+      busyRef.current = false;
+      setBusy(false);
       setActiveId(id);
       setConfirmDeleteId(null);
       const { data, error } = await supabase
@@ -107,6 +110,9 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
 
   function newChat() {
     abortRef.current?.abort();
+    // Unlock immediately; don't wait for the aborted request to unwind.
+    busyRef.current = false;
+    setBusy(false);
     setActiveId(null);
     setMessages([]);
     setConfirmDeleteId(null);
@@ -201,6 +207,9 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
 
     const update = (text: string, error = false) =>
       setMessages((cur) => {
+        // This reply was cancelled (user switched chats / started a new one):
+        // never write its text into whatever thread is showing now.
+        if (ac.signal.aborted) return cur;
         // Replace the streaming placeholder; if anything replaced the thread
         // meanwhile, append instead of overwriting someone else's message.
         const next = [...cur];
@@ -270,9 +279,13 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
       if (acc.trim()) {
         convoIdPromise.then((id) => saveMessage(id, { role: "model", text: acc })).catch(() => {});
       }
-      if (abortRef.current === ac) abortRef.current = null;
-      setBusy(false);
-      busyRef.current = false;
+      // Only unlock if this request is still the active one; a newer send
+      // owns the busy state now and must not be unlocked from here.
+      if (abortRef.current === ac) {
+        abortRef.current = null;
+        setBusy(false);
+        busyRef.current = false;
+      }
     }
   }
 
