@@ -36,7 +36,7 @@ async function fileToImage(file: File): Promise<{ mimeType: string; data: string
   return { mimeType: "image/jpeg", data: dataUrl.split(",")[1], previewUrl: dataUrl };
 }
 
-export default function AssistantChat({ strategies }: { strategies: Strategy[] }) {
+export default function SidekickChat({ strategies }: { strategies: Strategy[] }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [attach, setAttach] = useState<{ mimeType: string; data: string; previewUrl: string } | null>(null);
@@ -116,7 +116,7 @@ export default function AssistantChat({ strategies }: { strategies: Strategy[] }
       }
       if (!acc.trim()) update("I didn't get a response back. Try again.", true);
     } catch {
-      update("Couldn't reach the assistant. Check your connection and try again.", true);
+      update("Couldn't reach Sidekick. Check your connection and try again.", true);
     } finally {
       setBusy(false);
     }
@@ -295,7 +295,7 @@ function Avatar() {
 
 function TypingDots() {
   return (
-    <span className="inline-flex gap-1.5 py-1" aria-label="Assistant is thinking">
+    <span className="inline-flex gap-1.5 py-1" aria-label="Sidekick is thinking">
       {[0, 1, 2].map((i) => (
         <span
           key={i}
