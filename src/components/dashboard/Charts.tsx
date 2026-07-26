@@ -202,3 +202,62 @@ export function DailyBars({ days, cur }: { days: [string, number][]; cur: string
     </div>
   );
 }
+
+// Horizontal bar rows (PnL by pair, day of week). Hover or tap a row to
+// spotlight it and see full stats; other rows dim like DailyBars.
+export function HBars({
+  rows,
+  cur,
+}: {
+  rows: { label: string; value: number; count: number; wins: number }[];
+  cur: string;
+}) {
+  const [hover, setHover] = useState<number | null>(null);
+  const max = Math.max(...rows.map((r) => Math.abs(r.value)), 1);
+  return (
+    <div onPointerLeave={() => setHover(null)}>
+      <div className="space-y-2.5">
+        {rows.map((r, i) => {
+          const winPct = r.count ? Math.round((r.wins / r.count) * 100) : 0;
+          const avg = r.count ? r.value / r.count : 0;
+          return (
+            <div
+              key={r.label}
+              className="relative flex cursor-default items-center gap-3 transition-opacity"
+              style={{ opacity: hover == null || hover === i ? 1 : 0.45 }}
+              onPointerEnter={(e) => {
+                if (e.pointerType === "mouse") setHover(i);
+              }}
+              onPointerDown={() => setHover((h) => (h === i ? null : i))}
+            >
+              <div className="w-20 shrink-0">
+                <div className="truncate font-mono text-xs">{r.label}</div>
+                <div className="text-[10px] text-dim">
+                  {r.count} trade{r.count === 1 ? "" : "s"}
+                </div>
+              </div>
+              <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-surface2">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${Math.max(2, (Math.abs(r.value) / max) * 100)}%`,
+                    background: r.value >= 0 ? "var(--success)" : "var(--danger)",
+                  }}
+                />
+              </div>
+              <div className={`w-24 shrink-0 text-right font-mono text-xs ${r.value >= 0 ? "text-success" : "text-danger"}`}>
+                {moneySigned(r.value, cur)}
+              </div>
+              {hover === i && (
+                <div className="pointer-events-none absolute -top-9 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-md border border-border2 bg-card px-2.5 py-1.5 text-xs shadow-lg">
+                  <span className="text-dim">{winPct}% win</span>{" "}
+                  <span className="font-mono">avg {moneySigned(avg, cur)}</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

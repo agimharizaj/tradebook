@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { moneySigned, sym } from "@/lib/format";
-import { DailyBars, EquityCurve } from "@/components/dashboard/Charts";
+import { DailyBars, EquityCurve, HBars } from "@/components/dashboard/Charts";
 
 export const dynamic = "force-dynamic";
 
@@ -68,12 +68,13 @@ export default async function DashboardPage() {
   const days = Array.from(dayMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
 
   // PnL by pair: top 8 by absolute net, displayed best to worst.
-  const pairMap = new Map<string, { net: number; count: number }>();
+  const pairMap = new Map<string, { net: number; count: number; wins: number }>();
   withPnl.forEach((t) => {
     const k = t.pair || "Untagged";
-    const v = pairMap.get(k) ?? { net: 0, count: 0 };
+    const v = pairMap.get(k) ?? { net: 0, count: 0, wins: 0 };
     v.net += t.pnl;
     v.count += 1;
+    if (t.pnl > 0) v.wins += 1;
     pairMap.set(k, v);
   });
   const pairRows = Array.from(pairMap.entries())
@@ -189,7 +190,7 @@ export default async function DashboardPage() {
               <div className="rounded-2xl bg-card p-5 ring-1 ring-border">
                 <h2 className="mb-4 text-sm font-medium uppercase tracking-wide text-muted">PnL by pair</h2>
                 <HBars
-                  rows={pairRows.map(([pr, v]) => ({ label: pr, value: v.net, sub: `${v.count} trade${v.count === 1 ? "" : "s"}` }))}
+                  rows={pairRows.map(([pr, v]) => ({ label: pr, value: v.net, count: v.count, wins: v.wins }))}
                   cur={cur}
                 />
               </div>
@@ -198,7 +199,7 @@ export default async function DashboardPage() {
               <div className="rounded-2xl bg-card p-5 ring-1 ring-border">
                 <h2 className="mb-4 text-sm font-medium uppercase tracking-wide text-muted">Day of week</h2>
                 <HBars
-                  rows={dowRows.map((x) => ({ label: x.d, value: x.net, sub: `${x.count} · ${Math.round((x.wins / x.count) * 100)}% win` }))}
+                  rows={dowRows.map((x) => ({ label: x.d, value: x.net, count: x.count, wins: x.wins }))}
                   cur={cur}
                 />
               </div>
@@ -211,36 +212,6 @@ export default async function DashboardPage() {
         </p>
       )}
 
-    </div>
-  );
-}
-
-// Horizontal bar rows: label + optional sub-line, bar scaled to the largest
-// absolute value, monospace signed figure on the right.
-function HBars({ rows, cur }: { rows: { label: string; value: number; sub?: string }[]; cur: string }) {
-  const max = Math.max(...rows.map((r) => Math.abs(r.value)), 1);
-  return (
-    <div className="space-y-2.5">
-      {rows.map((r) => (
-        <div key={r.label} className="flex items-center gap-3">
-          <div className="w-20 shrink-0">
-            <div className="truncate font-mono text-xs">{r.label}</div>
-            {r.sub && <div className="text-[10px] text-dim">{r.sub}</div>}
-          </div>
-          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-surface2">
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: `${Math.max(2, (Math.abs(r.value) / max) * 100)}%`,
-                background: r.value >= 0 ? "var(--success)" : "var(--danger)",
-              }}
-            />
-          </div>
-          <div className={`w-24 shrink-0 text-right font-mono text-xs ${r.value >= 0 ? "text-success" : "text-danger"}`}>
-            {moneySigned(r.value, cur)}
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
