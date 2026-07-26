@@ -59,11 +59,12 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
     async (id: string) => {
       setActiveId(id);
       setConfirmDeleteId(null);
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("ai_messages")
         .select("role, content, strategy_name, has_image")
         .eq("conversation_id", id)
         .order("created_at", { ascending: true });
+      if (error) console.warn("[sidekick] load messages failed:", error.message);
       setMessages(
         ((data as { role: "user" | "model"; content: string; strategy_name: string | null; has_image: boolean }[]) ?? []).map(
           (m) => ({
@@ -125,7 +126,10 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
       .insert({ title })
       .select("id, title, updated_at")
       .single();
-    if (error || !data) return null;
+    if (error || !data) {
+      if (error) console.warn("[sidekick] create conversation failed:", error.message);
+      return null;
+    }
     const convo = data as Convo;
     setActiveId(convo.id);
     setConvos((c) => [convo, ...c]);
@@ -133,14 +137,18 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
   }
 
   async function saveMessage(conversationId: string | null, m: Msg) {
-    if (!conversationId) return;
-    await supabase.from("ai_messages").insert({
+    if (!conversationId) {
+      console.warn("[sidekick] no conversation id, message not saved:", m.role);
+      return;
+    }
+    const { error } = await supabase.from("ai_messages").insert({
       conversation_id: conversationId,
       role: m.role,
       content: m.text,
       strategy_name: m.strategyName ?? null,
       has_image: !!(m.image || m.hadImage),
     });
+    if (error) console.warn(`[sidekick] save ${m.role} message failed:`, error.message);
     await supabase
       .from("ai_conversations")
       .update({ updated_at: new Date().toISOString() })
