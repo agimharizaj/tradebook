@@ -84,7 +84,9 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         system_instruction: { parts: [{ text: systemInstruction }] },
         contents,
-        generationConfig: { temperature: 0.4, maxOutputTokens: 1500 },
+        // Roomy cap: Gemini 3.x spends hidden "thinking" tokens from this
+        // same budget, so a tight limit truncates visible answers mid-word.
+        generationConfig: { temperature: 0.4, maxOutputTokens: 8192 },
       }),
     }
   );
@@ -125,6 +127,9 @@ export async function POST(request: Request) {
           const parts: { text?: string }[] =
             json?.candidates?.[0]?.content?.parts ?? [];
           for (const p of parts) if (p.text) controller.enqueue(encoder.encode(p.text));
+          if (json?.candidates?.[0]?.finishReason === "MAX_TOKENS") {
+            controller.enqueue(encoder.encode("\n\n(Answer hit the length limit. Ask me to continue.)"));
+          }
           const block = json?.promptFeedback?.blockReason;
           if (block) controller.enqueue(encoder.encode(`\n(Request blocked by the AI provider: ${block})`));
         } catch {
