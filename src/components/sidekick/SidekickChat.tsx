@@ -272,8 +272,10 @@ export default function SidekickChat({
       for (;;) {
         const { done, value } = await readWithTimeout();
         if (done) break;
-        acc += decoder.decode(value, { stream: true });
-        update(acc);
+        // Zero-width spaces are server heartbeats sent while the model is
+        // still thinking; strip them from the visible text.
+        acc += decoder.decode(value, { stream: true }).replaceAll("​", "");
+        if (acc) update(acc);
       }
       reader.cancel().catch(() => {});
       if (!acc.trim()) update("I didn't get a response back. Try again.", true);

@@ -68,6 +68,10 @@ function streamFromOpenRouter(body: ReadableStream<Uint8Array>): ReadableStream<
   const encoder = new TextEncoder();
   let buffer = "";
   return new ReadableStream<Uint8Array>({
+    start(controller) {
+      // First byte immediately, so the platform never sees a silent response.
+      controller.enqueue(new TextEncoder().encode("​"));
+    },
     async pull(controller) {
       const { done, value } = await reader.read();
       if (done) {
@@ -253,46 +257,89 @@ export async function POST(request: Request) {
   let buffer = "";
 
   const stream = new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      const { done, value } = await reader.read();
-      if (done) {
-        controller.close();
-        return;
-      }
-      buffer += decoder.decode(value, { stream: true });
-      const frames = buffer.split("\n");
-      buffer = frames.pop() ?? "";
-      let finished = false;
-      for (const line of frames) {
-        if (!line.startsWith("data:")) continue;
-        const payload = line.slice(5).trim();
-        if (!payload || payload === "[DONE]") continue;
+    start(controller) {
+      // Heartbeat: Gemini 3.x "thinks" silently before the first token,
+      // sometimes for over a minute. Vercel kills functions that haven't
+      // started responding (504), so send invisible zero-width spaces
+      // immediately and every 10s until real text arrives. The client
+      // strips them out.
+      let gotText = false;
+      let closed = false;
+      const safeEnqueue = (s: string) => {
+        if (closed) return;
         try {
-          const json = JSON.parse(payload);
-          const parts: { text?: string }[] =
-            json?.candidates?.[0]?.content?.parts ?? [];
-          for (const p of parts) if (p.text) controller.enqueue(encoder.encode(p.text));
-          const fin = json?.candidates?.[0]?.finishReason;
-          if (fin === "MAX_TOKENS") {
-            controller.enqueue(encoder.encode("\n\n(Answer hit the length limit. Ask me to continue.)"));
+          controller.enqueue(encoder.encode(s));
+        } catch {
+          closed = true;
+        }
+      };
+      safeEnqueue("​");
+      const heartbeat = setInterval(() => {
+        if (!gotText) safeEnqueue("​");
+      }, 10_000);
+      const finish = () => {
+        clearInterval(heartbeat);
+        if (!closed) {
+          closed = true;
+          try {
+            controller.close();
+          } catch {
+            // Already closed by the consumer.
           }
-          if (fin) finished = true;
-          const block = json?.promptFeedback?.blockReason;
-          if (block) {
-            controller.enqueue(encoder.encode(`\n(Request blocked by the AI provider: ${block})`));
-            finished = true;
+        }
+        reader.cancel().catch(() => {});
+      };
+      (async () => {
+        try {
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) {
+              finish();
+              return;
+            }
+            buffer += decoder.decode(value, { stream: true });
+            const frames = buffer.split("\n");
+            buffer = frames.pop() ?? "";
+            let finished = false;
+            for (const line of frames) {
+              if (!line.startsWith("data:")) continue;
+              const payload = line.slice(5).trim();
+              if (!payload || payload === "[DONE]") continue;
+              try {
+                const json = JSON.parse(payload);
+                const parts: { text?: string }[] =
+                  json?.candidates?.[0]?.content?.parts ?? [];
+                for (const p of parts) {
+                  if (p.text) {
+                    gotText = true;
+                    safeEnqueue(p.text);
+                  }
+                }
+                const fin = json?.candidates?.[0]?.finishReason;
+                if (fin === "MAX_TOKENS") {
+                  safeEnqueue("\n\n(Answer hit the length limit. Ask me to continue.)");
+                }
+                if (fin) finished = true;
+                const block = json?.promptFeedback?.blockReason;
+                if (block) {
+                  safeEnqueue(`\n(Request blocked by the AI provider: ${block})`);
+                  finished = true;
+                }
+              } catch {
+                // Partial frame: leave for the next chunk via buffer.
+              }
+            }
+            // finishReason marks the true end; Gemini can hold the socket
+            // open afterwards, so close ourselves.
+            if (finished) {
+              finish();
+              return;
+            }
           }
         } catch {
-          // Partial frame: leave for the next chunk via buffer.
+          finish();
         }
-      }
-      // Gemini can hold the connection open after the final chunk, which
-      // leaves the client waiting forever ("writing" never ends, replies
-      // never save). finishReason marks the true end, so close there.
-      if (finished) {
-        controller.close();
-        reader.cancel().catch(() => {});
-      }
+      })();
     },
     cancel() {
       reader.cancel().catch(() => {});
