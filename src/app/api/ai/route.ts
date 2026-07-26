@@ -27,11 +27,27 @@ type ClientMessage = {
 type OrModel = { id?: string; pricing?: { prompt?: string; completion?: string } };
 let freeModelCache: { ids: string[]; at: number } | null = null;
 
+// Abort if response HEADERS don't arrive within `ms`; once they have, the
+// timer is cleared so long streams are unaffected. Free models can accept a
+// request and then queue for minutes - without this, one slow provider
+// freezes the whole reply.
+async function fetchWithHeaderTimeout(url: string, init: RequestInit, ms: number): Promise<Response> {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: ctl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 async function freeModelIds(key: string): Promise<string[]> {
   if (freeModelCache && Date.now() - freeModelCache.at < 60 * 60 * 1000) return freeModelCache.ids;
-  const r = await fetch("https://openrouter.ai/api/v1/models", {
-    headers: { Authorization: `Bearer ${key}` },
-  });
+  const r = await fetchWithHeaderTimeout(
+    "https://openrouter.ai/api/v1/models",
+    { headers: { Authorization: `Bearer ${key}` } },
+    5_000
+  );
   if (!r.ok) return [];
   const j = (await r.json()) as { data?: OrModel[] };
   const rank = (id: string) =>
@@ -103,11 +119,15 @@ async function tryOpenRouterFallback(
   ];
   for (const id of ids.slice(0, 3)) {
     try {
-      const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: id, messages: orMessages, stream: true }),
-      });
+      const r = await fetchWithHeaderTimeout(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ model: id, messages: orMessages, stream: true }),
+        },
+        10_000
+      );
       if (!r.ok || !r.body) continue;
       console.info("[ai] Gemini quota full; falling back to OpenRouter model", id);
       return new Response(streamFromOpenRouter(r.body), {
@@ -189,7 +209,7 @@ export async function POST(request: Request) {
     ],
   }));
 
-  const upstream = await fetch(
+  const upstream = await fetchWithHeaderTimeout(
     `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:streamGenerateContent?alt=sse`,
     {
       method: "POST",
@@ -201,7 +221,8 @@ export async function POST(request: Request) {
         // same budget, so a tight limit truncates visible answers mid-word.
         generationConfig: { temperature: 0.4, maxOutputTokens: 32768 },
       }),
-    }
+    },
+    20_000
   );
 
   if (!upstream.ok || !upstream.body) {
