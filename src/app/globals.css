@@ -228,3 +228,26 @@ input[type="time"] {
     font-size: 1rem;
   }
 }
+
+/* Sidekick: "alive" states for the AI bubble */
+@keyframes sk-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(106, 88, 240, 0.45), 0 4px 14px rgba(106, 88, 240, 0.35); }
+  50% { box-shadow: 0 0 0 7px rgba(106, 88, 240, 0), 0 4px 22px rgba(106, 88, 240, 0.55); }
+}
+.sk-avatar-live { animation: sk-breathe 1.8s ease-in-out infinite; }
+
+@keyframes sk-border {
+  0%, 100% { border-color: rgba(106, 88, 240, 0.55); box-shadow: 0 0 16px rgba(106, 88, 240, 0.16); }
+  50% { border-color: rgba(106, 88, 240, 0.18); box-shadow: 0 0 4px rgba(106, 88, 240, 0.04); }
+}
+.sk-bubble-live { animation: sk-border 1.8s ease-in-out infinite; }
+
+@keyframes sk-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.sk-in { animation: sk-in 0.25s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-avatar-live, .sk-bubble-live, .sk-in { animation: none; }
+}

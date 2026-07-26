@@ -165,7 +165,8 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
 
   async function send(textOverride?: string) {
     const text = (textOverride ?? input).trim();
-    if ((!text && !attach) || busy) return;
+    // busyRef (not state) so two Enter presses in the same tick can't double-send.
+    if ((!text && !attach) || busyRef.current) return;
 
     const userMsg: Msg = {
       role: "user",
@@ -362,7 +363,7 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
 
             {messages.map((m, i) =>
               m.role === "user" ? (
-                <div key={i} className="flex flex-row-reverse gap-3">
+                <div key={i} className="sk-in flex flex-row-reverse gap-3">
                   <div className="max-w-[85%] rounded-2xl border border-accent/40 bg-accent-soft px-4 py-3 text-sm leading-relaxed">
                     {m.imageUrl && (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -383,15 +384,17 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
                   </div>
                 </div>
               ) : (
-                <div key={i} className="flex gap-3">
+                <div key={i} className="sk-in flex gap-3">
                   <Avatar pulsing={busy && i === messages.length - 1} />
                   <div className="min-w-0 max-w-[85%]">
                     <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-dim">
-                      Sidekick{busy && i === messages.length - 1 && !m.text ? " · thinking" : " · AI"}
+                      Sidekick{busy && i === messages.length - 1 ? (m.text ? " · writing" : " · thinking") : " · AI"}
                     </div>
                     <div
                       className={`whitespace-pre-wrap rounded-2xl border px-4 py-3 text-sm leading-relaxed ${
-                        m.error ? "border-danger/40 bg-danger/10 text-danger" : "border-border bg-card"
+                        m.error
+                          ? "border-danger/40 bg-danger/10 text-danger"
+                          : `border-border bg-card ${busy && i === messages.length - 1 ? "sk-bubble-live" : ""}`
                       }`}
                     >
                       {m.text || <TypingDots />}
@@ -504,7 +507,7 @@ function Avatar({ pulsing = false }: { pulsing?: boolean }) {
   return (
     <div
       className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent shadow-[0_4px_14px_rgba(106,88,240,0.35)] ${
-        pulsing ? "animate-pulse" : ""
+        pulsing ? "sk-avatar-live" : ""
       }`}
     >
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
