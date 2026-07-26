@@ -5,7 +5,16 @@ import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 type Strategy = { id: string; name: string };
-type Convo = { id: string; title: string; updated_at: string };
+// pinned/unread/archived are undefined until migration 0011 adds the
+// columns; the UI treats undefined as false and keeps working without them.
+type Convo = {
+  id: string;
+  title: string;
+  updated_at: string;
+  pinned?: boolean;
+  unread?: boolean;
+  archived?: boolean;
+};
 
 type Msg = {
   role: "user" | "model";
@@ -98,6 +107,11 @@ export default function SidekickChat({
   const [convos, setConvos] = useState<Convo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  // Conversation context menu (⋮), inline rename, archived-view toggle.
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameVal, setRenameVal] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [attach, setAttach] = useState<{ mimeType: string; data: string; previewUrl: string } | null>(null);
@@ -124,6 +138,11 @@ export default function SidekickChat({
       setBusy(false);
       setActiveId(id);
       setConfirmDeleteId(null);
+      setMenuId(null);
+      // Opening a chat clears its unread marker (harmless no-op before
+      // migration 0011).
+      setConvos((cur) => cur.map((x) => (x.id === id && x.unread ? { ...x, unread: false } : x)));
+      supabase.from("ai_conversations").update({ unread: false }).eq("id", id).then(() => {});
       const { data, error } = await supabase
         .from("ai_messages")
         .select("role, content, strategy_name, has_image")
@@ -152,17 +171,87 @@ export default function SidekickChat({
   // past conversations stay one click away in the history list.
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase
+      // Full column set first; fall back to the 0009 columns if migration
+      // 0011 (pinned/unread/archived) hasn't been applied yet. If even the
+      // table is missing (pre-0009), stay usable as a session-only chat.
+      let rows: Convo[] | null = null;
+      const full = await supabase
         .from("ai_conversations")
-        .select("id, title, updated_at")
+        .select("id, title, updated_at, pinned, unread, archived")
         .order("updated_at", { ascending: false })
         .limit(50);
-      // If migration 0009 hasn't been applied yet the table is missing;
-      // stay usable as a session-only chat.
-      if (error || !data) return;
-      setConvos(data as Convo[]);
+      if (!full.error && full.data) rows = full.data as Convo[];
+      else {
+        const basic = await supabase
+          .from("ai_conversations")
+          .select("id, title, updated_at")
+          .order("updated_at", { ascending: false })
+          .limit(50);
+        if (!basic.error && basic.data) rows = basic.data as Convo[];
+      }
+      if (!rows) return;
+      setConvos(rows);
     })();
   }, [supabase]);
+
+  // Pinned chats first, then most recent; archived live behind a toggle.
+  const visibleConvos = convos
+    .filter((c) => !!c.archived === showArchived)
+    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.updated_at.localeCompare(a.updated_at));
+  const archivedCount = convos.filter((c) => c.archived).length;
+
+  // Flag/title updates: local state first, then the row (fire-and-forget;
+  // fails silently before migration 0011).
+  function updateConvo(id: string, patch: Partial<Pick<Convo, "title" | "pinned" | "unread" | "archived">>) {
+    setConvos((cur) => cur.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+    supabase
+      .from("ai_conversations")
+      .update(patch)
+      .eq("id", id)
+      .then(({ error }) => {
+        if (error) console.warn("[sidekick] update conversation failed:", error.message);
+      });
+  }
+
+  function startRename(c: Convo) {
+    setRenamingId(c.id);
+    setRenameVal(c.title);
+    setMenuId(null);
+  }
+
+  function commitRename() {
+    if (renamingId && renameVal.trim()) updateConvo(renamingId, { title: renameVal.trim() });
+    setRenamingId(null);
+  }
+
+  // Claude-style shortcuts while a conversation menu is open.
+  useEffect(() => {
+    if (!menuId) return;
+    const onKey = (e: KeyboardEvent) => {
+      const c = convos.find((x) => x.id === menuId);
+      if (!c) return;
+      const k = e.key.toLowerCase();
+      if (k === "escape") {
+        setMenuId(null);
+        setConfirmDeleteId(null);
+      } else if (k === "p") {
+        updateConvo(c.id, { pinned: !c.pinned });
+        setMenuId(null);
+      } else if (k === "u") {
+        updateConvo(c.id, { unread: !c.unread });
+        setMenuId(null);
+      } else if (k === "r") {
+        startRename(c);
+      } else if (k === "a") {
+        updateConvo(c.id, { archived: !c.archived });
+        setMenuId(null);
+      } else if (k === "d") {
+        deleteConvo(c.id);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -308,6 +397,7 @@ export default function SidekickChat({
       return;
     }
     setConfirmDeleteId(null);
+    setMenuId(null);
     setConvos((c) => c.filter((x) => x.id !== id));
     if (activeId === id) newChat();
     await supabase.from("ai_conversations").delete().eq("id", id); // messages cascade
@@ -517,38 +607,132 @@ export default function SidekickChat({
             New chat
           </button>
         </div>
+        {showArchived && (
+          <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-dim">Archived</div>
+        )}
         <div className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-3">
-          {convos.map((c) => (
+          {visibleConvos.map((c) => (
             <div
               key={c.id}
-              className={`group flex items-center gap-1 rounded-lg px-1 transition ${
+              className={`group relative flex items-center gap-1 rounded-lg px-1 transition ${
                 c.id === activeId ? "bg-accent-soft" : "hover:bg-surface2"
               }`}
             >
+              {renamingId === c.id ? (
+                <input
+                  autoFocus
+                  value={renameVal}
+                  onChange={(e) => setRenameVal(e.target.value)}
+                  onBlur={commitRename}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitRename();
+                    if (e.key === "Escape") setRenamingId(null);
+                  }}
+                  className="jfield my-1 min-w-0 flex-1 !py-1.5 text-[13px]"
+                  aria-label="Rename chat"
+                />
+              ) : (
+                <button
+                  onClick={() => loadConversation(c.id)}
+                  className={`flex min-w-0 flex-1 items-center gap-1.5 px-2 py-2 text-left text-[13px] ${
+                    c.id === activeId ? "text-accent2" : "text-muted"
+                  }`}
+                  title={c.title}
+                >
+                  {c.unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-label="Unread" />}
+                  {c.pinned && (
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-dim" aria-label="Pinned">
+                      <path d="M12 17v5M9 4h6l1 7 2 2H6l2-2 1-7z" />
+                    </svg>
+                  )}
+                  <span className={`truncate ${c.unread ? "font-medium text-foreground" : ""}`}>{c.title}</span>
+                </button>
+              )}
               <button
-                onClick={() => loadConversation(c.id)}
-                className={`min-w-0 flex-1 truncate px-2 py-2 text-left text-[13px] ${
-                  c.id === activeId ? "text-accent2" : "text-muted"
-                }`}
-                title={c.title}
-              >
-                {c.title}
-              </button>
-              <button
-                onClick={() => deleteConvo(c.id)}
-                aria-label={confirmDeleteId === c.id ? "Confirm delete" : `Delete "${c.title}"`}
-                className={`shrink-0 rounded-md px-1.5 py-1 text-[11px] transition ${
-                  confirmDeleteId === c.id
-                    ? "bg-danger/15 text-danger"
-                    : "text-dim opacity-0 hover:text-danger group-hover:opacity-100"
+                onClick={() => {
+                  setConfirmDeleteId(null);
+                  setMenuId(menuId === c.id ? null : c.id);
+                }}
+                aria-label={`Options for "${c.title}"`}
+                aria-expanded={menuId === c.id}
+                className={`shrink-0 rounded-md px-1 py-1 text-dim transition hover:bg-surface2 hover:text-foreground ${
+                  menuId === c.id ? "" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                 }`}
               >
-                {confirmDeleteId === c.id ? "Sure?" : "✕"}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" />
+                </svg>
               </button>
+
+              {menuId === c.id && (
+                <>
+                  <div
+                    className="fixed inset-0 z-20"
+                    onClick={() => {
+                      setMenuId(null);
+                      setConfirmDeleteId(null);
+                    }}
+                    aria-hidden="true"
+                  />
+                  <div className="absolute right-0 top-full z-30 w-48 overflow-hidden rounded-xl border border-border2 bg-card py-1 shadow-2xl">
+                    <MenuItem
+                      k="P"
+                      label={c.pinned ? "Unpin" : "Pin"}
+                      icon="M12 17v5M9 4h6l1 7 2 2H6l2-2 1-7z"
+                      onClick={() => {
+                        updateConvo(c.id, { pinned: !c.pinned });
+                        setMenuId(null);
+                      }}
+                    />
+                    <MenuItem
+                      k="U"
+                      label={c.unread ? "Mark as read" : "Mark as unread"}
+                      icon="M3 3l18 18M10.5 5.2A9.8 9.8 0 0 1 12 5c7 0 10 7 10 7a13.4 13.4 0 0 1-1.7 2.6M6.6 6.6A13.2 13.2 0 0 0 2 12s3 7 10 7a9.9 9.9 0 0 0 5.4-1.6"
+                      onClick={() => {
+                        updateConvo(c.id, { unread: !c.unread });
+                        setMenuId(null);
+                      }}
+                    />
+                    <MenuItem
+                      k="R"
+                      label="Rename"
+                      icon="M15.5 3.5a2.12 2.12 0 0 1 3 3L8 17l-4 1 1-4z"
+                      onClick={() => startRename(c)}
+                    />
+                    <MenuItem
+                      k="A"
+                      label={c.archived ? "Unarchive" : "Archive"}
+                      icon="M3 7h18M5 7l1 13h12l1-13M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"
+                      onClick={() => {
+                        updateConvo(c.id, { archived: !c.archived });
+                        setMenuId(null);
+                      }}
+                    />
+                    <div className="mx-2 my-1 border-t border-border" />
+                    <MenuItem
+                      k="D"
+                      label={confirmDeleteId === c.id ? "Sure? Delete" : "Delete"}
+                      icon="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"
+                      danger
+                      onClick={() => deleteConvo(c.id)}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           ))}
-          {convos.length === 0 && <p className="px-3 py-2 text-xs text-dim">No saved chats yet.</p>}
+          {visibleConvos.length === 0 && (
+            <p className="px-3 py-2 text-xs text-dim">{showArchived ? "Nothing archived." : "No saved chats yet."}</p>
+          )}
         </div>
+        {(archivedCount > 0 || showArchived) && (
+          <button
+            onClick={() => setShowArchived((v) => !v)}
+            className="border-t border-border px-4 py-2.5 text-left text-xs text-dim transition hover:text-foreground"
+          >
+            {showArchived ? "← Back to chats" : `Archived (${archivedCount})`}
+          </button>
+        )}
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -561,11 +745,14 @@ export default function SidekickChat({
             aria-label="Chat history"
           >
             <option value="">New chat</option>
-            {convos.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.title}
-              </option>
-            ))}
+            {convos
+              .filter((c) => !c.archived)
+              .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.updated_at.localeCompare(a.updated_at))
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.pinned ? "📌 " : ""}{c.title}
+                </option>
+              ))}
           </select>
           <button
             onClick={newChat}
@@ -827,6 +1014,35 @@ export default function SidekickChat({
         </div>
       </div>
     </div>
+  );
+}
+
+function MenuItem({
+  label,
+  k,
+  icon,
+  onClick,
+  danger = false,
+}: {
+  label: string;
+  k: string;
+  icon: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] transition hover:bg-surface2 ${
+        danger ? "text-danger" : "text-foreground"
+      }`}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden="true">
+        <path d={icon} />
+      </svg>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="shrink-0 font-mono text-[11px] text-dim">{k}</span>
+    </button>
   );
 }
 
