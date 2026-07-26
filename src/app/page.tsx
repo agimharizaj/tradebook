@@ -5,6 +5,8 @@ import LogoMark from "@/components/LogoMark";
 import HeroCurve from "@/components/landing/HeroCurve";
 import RiskDemo from "@/components/landing/RiskDemo";
 import EntryChecklist from "@/components/landing/EntryChecklist";
+import JournalDemo from "@/components/landing/JournalDemo";
+import SidekickDemo from "@/components/landing/SidekickDemo";
 
 // Public landing page. Signed-in visitors skip straight to their dashboard.
 export default async function Home({
@@ -58,7 +60,7 @@ export default async function Home({
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div>
             <div className="mb-4 flex flex-wrap gap-1.5">
-              {["Free", "Self-hosted", "Playbooks", "Journal", "Risk"].map((tag) => (
+              {["Playbooks", "Journal", "Risk", "Charts", "AI sidekick"].map((tag) => (
                 <span
                   key={tag}
                   className="rounded-full border border-border2 px-2.5 py-1 font-mono text-xs text-muted"
@@ -76,10 +78,10 @@ export default async function Home({
               <span className="text-accent2">Face the numbers.</span>
             </h1>
             <p className="mt-5 max-w-md text-lg text-muted">
-              Tradebook is a free, self-hosted trading companion. Playbooks you
-              tick before entry, a journal that keeps score without flattering
-              you, and a risk engine that sizes the position before you click.
-              Your data lives in your own database, not ours.
+              Tradebook is a trading companion built around your own rules.
+              Playbooks you tick before entry, a journal that keeps score
+              without flattering you, a risk engine that sizes the position
+              before you click, and an AI sidekick that has read all of it.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link
@@ -96,7 +98,7 @@ export default async function Home({
               </Link>
             </div>
             <p className="mt-4 font-mono text-xs text-dim">
-              Free. No tiers, no trial clock, no broker upsell. Installs on your phone.
+              Installs on your phone. Your data stays in your own database.
             </p>
           </div>
 
@@ -141,8 +143,8 @@ export default async function Home({
             Everything between the idea and the fill.
           </h2>
           <p className="mt-2 max-w-xl text-muted">
-            Six tools that usually live in six tabs and two subscriptions, wired
-            together in one place.
+            Nine tools that usually live in nine tabs, wired together in one
+            place and aware of each other.
           </p>
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {[
@@ -169,6 +171,18 @@ export default async function Home({
               {
                 t: "Dashboard analytics",
                 d: "Equity curve, profit factor, drawdown, day-of-week leaks. Not a report card you buy, a mirror you own.",
+              },
+              {
+                t: "Sidekick, the AI",
+                d: "An assistant that reads your journal, strategies, notes and the page you're on before it answers. Chart reads, honest opinions, and rule-by-rule setup checks. Opinions with reasoning, never certainty.",
+              },
+              {
+                t: "News + economic calendar",
+                d: "Market headlines and the economic calendar next to your charts, archived as they arrive so the record deepens the longer you run it. Ask Sidekick what a print means for your pairs.",
+              },
+              {
+                t: "Sanctuary",
+                d: "Box breathing and psychology prompts for the moments the market gets loud. The cheapest risk control in the whole app.",
               },
             ].map((f) => (
               <div key={f.t} className="rounded-2xl bg-card p-6 ring-1 ring-border transition hover:ring-accent">
@@ -201,6 +215,53 @@ export default async function Home({
             </p>
           </div>
           <RiskDemo />
+        </div>
+      </section>
+
+      {/* Journal calendar demo */}
+      <section className="border-t border-border bg-bg2">
+        <div className="mx-auto max-w-6xl px-5 py-16 md:px-8 md:py-20">
+          <div className="grid items-center gap-10 lg:grid-cols-2">
+            <JournalDemo />
+            <div>
+              <h2 className="text-2xl md:text-3xl" style={{ fontFamily: "var(--font-display)" }}>
+                A month of trading at a glance.
+              </h2>
+              <p className="mt-4 max-w-md leading-relaxed text-muted">
+                The journal is a calendar, exactly like this one. Green days,
+                red days, tap any of them for the trades behind the number.
+                Weekly and monthly summaries, true expectancy and average R
+                sit underneath.
+              </p>
+              <p className="mt-3 max-w-md leading-relaxed text-muted">
+                Import your MT5 history and the record fills itself, commission
+                and swap included, so the score is the real one.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Sidekick demo */}
+      <section className="mx-auto max-w-6xl px-5 py-16 md:px-8 md:py-20">
+        <div className="grid items-center gap-10 lg:grid-cols-2">
+          <div>
+            <h2 className="text-2xl md:text-3xl" style={{ fontFamily: "var(--font-display)" }}>
+              An analyst who has actually read your journal.
+            </h2>
+            <p className="mt-4 max-w-md leading-relaxed text-muted">
+              Sidekick sits on every page. It knows your trades, your written
+              rules, your notes and what&apos;s on screen, so you can ask it to
+              read a chart, explain the news, or say plainly where the money
+              leaks.
+            </p>
+            <p className="mt-3 max-w-md leading-relaxed text-muted">
+              Attach a chart screenshot and it checks the setup against your
+              own entry criteria, rule by rule. Opinions with reasoning, never
+              certainty; the trade stays yours.
+            </p>
+          </div>
+          <SidekickDemo />
         </div>
       </section>
 

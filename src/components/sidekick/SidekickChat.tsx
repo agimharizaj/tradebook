@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 type Strategy = { id: string; name: string };
@@ -17,21 +18,55 @@ type Msg = {
   // stored, so render a chip instead of the image.
   hadImage?: boolean;
   strategyName?: string;
-  // Notebook note attached via the /note command. Content rides along to
-  // the model only for the message being sent; history keeps the title.
-  noteTitle?: string;
-  noteContent?: string;
+  // Context attached via a slash command (/note, /strategy, /analysis).
+  // Content rides to the model only on the message being sent; history
+  // keeps the kind and title.
+  att?: { kind: AttachKind; title: string; content?: string };
   error?: boolean;
 };
 
-type NoteOption = { id: string; title: string; content: string | null; updated_at: string };
+type AttachKind = "note" | "strategy" | "analysis";
+type SlashOption = { id: string; title: string; hint: string };
+type NoteRow = { id: string; title: string; content: string | null; updated_at: string };
+type AnalysisRow = {
+  id: string;
+  symbol: string;
+  timeframe: string | null;
+  direction: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
+const SLASH_COMMANDS: { cmd: AttachKind; desc: string }[] = [
+  { cmd: "note", desc: "attach a notebook note" },
+  { cmd: "strategy", desc: "attach a strategy's rules" },
+  { cmd: "analysis", desc: "attach a chart analysis entry" },
+];
+
+function KindIcon({ kind }: { kind: AttachKind }) {
+  const d =
+    kind === "note"
+      ? "M15.5 3.5a2.12 2.12 0 0 1 3 3L8 17l-4 1 1-4z"
+      : kind === "strategy"
+        ? "M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+        : "M4 19V5M4 19h16M8 15l3-3 3 2 4-5";
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} />
+    </svg>
+  );
+}
 
 const SUGGESTIONS = [
   "Am I breaking my risk rules?",
   "How is my expectancy trending?",
   "Where am I leaking money?",
-  "Review my last 10 trades",
+  "What's in the latest market news?",
 ];
+
+// History rows store command attachments as a parseable content prefix
+// (no migration needed): "[note: Title] message".
+const ATT_PREFIX = /^\[(note|strategy|analysis): (.*?)\] /;
 
 // Downscale to keep the request small and inside Gemini's inline-data limits.
 async function fileToImage(file: File): Promise<{ mimeType: string; data: string; previewUrl: string }> {
@@ -57,14 +92,18 @@ export default function SidekickChat({
   compact?: boolean;
 }) {
   const supabase = useMemo(() => createClient(), []);
+  // Sent with every request so Sidekick knows which app page is on screen
+  // ("explain this news", "what am I looking at").
+  const pathname = usePathname();
   const [convos, setConvos] = useState<Convo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [attach, setAttach] = useState<{ mimeType: string; data: string; previewUrl: string } | null>(null);
-  const [noteAttach, setNoteAttach] = useState<{ title: string; content: string } | null>(null);
-  const [notesList, setNotesList] = useState<NoteOption[] | null>(null);
+  const [ctxAttach, setCtxAttach] = useState<{ kind: AttachKind; title: string; content: string } | null>(null);
+  const [notesList, setNotesList] = useState<NoteRow[] | null>(null);
+  const [analysesList, setAnalysesList] = useState<AnalysisRow[] | null>(null);
   const [slashIndex, setSlashIndex] = useState(0);
   const [strategyId, setStrategyId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -94,11 +133,11 @@ export default function SidekickChat({
       setMessages(
         ((data as { role: "user" | "model"; content: string; strategy_name: string | null; has_image: boolean }[]) ?? []).map(
           (m) => {
-            const noteMatch = m.content.match(/^\[note: (.*?)\] /);
+            const attMatch = m.content.match(ATT_PREFIX);
             return {
               role: m.role,
-              text: noteMatch ? m.content.slice(noteMatch[0].length) : m.content,
-              noteTitle: noteMatch?.[1],
+              text: attMatch ? m.content.slice(attMatch[0].length) : m.content,
+              ...(attMatch ? { att: { kind: attMatch[1] as AttachKind, title: attMatch[2] } } : {}),
               hadImage: m.has_image,
               strategyName: m.strategy_name ?? undefined,
             };
@@ -109,7 +148,8 @@ export default function SidekickChat({
     [supabase]
   );
 
-  // Load the conversation list once; auto-open the most recent chat.
+  // Load the conversation list once. Every open starts on a fresh chat;
+  // past conversations stay one click away in the history list.
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase
@@ -121,40 +161,134 @@ export default function SidekickChat({
       // stay usable as a session-only chat.
       if (error || !data) return;
       setConvos(data as Convo[]);
-      if (data.length) await loadConversation((data[0] as Convo).id);
     })();
-  }, [supabase, loadConversation]);
+  }, [supabase]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  // /note command: typing "/" opens the command hint, "/note foo" filters
-  // notes by title. Notes are fetched once, on first use.
-  const slashQuery = input.match(/^\/note\s*(.*)$/i)?.[1] ?? null;
-  const slashHint = input === "/" || input === "/n" || input === "/no" || input === "/not";
+  // Slash commands: "/" opens the command menu; "/note q", "/strategy q",
+  // "/analysis q" filter that kind's items by q. Lists are fetched lazily,
+  // once per kind.
+  const slashRaw = input.startsWith("/") ? input.slice(1) : null;
+  const slashParts = slashRaw?.match(/^(\S*)(?:\s+(.*))?$/);
+  const typedCmd = (slashParts?.[1] ?? "").toLowerCase();
+  const exactCmd = SLASH_COMMANDS.find((c) => c.cmd === typedCmd)?.cmd ?? null;
+  // Menu of commands while the word is still partial; options once complete.
+  const cmdMenu =
+    slashRaw !== null && !exactCmd
+      ? SLASH_COMMANDS.filter((c) => c.cmd.startsWith(typedCmd) && slashParts?.[2] === undefined)
+      : [];
+  const slashQuery = exactCmd ? (slashParts?.[2] ?? "").trim() : null;
+  const slashActive = slashRaw !== null && (exactCmd !== null || cmdMenu.length > 0);
+
   useEffect(() => {
-    if ((slashQuery !== null || slashHint) && notesList === null) {
+    if (exactCmd === "note" && notesList === null) {
       (async () => {
         const { data } = await supabase
           .from("notes")
           .select("id, title, content, updated_at")
           .order("updated_at", { ascending: false })
           .limit(50);
-        setNotesList((data as NoteOption[]) ?? []);
+        setNotesList((data as NoteRow[]) ?? []);
       })();
     }
-  }, [slashQuery, slashHint, notesList, supabase]);
-  const slashOptions =
-    slashQuery !== null && notesList
-      ? notesList.filter((n) => n.title.toLowerCase().includes(slashQuery.toLowerCase())).slice(0, 8)
-      : [];
+    if (exactCmd === "analysis" && analysesList === null) {
+      (async () => {
+        const { data } = await supabase
+          .from("chart_analyses")
+          .select("id, symbol, timeframe, direction, notes, created_at")
+          .order("created_at", { ascending: false })
+          .limit(50);
+        setAnalysesList((data as AnalysisRow[]) ?? []);
+      })();
+    }
+  }, [exactCmd, notesList, analysesList, supabase]);
 
-  function pickNote(n: NoteOption) {
-    setNoteAttach({ title: n.title, content: (n.content ?? "").trim() });
+  const analysisTitle = (a: AnalysisRow) =>
+    [a.symbol, a.timeframe, a.direction ? `(${a.direction})` : null].filter(Boolean).join(" ");
+
+  const slashOptions: SlashOption[] = useMemo(() => {
+    if (!exactCmd || slashQuery === null) return [];
+    const q = slashQuery.toLowerCase();
+    if (exactCmd === "note")
+      return (notesList ?? [])
+        .filter((n) => n.title.toLowerCase().includes(q))
+        .slice(0, 8)
+        .map((n) => ({ id: n.id, title: n.title, hint: n.updated_at.slice(0, 10) }));
+    if (exactCmd === "strategy")
+      return strategies
+        .filter((s) => s.name.toLowerCase().includes(q))
+        .slice(0, 8)
+        .map((s) => ({ id: s.id, title: s.name, hint: "" }));
+    return (analysesList ?? [])
+      .filter((a) => analysisTitle(a).toLowerCase().includes(q))
+      .slice(0, 8)
+      .map((a) => ({ id: a.id, title: analysisTitle(a), hint: a.created_at.slice(0, 10) }));
+  }, [exactCmd, slashQuery, notesList, strategies, analysesList]);
+
+  const listLoading =
+    (exactCmd === "note" && notesList === null) || (exactCmd === "analysis" && analysesList === null);
+
+  function finishPick(kind: AttachKind, title: string, content: string) {
+    setCtxAttach({ kind, title, content });
     setInput("");
     setSlashIndex(0);
     inputRef.current?.focus();
+  }
+
+  async function pickOption(opt: SlashOption) {
+    if (!exactCmd) return;
+    if (exactCmd === "note") {
+      const n = notesList?.find((x) => x.id === opt.id);
+      finishPick("note", opt.title, (n?.content ?? "").trim());
+      return;
+    }
+    if (exactCmd === "analysis") {
+      const a = analysesList?.find((x) => x.id === opt.id);
+      finishPick("analysis", opt.title, (a?.notes ?? "").trim() || "(no text, screenshot-only entry)");
+      return;
+    }
+    // Strategy: pull its written rules so the conversation can quote them.
+    finishPick("strategy", opt.title, "(loading rules…)");
+    const lines = (table: string) =>
+      supabase.from(table).select("content, sort_order").eq("strategy_id", opt.id).order("sort_order");
+    const [row, entry, exit, rules] = await Promise.all([
+      supabase
+        .from("strategies")
+        .select("plan_type, max_trades_per_day, max_daily_loss, max_daily_profit, risk_per_trade_pct, trading_window, trading_window_2, strategy_date, trading_notes")
+        .eq("id", opt.id)
+        .single(),
+      lines("entry_criteria"),
+      lines("exit_criteria"),
+      lines("trade_management_rules"),
+    ]);
+    const s = (row.data ?? {}) as Record<string, unknown>;
+    const list = (r: { data: unknown }) =>
+      (((r as { data: { content: string }[] | null }).data ?? []).map((x) => `- ${x.content}`).join("\n")) || "- (none written)";
+    const rc = [
+      s.max_trades_per_day != null ? `max trades/day ${s.max_trades_per_day}` : null,
+      s.max_daily_loss != null ? `max daily loss ${s.max_daily_loss}` : null,
+      s.max_daily_profit != null ? `max daily profit ${s.max_daily_profit}` : null,
+      s.risk_per_trade_pct != null ? `risk per trade ${s.risk_per_trade_pct}%` : null,
+      s.trading_window ? `trading window ${s.trading_window}` : null,
+      s.trading_window_2 ? `second window ${s.trading_window_2}` : null,
+      s.strategy_date ? `date ${s.strategy_date}` : null,
+    ].filter(Boolean);
+    const content = [
+      s.plan_type ? `Plan type: ${s.plan_type}` : null,
+      `Risk controls: ${rc.length ? rc.join(", ") : "(none set)"}`,
+      `Entry criteria:\n${list(entry)}`,
+      `Exit criteria:\n${list(exit)}`,
+      `Trade management rules:\n${list(rules)}`,
+      s.trading_notes ? `Notes: ${s.trading_notes}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    setCtxAttach((cur) =>
+      cur && cur.kind === "strategy" && cur.title === opt.title ? { ...cur, content } : cur
+    );
   }
 
   function newChat() {
@@ -206,8 +340,9 @@ export default function SidekickChat({
     const { error } = await supabase.from("ai_messages").insert({
       conversation_id: conversationId,
       role: m.role,
-      // Note titles ride inside content as a parseable prefix (no migration).
-      content: m.noteTitle ? `[note: ${m.noteTitle}] ${m.text}` : m.text,
+      // Attachment kind+title ride inside content as a parseable prefix
+      // (no migration).
+      content: m.att ? `[${m.att.kind}: ${m.att.title}] ${m.text}` : m.text,
       strategy_name: m.strategyName ?? null,
       has_image: !!(m.image || m.hadImage),
     });
@@ -226,14 +361,16 @@ export default function SidekickChat({
   async function send(textOverride?: string) {
     const text = (textOverride ?? input).trim();
     // busyRef (not state) so two Enter presses in the same tick can't double-send.
-    if ((!text && !attach && !noteAttach) || busyRef.current) return;
-    // Don't send a bare slash command as a message.
-    if (slashQuery !== null || slashHint) return;
+    if ((!text && !attach && !ctxAttach) || busyRef.current) return;
+    // Don't send a half-typed slash command as a message.
+    if (slashActive) return;
 
     const userMsg: Msg = {
       role: "user",
-      text: text || (attach ? "Check this setup against my rules." : "Thoughts on this note?"),
-      ...(noteAttach ? { noteTitle: noteAttach.title, noteContent: noteAttach.content } : {}),
+      text:
+        text ||
+        (attach ? "Check this setup against my rules." : `Thoughts on this ${ctxAttach?.kind ?? "attachment"}?`),
+      ...(ctxAttach ? { att: { ...ctxAttach } } : {}),
       ...(attach
         ? {
             imageUrl: attach.previewUrl,
@@ -247,7 +384,7 @@ export default function SidekickChat({
     setInput("");
     const sentStrategyId = attach ? strategyId : "";
     setAttach(null);
-    setNoteAttach(null);
+    setCtxAttach(null);
     setBusy(true);
     busyRef.current = true;
 
@@ -283,19 +420,21 @@ export default function SidekickChat({
         signal: ac.signal,
         body: JSON.stringify({
           strategyId: sentStrategyId || null,
+          page: pathname,
           messages: history.map((m, i) => ({
             role: m.role,
-            // Only the message being sent now carries image bytes / note text.
+            // Only the message being sent now carries image bytes / full
+            // attachment text; older ones become one-line placeholders.
             text: (() => {
               let t = m.text;
               if (i === history.length - 1) {
                 if (m.strategyName) t = `(setup check against strategy "${m.strategyName}") ${t}`;
-                if (m.noteContent)
-                  t = `(attached notebook note "${m.noteTitle}")\n${m.noteContent}\n(end of note)\n\n${t}`;
+                if (m.att?.content)
+                  t = `(attached ${m.att.kind} "${m.att.title}")\n${m.att.content}\n(end of ${m.att.kind})\n\n${t}`;
               } else {
                 if (m.imageUrl || m.hadImage)
                   t = `(a chart screenshot was attached here${m.strategyName ? `, checked against "${m.strategyName}"` : ""}) ${t}`;
-                if (m.noteTitle) t = `(notebook note "${m.noteTitle}" was attached here) ${t}`;
+                if (m.att) t = `(${m.att.kind} "${m.att.title}" was attached here) ${t}`;
               }
               return t;
             })(),
@@ -446,13 +585,13 @@ export default function SidekickChat({
                 <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-dim">Sidekick · AI</div>
                 <div className="rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed">
                 <p>
-                  I read your journal, strategies and stats before every answer. Ask where
-                  you&apos;re leaking money, which rules you broke, or whether a setup matches
-                  your playbook.
+                  I read your journal, strategies, notes and stats before every answer, and
+                  I know which page you&apos;re on. Ask for a chart read, advice on a setup,
+                  what the news means, or where you&apos;re leaking money.
                 </p>
                 <p className="mt-2 text-[13px] text-muted">
-                  For a setup check, attach a chart screenshot and pick a strategy. Each chat
-                  keeps about the last 100k tokens in memory.
+                  Attach a chart screenshot for analysis, or type <span className="font-mono text-accent2">/</span> to
+                  attach a note, strategy or chart analysis to the conversation.
                 </p>
                 </div>
               </div>
@@ -477,10 +616,10 @@ export default function SidekickChat({
                         {m.strategyName}
                       </div>
                     )}
-                    {m.noteTitle && (
+                    {m.att && (
                       <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-full border border-border2 px-2.5 py-0.5 text-xs text-muted">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15.5 3.5a2.12 2.12 0 0 1 3 3L8 17l-4 1 1-4z" /></svg>
-                        {m.noteTitle}
+                        <KindIcon kind={m.att.kind} />
+                        {m.att.title}
                       </div>
                     )}
                     <div className="whitespace-pre-wrap">{m.text}</div>
@@ -526,14 +665,18 @@ export default function SidekickChat({
         {/* composer */}
         <div className="shrink-0 border-t border-border bg-bg2 px-4 pb-3 pt-3 md:px-6">
           <div className="mx-auto max-w-3xl">
-            {noteAttach && (
+            {ctxAttach && (
               <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-3 py-1 text-xs text-accent2">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15.5 3.5a2.12 2.12 0 0 1 3 3L8 17l-4 1 1-4z" /></svg>
-                  {noteAttach.title}
-                  <button onClick={() => setNoteAttach(null)} aria-label="Remove note" className="ml-0.5 text-muted hover:text-danger">✕</button>
+                  <KindIcon kind={ctxAttach.kind} />
+                  {ctxAttach.title}
+                  <button onClick={() => setCtxAttach(null)} aria-label="Remove attachment" className="ml-0.5 text-muted hover:text-danger">✕</button>
                 </span>
-                <span className="text-xs text-dim">Note text goes to Sidekick with your message.</span>
+                <span className="text-xs text-dim">
+                  {ctxAttach.kind === "note" && "Note text goes to Sidekick with your message."}
+                  {ctxAttach.kind === "strategy" && "The strategy's written rules go with your message."}
+                  {ctxAttach.kind === "analysis" && "The analysis text goes with your message."}
+                </span>
               </div>
             )}
             {attach && (
@@ -562,36 +705,52 @@ export default function SidekickChat({
                     </option>
                   ))}
                 </select>
-                <span className="text-xs text-dim">Rules compliance only, never a trade call.</span>
+                <span className="text-xs text-dim">Pick a strategy for a rule-by-rule check, or send as-is for a read.</span>
               </div>
             )}
             <div className="relative flex items-end gap-2 rounded-2xl border border-border2 bg-card p-1.5 transition focus-within:border-accent/60">
-              {(slashQuery !== null || slashHint) && (
+              {slashActive && (
                 <div className="absolute bottom-full left-0 z-10 mb-2 w-full max-w-sm overflow-hidden rounded-xl border border-border2 bg-card shadow-2xl">
-                  {slashHint && (
-                    <div className="px-3 py-2.5 text-[13px] text-muted">
-                      <span className="font-mono text-accent2">/note</span> — attach a notebook note
+                  {!exactCmd &&
+                    cmdMenu.map((c, i) => (
+                      <button
+                        key={c.cmd}
+                        onClick={() => {
+                          setInput(`/${c.cmd} `);
+                          setSlashIndex(0);
+                          inputRef.current?.focus();
+                        }}
+                        onMouseEnter={() => setSlashIndex(i)}
+                        className={`flex w-full items-baseline gap-3 px-3 py-2.5 text-left text-[13px] transition ${
+                          i === slashIndex ? "bg-accent-soft" : "hover:bg-surface2"
+                        }`}
+                      >
+                        <span className="font-mono text-accent2">/{c.cmd}</span>
+                        <span className="text-muted">{c.desc}</span>
+                      </button>
+                    ))}
+                  {exactCmd && listLoading && (
+                    <div className="px-3 py-2.5 text-[13px] text-dim">Loading…</div>
+                  )}
+                  {exactCmd && !listLoading && slashOptions.length === 0 && (
+                    <div className="px-3 py-2.5 text-[13px] text-dim">
+                      {slashQuery ? `Nothing matches “${slashQuery}”.` : `Nothing to attach yet.`}
                     </div>
                   )}
-                  {slashQuery !== null && notesList === null && (
-                    <div className="px-3 py-2.5 text-[13px] text-dim">Loading notes…</div>
-                  )}
-                  {slashQuery !== null && notesList !== null && slashOptions.length === 0 && (
-                    <div className="px-3 py-2.5 text-[13px] text-dim">No notes match “{slashQuery}”.</div>
-                  )}
-                  {slashOptions.map((n, i) => (
-                    <button
-                      key={n.id}
-                      onClick={() => pickNote(n)}
-                      onMouseEnter={() => setSlashIndex(i)}
-                      className={`flex w-full items-baseline justify-between gap-3 px-3 py-2 text-left text-[13px] transition ${
-                        i === slashIndex ? "bg-accent-soft text-accent2" : "text-foreground hover:bg-surface2"
-                      }`}
-                    >
-                      <span className="truncate">{n.title}</span>
-                      <span className="shrink-0 font-mono text-[11px] text-dim">{n.updated_at.slice(0, 10)}</span>
-                    </button>
-                  ))}
+                  {exactCmd &&
+                    slashOptions.map((o, i) => (
+                      <button
+                        key={o.id}
+                        onClick={() => pickOption(o)}
+                        onMouseEnter={() => setSlashIndex(i)}
+                        className={`flex w-full items-baseline justify-between gap-3 px-3 py-2 text-left text-[13px] transition ${
+                          i === slashIndex ? "bg-accent-soft text-accent2" : "text-foreground hover:bg-surface2"
+                        }`}
+                      >
+                        <span className="truncate">{o.title}</span>
+                        <span className="shrink-0 font-mono text-[11px] text-dim">{o.hint}</span>
+                      </button>
+                    ))}
                 </div>
               )}
               <input ref={fileRef} type="file" accept="image/*" onChange={onPickFile} className="hidden" />
@@ -614,20 +773,26 @@ export default function SidekickChat({
                   autogrow(e.target);
                 }}
                 onKeyDown={(e) => {
-                  if (slashQuery !== null && slashOptions.length) {
-                    if (e.key === "ArrowDown") {
+                  if (slashActive) {
+                    const count = exactCmd ? slashOptions.length : cmdMenu.length;
+                    if (e.key === "ArrowDown" && count) {
                       e.preventDefault();
-                      setSlashIndex((i) => (i + 1) % slashOptions.length);
+                      setSlashIndex((i) => (i + 1) % count);
                       return;
                     }
-                    if (e.key === "ArrowUp") {
+                    if (e.key === "ArrowUp" && count) {
                       e.preventDefault();
-                      setSlashIndex((i) => (i - 1 + slashOptions.length) % slashOptions.length);
+                      setSlashIndex((i) => (i - 1 + count) % count);
                       return;
                     }
-                    if (e.key === "Enter" || e.key === "Tab") {
+                    if ((e.key === "Enter" || e.key === "Tab") && count) {
                       e.preventDefault();
-                      pickNote(slashOptions[Math.min(slashIndex, slashOptions.length - 1)]);
+                      const idx = Math.min(slashIndex, count - 1);
+                      if (exactCmd) pickOption(slashOptions[idx]);
+                      else {
+                        setInput(`/${cmdMenu[idx].cmd} `);
+                        setSlashIndex(0);
+                      }
                       return;
                     }
                     if (e.key === "Escape") {
@@ -645,7 +810,7 @@ export default function SidekickChat({
               />
               <button
                 onClick={() => send()}
-                disabled={busy || (!input.trim() && !attach && !noteAttach) || slashQuery !== null || slashHint}
+                disabled={busy || (!input.trim() && !attach && !ctxAttach) || slashActive}
                 title="Send"
                 aria-label="Send"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent text-white shadow-[0_6px_16px_rgba(106,88,240,0.35)] transition hover:brightness-110 disabled:opacity-40 disabled:shadow-none"
@@ -656,7 +821,7 @@ export default function SidekickChat({
               </button>
             </div>
             <p className="mt-2 text-center text-[11.5px] text-dim">
-              Analysis of your own data, not financial advice or signals.
+              Opinions with reasoning, never certainty. The trade and the risk stay yours.
             </p>
           </div>
         </div>

@@ -251,3 +251,10 @@ input[type="time"] {
 @media (prefers-reduced-motion: reduce) {
   .sk-avatar-live, .sk-bubble-live, .sk-in { animation: none; }
 }
+
+/* While a strategy or note is being edited (body[data-editing] set by those
+   workspaces), hide the floating Sidekick launcher: it shares the bottom-right
+   corner with the Save/Done pill and the two buttons mesh together. */
+body[data-editing="1"] .sk-dock-launcher {
+  display: none;
+}

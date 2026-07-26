@@ -64,6 +64,17 @@ export default function NotebookWorkspace() {
   const [toDate, setToDate] = useState("");
   const dirty = useRef(false);
 
+  // While editing, flag the body so the floating Sidekick launcher hides
+  // (see globals.css); otherwise it sits on top of the Done/Save pill in
+  // the bottom-right corner.
+  useEffect(() => {
+    if (noteMode === "edit") document.body.dataset.editing = "1";
+    else delete document.body.dataset.editing;
+    return () => {
+      delete document.body.dataset.editing;
+    };
+  }, [noteMode]);
+
   // Search by title plus optional created-date range.
   const filteredList = list.filter((n) => {
     if (q.trim() && !(n.title || "Untitled").toLowerCase().includes(q.toLowerCase())) return false;

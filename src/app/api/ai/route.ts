@@ -146,16 +146,31 @@ async function tryOpenRouterFallback(
   return null;
 }
 
-const HARD_RULES = `You are Sidekick, the Tradebook trading companion, a trading performance analyst and accountability coach for one trader. Below is a snapshot of their own data: summary statistics, recent trades, their strategies (entry/exit criteria and risk controls), and note titles.
+const HARD_RULES = `You are Sidekick, the Tradebook trading companion: an experienced trading analyst, coach and second pair of eyes for one trader. Below is a snapshot of their own data: summary statistics, recent trades, their strategies (entry/exit criteria and risk controls), notes, chart analyses and recent market headlines.
 
-Hard rules, no exceptions:
-1. Never predict price or direction. Never suggest when to enter or exit, a stop, a target, position size for a live trade, or whether to take a trade. You give no signals. If asked, briefly explain why you don't and offer a rule-compliance check of their setup against their own strategy instead.
-2. Ground every claim in the data provided. Quote the numbers you used. If the data does not support an answer, say so plainly instead of guessing.
-3. Chart screenshots: evaluate only against the selected strategy's written entry criteria and risk controls, rule by rule, each marked met, not met, or cannot tell from the image. Frame the result as an opinion on rule compliance, never a trade recommendation. If no strategy was selected, ask for one before evaluating.
-4. Coach on discipline: day-of-week and pair leaks, risk-rule violations, oversized losses, expectancy trends. Ask short, direct questions that make the trader reflect on process, not outcomes.
-5. Be concise. Plain language, numbers exact.
+How to work:
+1. Give your honest read when asked. You may analyse charts (structure, trend, key levels, momentum, liquidity, candlestick behaviour), explain news and macro events, and give opinions and advice on setups, strategy, risk and process. Always give reasoning, not just a verdict.
+2. Frame market views as probabilistic opinion, never certainty. No guaranteed outcomes, no "this will happen". When your view could drive a live trade, say plainly that the decision and the risk are the trader's.
+3. Ground claims about the trader's own performance in the data snapshot and quote the numbers you used. If the data does not support an answer, say so instead of guessing.
+4. Chart screenshots: describe what you actually see on the chart. If a strategy was selected, also check the setup against that strategy's written entry criteria and risk controls, rule by rule, each marked met, not met, or cannot tell from the image, then give your overall opinion of the setup.
+5. Coach on discipline: day-of-week and pair leaks, risk-rule violations, oversized losses, expectancy trends. Be direct; if the data shows a bad habit, name it.
+6. Be concise. Plain language, numbers exact.
 
 Formatting: plain text only. Short paragraphs, hyphen lists where a list helps. No markdown headers, no asterisks, no tables.`;
+
+// What each app page shows, so "explain this page" / "what am I looking at"
+// resolves to the right slice of the data snapshot.
+const PAGE_NOTES: [string, string][] = [
+  ["/dashboard", "the Dashboard: lifetime stats from their logged trades (net PnL, win rate, profit factor, equity curve, max drawdown, day-of-week breakdown)"],
+  ["/journal", "the Journal: a monthly calendar of their trades with daily PnL, weekly and monthly summaries, expectancy and average R"],
+  ["/charts", "the Charts page: a live TradingView chart of a pair from their watchlist, with a log of their saved chart analyses"],
+  ["/risk", "the Risk calculator: position sizing (account size and risk in, lot size out) with live prices"],
+  ["/news", "the News page: market headlines and the economic calendar (recent headlines are in the snapshot below)"],
+  ["/notebook", "the Notebook: their free-form trading notes (recent notes are in the snapshot below)"],
+  ["/strategy", "the Strategy page: their playbooks with charting process, entry/exit criteria, management rules and risk controls (all in the snapshot below)"],
+  ["/sanctuary", "the Sanctuary: a box-breathing and trading-psychology page"],
+  ["/profile", "their Profile settings (display name, password, trading pairs watchlist)"],
+];
 
 export async function POST(request: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -172,7 +187,7 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Not signed in." }, { status: 401 });
 
-  let body: { messages?: ClientMessage[]; strategyId?: string | null };
+  let body: { messages?: ClientMessage[]; strategyId?: string | null; page?: string | null };
   try {
     body = await request.json();
   } catch {
@@ -197,8 +212,16 @@ export async function POST(request: Request) {
   // Fresh data snapshot per request, as the signed-in user (RLS applies).
   const context = await buildAiContext(supabase, user);
 
+  const pageNote =
+    typeof body.page === "string"
+      ? PAGE_NOTES.find(([prefix]) => body.page!.startsWith(prefix))?.[1]
+      : undefined;
+
   const systemInstruction = [
     HARD_RULES,
+    pageNote
+      ? `\nThe trader currently has ${pageNote} open in Tradebook. When they ask about "this page", "this", or what's on screen, that is what they mean; answer from the matching parts of the data snapshot.`
+      : "",
     body.strategyId
       ? `\nFor this conversation's setup check the trader selected the strategy with id ${body.strategyId}. Use that strategy's written entry criteria and risk controls.`
       : "",

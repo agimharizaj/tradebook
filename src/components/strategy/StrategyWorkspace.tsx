@@ -21,6 +21,8 @@ type Draft = {
   maxProfit: string;
   riskPct: string;
   window: string;
+  window2: string;
+  date: string;
 };
 
 type StrategyRow = { id: string; name: string; plan_type: string | null };
@@ -44,6 +46,8 @@ function emptyDraft(): Draft {
     maxProfit: "",
     riskPct: "",
     window: "",
+    window2: "",
+    date: "",
   };
 }
 
@@ -85,6 +89,17 @@ export default function StrategyWorkspace() {
   // prompts to save or discard instead of silently dropping the draft.
   const dirtyEdit = useRef(false);
   const [pendingNav, setPendingNav] = useState<{ kind: "open"; id: string } | { kind: "new" } | { kind: "close" } | null>(null);
+
+  // While editing, flag the body so the floating Sidekick launcher hides
+  // (see globals.css); otherwise it sits on top of the Save/Edit pill in
+  // the bottom-right corner.
+  useEffect(() => {
+    if (mode === "edit") document.body.dataset.editing = "1";
+    else delete document.body.dataset.editing;
+    return () => {
+      delete document.body.dataset.editing;
+    };
+  }, [mode]);
 
   const loadList = useCallback(async () => {
     const { data } = await supabase
@@ -193,6 +208,8 @@ export default function StrategyWorkspace() {
       maxProfit: s.max_daily_profit?.toString() ?? "",
       riskPct: s.risk_per_trade_pct?.toString() ?? "",
       window: s.trading_window ?? "",
+      window2: s.trading_window_2 ?? "",
+      date: s.strategy_date ?? "",
     });
     setMode("view");
   }
@@ -310,6 +327,8 @@ export default function StrategyWorkspace() {
       max_daily_profit: num(draft.maxProfit),
       risk_per_trade_pct: num(draft.riskPct),
       trading_window: draft.window || null,
+      trading_window_2: draft.window2 || null,
+      strategy_date: draft.date || null,
     };
 
     let sid = draft.id;
@@ -616,6 +635,16 @@ export default function StrategyWorkspace() {
                   className="field"
                 />
               </Section>
+              <Section label="Date">
+                <input
+                  type="date"
+                  value={draft.date}
+                  onChange={(e) => patch({ date: e.target.value })}
+                  className="field"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                  aria-label="Strategy date"
+                />
+              </Section>
             </div>
 
             <OrderedList
@@ -725,6 +754,13 @@ export default function StrategyWorkspace() {
                 <Num label="Risk per trade %" v={draft.riskPct} on={(v) => patch({ riskPct: v })} />
                 <div className="col-span-2">
                   <WindowPicker value={draft.window} on={(v) => patch({ window: v })} />
+                </div>
+                <div className="col-span-2">
+                  <WindowPicker
+                    label="Trading window 2 (optional)"
+                    value={draft.window2}
+                    on={(v) => patch({ window2: v })}
+                  />
                 </div>
               </div>
             </Section>
@@ -888,7 +924,15 @@ function MoneyOrPct({
 // Structured trading window: start/end time pickers plus a timezone select
 // defaulting to the browser timezone. Stored as "08:00-17:00 Europe/London"
 // in the existing text column, so no migration is needed.
-function WindowPicker({ value, on }: { value: string; on: (v: string) => void }) {
+function WindowPicker({
+  value,
+  on,
+  label = "Trading window",
+}: {
+  value: string;
+  on: (v: string) => void;
+  label?: string;
+}) {
   const browserTz =
     typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
   // Local state, synced from the prop only when it changes externally
@@ -930,7 +974,7 @@ function WindowPicker({ value, on }: { value: string; on: (v: string) => void })
   };
   return (
     <label className="block">
-      <span className="mb-1 block text-xs text-dim">Trading window</span>
+      <span className="mb-1 block text-xs text-dim">{label}</span>
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="time"
@@ -982,6 +1026,7 @@ function StrategyView({
     ["Max daily profit", draft.maxProfit],
     ["Risk per trade %", draft.riskPct],
     ["Trading window", draft.window],
+    ["Trading window 2", draft.window2],
   ].filter(([, v]) => v && v.toString().trim());
 
   return (
@@ -991,6 +1036,15 @@ function StrategyView({
           <h1 className="text-2xl">{draft.name || "Untitled"}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             {draft.plan_type && <span className="text-muted">{draft.plan_type}</span>}
+            {draft.date && (
+              <span className="font-mono text-xs text-dim">
+                {new Date(`${draft.date}T00:00:00`).toLocaleDateString(undefined, {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
+            )}
           </div>
         </div>
         <div className="flex shrink-0 gap-2">
