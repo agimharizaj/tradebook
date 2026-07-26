@@ -61,6 +61,7 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
   const loadConversation = useCallback(
     async (id: string) => {
       // Switching away cancels any in-flight reply (its text so far is saved).
+      console.info("[sidekick] switching to conversation", id);
       abortRef.current?.abort();
       setActiveId(id);
       setConfirmDeleteId(null);
@@ -369,13 +370,14 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
                 <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-dim">Sidekick · AI</div>
                 <div className="rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed">
                 <p>
-                  I&apos;m your trading analyst. I can see your journal, strategies and stats, and I&apos;ll
-                  hold you to your own rules. I analyse; I never signal.
+                  I read your journal, strategies and stats before every answer. Ask where
+                  you&apos;re leaking money, which rules you broke, or whether a setup actually
+                  matches your playbook. No predictions, no signals. Your data, your rules,
+                  your call.
                 </p>
                 <p className="mt-2 text-[13px] text-muted">
-                  Ask about your patterns, or attach a chart screenshot and pick a strategy for a
-                  rule-compliance check. I keep roughly the last 100k tokens of each conversation
-                  in mind, along with a fresh snapshot of your data on every message.
+                  For a setup check, attach a chart screenshot and pick a strategy. Each chat
+                  keeps about the last 100k tokens in memory.
                 </p>
                 </div>
               </div>
