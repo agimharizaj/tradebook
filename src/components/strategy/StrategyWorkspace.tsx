@@ -489,6 +489,22 @@ export default function StrategyWorkspace() {
             </button>
           ))}
         </div>
+        {/* Floating mode control, matching the notes editor: Edit in view
+            mode, Save while editing, so long plans never need a scroll to
+            the header. */}
+        {draft && (
+          <button
+            onClick={() => (mode === "view" ? setMode("edit") : save())}
+            disabled={saving}
+            className={`fixed bottom-40 right-3 z-40 rounded-full px-4 py-2.5 text-sm font-medium shadow-xl backdrop-blur transition disabled:opacity-60 md:bottom-8 md:right-8 ${
+              mode === "edit"
+                ? "bg-accent text-white hover:opacity-90"
+                : "border border-border2 bg-card/95 text-foreground hover:border-accent"
+            }`}
+          >
+            {mode === "edit" ? (saving ? "Saving..." : "Save") : "Edit"}
+          </button>
+        )}
         {draft && (
           <button
             onClick={() => {

@@ -153,11 +153,34 @@ export default async function DashboardPage() {
             <EquityCurve values={equity} baseline={curveStart} dates={equityDates} cur={cur} />
           </div>
 
-          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          {/* Cards paired by similar height (items-start stops the grid
+              stretching a short card to its neighbour's height). */}
+          <div className="mt-6 grid items-start gap-6 lg:grid-cols-2">
             <div className="rounded-2xl bg-card p-5 ring-1 ring-border">
               <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">Daily PnL</h2>
               <DailyBars days={days} cur={cur} />
             </div>
+            {dowRows.length > 0 && (
+              <div className="rounded-2xl bg-card p-5 ring-1 ring-border">
+                <h2 className="mb-4 text-sm font-medium uppercase tracking-wide text-muted">Day of week</h2>
+                <HBars
+                  rows={dowRows.map((x) => ({ label: x.d, value: x.net, count: x.count, wins: x.wins }))}
+                  cur={cur}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="mt-6 grid items-start gap-6 lg:grid-cols-2">
+            {pairRows.length > 0 && (
+              <div className="rounded-2xl bg-card p-5 ring-1 ring-border">
+                <h2 className="mb-4 text-sm font-medium uppercase tracking-wide text-muted">PnL by pair</h2>
+                <HBars
+                  rows={pairRows.map(([pr, v]) => ({ label: pr, value: v.net, count: v.count, wins: v.wins }))}
+                  cur={cur}
+                />
+              </div>
+            )}
             <div className="rounded-2xl bg-card p-5 ring-1 ring-border">
               <h2 className="mb-4 text-sm font-medium uppercase tracking-wide text-muted">Breakdown</h2>
               <div className="grid grid-cols-2 gap-3">
@@ -183,27 +206,6 @@ export default async function DashboardPage() {
                 <Mini label="Max loss streak" value={String(maxL)} tone="down" />
               </div>
             </div>
-          </div>
-
-          <div className="mt-6 grid gap-6 lg:grid-cols-2">
-            {pairRows.length > 0 && (
-              <div className="rounded-2xl bg-card p-5 ring-1 ring-border">
-                <h2 className="mb-4 text-sm font-medium uppercase tracking-wide text-muted">PnL by pair</h2>
-                <HBars
-                  rows={pairRows.map(([pr, v]) => ({ label: pr, value: v.net, count: v.count, wins: v.wins }))}
-                  cur={cur}
-                />
-              </div>
-            )}
-            {dowRows.length > 0 && (
-              <div className="rounded-2xl bg-card p-5 ring-1 ring-border">
-                <h2 className="mb-4 text-sm font-medium uppercase tracking-wide text-muted">Day of week</h2>
-                <HBars
-                  rows={dowRows.map((x) => ({ label: x.d, value: x.net, count: x.count, wins: x.wins }))}
-                  cur={cur}
-                />
-              </div>
-            )}
           </div>
         </>
       ) : (
