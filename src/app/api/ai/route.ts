@@ -50,7 +50,18 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ error: "Invalid request body." }, { status: 400 });
   }
-  const messages = (body.messages ?? []).slice(-20); // cap history
+  // Conversation window: keep the newest history that fits ~100k tokens
+  // (approximated at 4 chars/token). Gemini Flash takes 1M, so this is a
+  // deliberate ceiling that keeps free-tier per-minute token quotas workable.
+  const MAX_CONTEXT_CHARS = 400_000;
+  const all = body.messages ?? [];
+  const messages: ClientMessage[] = [];
+  let chars = 0;
+  for (let i = all.length - 1; i >= 0; i--) {
+    chars += (all[i].text?.length ?? 0) + 20;
+    if (chars > MAX_CONTEXT_CHARS && messages.length) break;
+    messages.unshift(all[i]);
+  }
   if (!messages.length || messages[messages.length - 1].role !== "user") {
     return Response.json({ error: "No user message." }, { status: 400 });
   }
@@ -86,7 +97,7 @@ export async function POST(request: Request) {
         contents,
         // Roomy cap: Gemini 3.x spends hidden "thinking" tokens from this
         // same budget, so a tight limit truncates visible answers mid-word.
-        generationConfig: { temperature: 0.4, maxOutputTokens: 8192 },
+        generationConfig: { temperature: 0.4, maxOutputTokens: 32768 },
       }),
     }
   );

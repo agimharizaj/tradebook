@@ -342,7 +342,8 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
                 </p>
                 <p className="mt-2 text-[13px] text-muted">
                   Ask about your patterns, or attach a chart screenshot and pick a strategy for a
-                  rule-compliance check.
+                  rule-compliance check. I keep roughly the last 100k tokens of each conversation
+                  in mind, along with a fresh snapshot of your data on every message.
                 </p>
               </div>
             </div>
