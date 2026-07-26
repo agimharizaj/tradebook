@@ -154,7 +154,7 @@ export default async function Home({
               },
               {
                 t: "Trade journal",
-                d: "A calendar that keeps score: daily PnL, weekly and monthly breakdowns, true expectancy, and MT5 import so the record is complete even when you'd rather it wasn't.",
+                d: "A calendar that keeps score: daily PnL, weekly and monthly breakdowns, true expectancy, and broker-history import so the record is complete even when you'd rather it wasn't.",
               },
               {
                 t: "Risk engine",
@@ -234,7 +234,7 @@ export default async function Home({
                 sit underneath.
               </p>
               <p className="mt-3 max-w-md leading-relaxed text-muted">
-                Import your MT5 history and the record fills itself, commission
+                Log trades in seconds or import your broker history, commission
                 and swap included, so the score is the real one.
               </p>
             </div>
