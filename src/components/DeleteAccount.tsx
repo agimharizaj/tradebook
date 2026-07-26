@@ -27,7 +27,7 @@ export default function DeleteAccount() {
     // The auth user is gone; clear the local session and land on the
     // public page.
     await createClient().auth.signOut().catch(() => {});
-    window.location.href = "/";
+    window.location.href = "/?deleted=1";
   }
 
   return (

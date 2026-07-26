@@ -7,12 +7,17 @@ import RiskDemo from "@/components/landing/RiskDemo";
 import EntryChecklist from "@/components/landing/EntryChecklist";
 
 // Public landing page. Signed-in visitors skip straight to their dashboard.
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ deleted?: string }>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (user) redirect("/dashboard");
+  const sp = await searchParams;
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
@@ -39,6 +44,14 @@ export default async function Home() {
           </Link>
         </nav>
       </header>
+
+      {sp.deleted === "1" && (
+        <div className="mx-auto max-w-6xl px-5 md:px-8">
+          <p className="rounded-xl border border-success/40 bg-success/10 px-4 py-3 text-sm text-success">
+            Your account and all its data have been permanently deleted.
+          </p>
+        </div>
+      )}
 
       {/* Hero */}
       <section className="mx-auto max-w-6xl px-5 pb-16 pt-10 md:px-8 md:pb-24 md:pt-16">
