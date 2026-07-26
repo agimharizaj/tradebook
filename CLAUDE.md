@@ -40,6 +40,7 @@ The approved look is the dark "terminal" concept in `design/tradebook-brand-conc
 - Accents: violet `#6A58F0` (primary/brand, chosen so white button text passes WCAG AA at 4.9:1; `#AB9DFF` lighter for text accents), teal-green `#22D39A` (profit/positive), red `#FF6274` (loss/negative), gold `#F3C57C` (premium highlight). Dim text is `#939AAD` (AA on all surfaces); do not darken either without rechecking contrast.
 - Rationale: leading trading UIs avoid pure black (halation, eye strain over long sessions) and use a deep blue-slate base with a clear elevation ladder, one accent, off-white text. See research in git history / brand concept.
 - Feel: institutional trading terminal, flat surfaces, subtle glow only on primary actions, numbers always monospace. No busy gradients on content, no clutter.
+- Icons: inline SVG only (24 viewBox, strokeWidth 1.8-2, round caps/joins, currentColor), matching the existing set. Never use unicode arrows (← → ↑ ↓), ASCII glyphs, or emoji as UI icons - owner's rule. Sole exception: native `<option>` elements can't render SVG, so a text/emoji prefix there is tolerated.
 
 ## Current status
 

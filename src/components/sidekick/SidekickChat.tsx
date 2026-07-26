@@ -728,9 +728,23 @@ export default function SidekickChat({
         {(archivedCount > 0 || showArchived) && (
           <button
             onClick={() => setShowArchived((v) => !v)}
-            className="border-t border-border px-4 py-2.5 text-left text-xs text-dim transition hover:text-foreground"
+            className="flex w-full items-center gap-1.5 border-t border-border px-4 py-2.5 text-left text-xs text-dim transition hover:text-foreground"
           >
-            {showArchived ? "← Back to chats" : `Archived (${archivedCount})`}
+            {showArchived ? (
+              <>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+                Back to chats
+              </>
+            ) : (
+              <>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 7h18M5 7l1 13h12l1-13M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+                Archived ({archivedCount})
+              </>
+            )}
           </button>
         )}
       </aside>
