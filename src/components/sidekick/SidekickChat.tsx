@@ -54,12 +54,14 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  // Guards the auto-load + manual loads against wiping an in-flight reply.
+  // Double-send guard + cancelling an in-flight reply when switching chats.
   const busyRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   const loadConversation = useCallback(
     async (id: string) => {
-      if (busyRef.current) return;
+      // Switching away cancels any in-flight reply (its text so far is saved).
+      abortRef.current?.abort();
       setActiveId(id);
       setConfirmDeleteId(null);
       const { data, error } = await supabase
@@ -103,6 +105,7 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
   }, [messages]);
 
   function newChat() {
+    abortRef.current?.abort();
     setActiveId(null);
     setMessages([]);
     setConfirmDeleteId(null);
@@ -206,10 +209,14 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
         return next;
       });
 
+    const ac = new AbortController();
+    abortRef.current = ac;
+    let acc = "";
     try {
       const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: ac.signal,
         body: JSON.stringify({
           strategyId: sentStrategyId || null,
           messages: history.map((m, i) => ({
@@ -234,22 +241,35 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
 
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
-      let acc = "";
+      // Watchdog: if no chunk arrives for 45s, treat the reply as finished
+      // rather than hanging in "writing" forever on a stuck connection.
+      const readWithTimeout = () =>
+        new Promise<ReadableStreamReadResult<Uint8Array>>((resolve, reject) => {
+          const t = setTimeout(() => resolve({ done: true, value: undefined }), 45_000);
+          reader.read().then(
+            (r) => { clearTimeout(t); resolve(r); },
+            (e) => { clearTimeout(t); reject(e); }
+          );
+        });
       for (;;) {
-        const { done, value } = await reader.read();
+        const { done, value } = await readWithTimeout();
         if (done) break;
         acc += decoder.decode(value, { stream: true });
         update(acc);
       }
-      if (!acc.trim()) {
-        update("I didn't get a response back. Try again.", true);
-      } else {
-        const convoId = await convoIdPromise;
-        saveMessage(convoId, { role: "model", text: acc }).catch(() => {});
-      }
+      reader.cancel().catch(() => {});
+      if (!acc.trim()) update("I didn't get a response back. Try again.", true);
     } catch {
-      update("Couldn't reach Sidekick. Check your connection and try again.", true);
+      // Aborted = user switched chats; anything else is a real failure.
+      if (!ac.signal.aborted && !acc.trim()) {
+        update("Couldn't reach Sidekick. Check your connection and try again.", true);
+      }
     } finally {
+      // Persist whatever text arrived, even if cancelled or timed out.
+      if (acc.trim()) {
+        convoIdPromise.then((id) => saveMessage(id, { role: "model", text: acc })).catch(() => {});
+      }
+      if (abortRef.current === ac) abortRef.current = null;
       setBusy(false);
       busyRef.current = false;
     }
