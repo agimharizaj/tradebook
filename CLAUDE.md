@@ -58,6 +58,7 @@ The approved look is the dark "terminal" concept in `design/tradebook-brand-conc
 - Security: password minimum is 10 in the client; ALSO raise it in Supabase dashboard (Auth -> Passwords, still default 6) and enable leaked-password protection.
 - Accessibility: form labels and primary buttons pass WCAG AA (see brand section); avoid reintroducing `#757C8E` text or `maximumScale: 1`. Light theme (`html[data-theme="light"]` in `globals.css`) is also AA-tuned: dim `#646B7E`, success `#087A52`, danger `#C92F35`, gold `#9A650F`; page bg darker than cards for elevation. Recheck contrast before changing any of these.
 - Shared form input CSS (`.field`/`.input`/`.jfield`) lives in `globals.css`, not per-component style tags.
+- AI assistant: `/assistant` chat over the user's own data via Gemini (`gemini-3.6-flash`, free-tier key in `GEMINI_API_KEY`, server-side only). `/api/ai` streams plain text; per request it rebuilds a compact context (`src/lib/ai-context.ts`: aggregates, breach days, strategies with criteria/risk controls, last 50 trades, note titles) with the signed-in user's Supabase client so RLS applies. Setup checker: attach a chart screenshot + pick a strategy; the system prompt hard-blocks signals/predictions and forces rule-by-rule compliance opinions only. Session-only history (no table). Concept mock: `design/tradebook-assistant-concept.html`. If chat history persists later it is migration 0009 with RLS.
 - Deploy: pushed to GitHub (`agimharizaj/tradebook`), auto-deploys to Vercel on push to `main`.
 - Industry benchmark: `industry-standards-review.md` (July 2026). Deferred from its list: StrategyWorkspace split, per-trade screenshots, multi-tag setups, time-of-day reports, service worker.
 
@@ -70,7 +71,9 @@ The approved look is the dark "terminal" concept in `design/tradebook-brand-conc
 
 Done beyond the core four: PWA (installable, manifest + icons), responsive mobile layout with bottom tab nav, Charts (TradingView embed with drawing tools) at `/charts`, Notebook (notes CRUD, autosave) at `/notebook` (table in `0003_notes.sql`), News (TradingView market-news timeline + economic calendar) at `/news`, Sanctuary (box-breathing + psychology prompts) at `/sanctuary`. Profile moved to the sidebar footer.
 
-Later, not now: AI assistant, live broker sync (MetaApi), placing trades from the chart, richer note formatting.
+Done beyond that: AI assistant at `/assistant` (see Current status).
+
+Later, not now: live broker sync (MetaApi), placing trades from the chart, richer note formatting, persisted AI chat history (migration 0009).
 
 ## Definition of done per phase
 

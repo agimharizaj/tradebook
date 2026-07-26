@@ -2,6 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import LogoMark from "@/components/LogoMark";
+import HeroCurve from "@/components/landing/HeroCurve";
+import RiskDemo from "@/components/landing/RiskDemo";
+import EntryChecklist from "@/components/landing/EntryChecklist";
 
 // Public landing page. Signed-in visitors skip straight to their dashboard.
 export default async function Home() {
@@ -42,19 +45,21 @@ export default async function Home() {
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div>
             <p className="mb-4 inline-block rounded-full border border-border2 px-3 py-1 font-mono text-xs text-muted">
-              Playbooks · Journal · Risk · Charts
+              Free · Self-hosted · Playbooks · Journal · Risk
             </p>
             <h1
               className="text-4xl leading-tight md:text-5xl"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              Your entire trading edge.
+              Plan the trade. Take the trade.
               <br />
-              <span className="text-accent2">One terminal.</span>
+              <span className="text-accent2">Face the numbers.</span>
             </h1>
             <p className="mt-5 max-w-md text-lg text-muted">
-              Strategy playbooks you actually follow, a journal that shows you the
-              truth, and a risk engine that sizes every position before you click.
+              Tradebook is a free, self-hosted trading companion. Playbooks you
+              tick before entry, a journal that keeps score without flattering
+              you, and a risk engine that sizes the position before you click.
+              Your data lives in your own database, not ours.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link
@@ -71,34 +76,20 @@ export default async function Home() {
               </Link>
             </div>
             <p className="mt-4 font-mono text-xs text-dim">
-              Works in the browser. Installs on your phone.
+              Free. No tiers, no trial clock, no broker upsell. Installs on your phone.
             </p>
           </div>
 
-          {/* Terminal mock: equity curve + stat chips */}
+          {/* Terminal card: animated equity curve + stat chips */}
           <div className="rounded-2xl border border-border bg-bg2 p-3 shadow-2xl">
             <div className="rounded-xl bg-card p-5 ring-1 ring-border">
               <div className="mb-4 flex items-center justify-between">
                 <span className="text-xs font-medium uppercase tracking-wide text-muted">
-                  Balance curve
+                  Balance curve · demo
                 </span>
                 <span className="font-mono text-sm text-success">+12.4%</span>
               </div>
-              <svg viewBox="0 0 400 120" className="w-full" aria-hidden="true">
-                <path
-                  d="M0,95 L30,88 L55,98 L80,70 L105,78 L130,52 L155,60 L180,45 L205,58 L230,38 L255,45 L280,30 L305,36 L330,22 L360,28 L400,10"
-                  fill="none"
-                  stroke="var(--success)"
-                  strokeWidth="2.5"
-                  vectorEffect="non-scaling-stroke"
-                />
-                <path
-                  d="M0,95 L30,88 L55,98 L80,70 L105,78 L130,52 L155,60 L180,45 L205,58 L230,38 L255,45 L280,30 L305,36 L330,22 L360,28 L400,10 L400,120 L0,120 Z"
-                  fill="var(--success)"
-                  opacity="0.1"
-                />
-                <line x1="0" x2="400" y1="95" y2="95" stroke="var(--border2)" strokeDasharray="4 4" />
-              </svg>
+              <HeroCurve />
               <div className="mt-4 grid grid-cols-3 gap-2">
                 {[
                   ["Win rate", "61.3%", ""],
@@ -116,11 +107,9 @@ export default async function Home() {
                 ))}
               </div>
             </div>
-            <div className="mt-3 flex items-center justify-between rounded-xl bg-card px-4 py-3 ring-1 ring-border">
-              <span className="font-mono text-xs text-muted">RISK · EUR/USD</span>
-              <span className="font-mono text-xs text-dim">0.5% risk =</span>
-              <span className="font-mono text-sm font-medium text-accent2">0.42 lots</span>
-            </div>
+            <p className="px-2 pt-3 pb-1 font-mono text-xs text-dim">
+              The dashboard draws this from your trades. These numbers are a demo.
+            </p>
           </div>
         </div>
       </section>
@@ -132,33 +121,34 @@ export default async function Home() {
             Everything between the idea and the fill.
           </h2>
           <p className="mt-2 max-w-xl text-muted">
-            Six tools that usually live in six tabs, wired together in one place.
+            Six tools that usually live in six tabs and two subscriptions, wired
+            together in one place.
           </p>
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {[
               {
                 t: "Strategy playbooks",
-                d: "Charting process, entry and exit criteria as tickable checklists, trade management rules, and hard risk controls per strategy.",
+                d: "Your setup as a tickable contract: charting process, entry and exit criteria, management rules, and hard risk caps per strategy. If the boxes aren't ticked, it's not your trade.",
               },
               {
                 t: "Trade journal",
-                d: "Monthly calendar with daily PnL, weekly and monthly breakdowns, true expectancy, and one-click MT5 / FTMO CSV import.",
+                d: "A calendar that keeps score: daily PnL, weekly and monthly breakdowns, true expectancy, and MT5 import so the record is complete even when you'd rather it wasn't.",
               },
               {
                 t: "Risk engine",
-                d: "Three sizing modes with live prices. Account risk in, lot size out, floored to broker steps. No more napkin math.",
+                d: "Stop distance in, lot size out. Three modes, live prices, floored to broker steps. The math is done before the trade exists.",
               },
               {
                 t: "Charts + analysis log",
-                d: "TradingView charts with your watchlist, an on-chart risk widget, and a screenshot log of every read you take.",
+                d: "TradingView charts with your watchlist and a screenshot log of every read you take, so you can check your past self's work.",
               },
               {
                 t: "Notebook",
-                d: "Block-based notes with images, timestamps, to-dos and stickies. Chart snaps file themselves into the right note.",
+                d: "Block-based notes with images, timestamps and to-dos. Chart snaps file themselves into the right note.",
               },
               {
                 t: "Dashboard analytics",
-                d: "Balance curve, daily PnL, PnL by pair, day-of-week leaks, streaks and drawdown. Your edge, quantified.",
+                d: "Equity curve, profit factor, drawdown, day-of-week leaks. Not a report card you buy, a mirror you own.",
               },
             ].map((f) => (
               <div key={f.t} className="rounded-2xl bg-card p-6 ring-1 ring-border transition hover:ring-accent">
@@ -172,48 +162,83 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Discipline strip */}
+      {/* Risk engine demo */}
       <section className="mx-auto max-w-6xl px-5 py-16 md:px-8 md:py-20">
         <div className="grid items-center gap-10 lg:grid-cols-2">
-          <div className="rounded-2xl bg-card p-6 ring-1 ring-border">
-            <div className="mb-3 text-xs font-medium uppercase tracking-wide text-muted">
-              Entry criteria · London sweep
-            </div>
-            {[
-              ["Liquidity taken above Asia high", true],
-              ["15m structure shift confirmed", true],
-              ["Entry inside FVG, risk 0.5%", false],
-            ].map(([text, done]) => (
-              <div key={text as string} className="flex items-center gap-2.5 py-1.5 text-sm">
-                <span
-                  className={`flex h-4 w-4 items-center justify-center rounded border ${done ? "border-success bg-success text-background" : "border-border2"}`}
-                >
-                  {done ? (
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M5 12l5 5L20 7" />
-                    </svg>
-                  ) : null}
-                </span>
-                <span className={done ? "text-muted line-through" : ""}>{text}</span>
-              </div>
-            ))}
-            <div className="mt-3 rounded-lg bg-surface2 px-3 py-2 font-mono text-xs text-dim">
-              Max daily loss -1% · Window 07:00-11:00 London
-            </div>
-          </div>
           <div>
             <h2 className="text-2xl md:text-3xl" style={{ fontFamily: "var(--font-display)" }}>
-              Built for discipline, not dopamine.
+              Try the engine before you sign up.
             </h2>
             <p className="mt-4 max-w-md leading-relaxed text-muted">
-              Your rules live next to your chart. Criteria get ticked before entries,
-              risk controls cap the damage on bad days, and the journal shows you
-              what you actually did - not what you remember doing.
+              This is the actual sizing math from the app, running in your
+              browser right now. Account size and risk in, lot size out, floored
+              to 0.01 steps so a position never risks more than you stated.
             </p>
             <p className="mt-3 max-w-md leading-relaxed text-muted">
-              There is even a breathing page for the moments the market gets loud.
+              Inside Tradebook the prices are live, the pairs come from your own
+              watchlist, and there are two more modes: solve for the stop, or
+              audit the risk of a size you already have on.
             </p>
           </div>
+          <RiskDemo />
+        </div>
+      </section>
+
+      {/* Checklist strip */}
+      <section className="border-t border-border bg-bg2">
+        <div className="mx-auto max-w-6xl px-5 py-16 md:px-8 md:py-20">
+          <div className="grid items-center gap-10 lg:grid-cols-2">
+            <EntryChecklist />
+            <div>
+              <h2 className="text-2xl md:text-3xl" style={{ fontFamily: "var(--font-display)" }}>
+                Your rules, in writing, next to the chart.
+              </h2>
+              <p className="mt-4 max-w-md leading-relaxed text-muted">
+                Every strategy is a checklist you tick before entry. Try the one
+                on the left: criteria strike through as they're met, exactly as
+                they do in the app. Risk controls cap the damage on bad days, and
+                the journal records what you actually did, not what you remember
+                doing.
+              </p>
+              <p className="mt-3 max-w-md leading-relaxed text-muted">
+                There is even a breathing page for the moments the market gets loud.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Free, plainly */}
+      <section className="mx-auto max-w-6xl px-5 py-16 md:px-8 md:py-20">
+        <h2 className="text-2xl md:text-3xl" style={{ fontFamily: "var(--font-display)" }}>
+          Free. Not freemium.
+        </h2>
+        <p className="mt-2 max-w-xl text-muted">
+          Most journals charge $30 to $50 a month and hold your history if you
+          stop paying. Tradebook takes a different deal.
+        </p>
+        <div className="mt-8 grid gap-5 sm:grid-cols-3">
+          {[
+            {
+              t: "No price tag",
+              d: "No tiers, no trial clock, no feature gates. Every tool on this page is included, for as long as you use it.",
+            },
+            {
+              t: "Your own database",
+              d: "Self-hosted on your Supabase project. Your trades, notes and screenshots sit in infrastructure you control, exportable any day.",
+            },
+            {
+              t: "No lock-in",
+              d: "No ads, no data selling, no broker upsell. If you leave, everything comes with you.",
+            },
+          ].map((f) => (
+            <div key={f.t} className="rounded-2xl bg-card p-6 ring-1 ring-border">
+              <h3 className="font-medium" style={{ fontFamily: "var(--font-display)" }}>
+                {f.t}
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted">{f.d}</p>
+            </div>
+          ))}
         </div>
       </section>
 

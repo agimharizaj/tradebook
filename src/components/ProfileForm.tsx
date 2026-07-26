@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import DeleteAccount from "@/components/DeleteAccount";
 import Link from "next/link";
 import Combobox from "@/components/Combobox";
 import { withCommas } from "@/lib/format";
@@ -359,6 +360,8 @@ export default function ProfileForm({
           </button>
         </form>
       </div>
+
+      <DeleteAccount />
 
     </div>
   );
