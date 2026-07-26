@@ -7,6 +7,7 @@ import TradingViewChart from "@/components/charts/TradingViewChart";
 import AnalysisPanel from "@/components/charts/AnalysisPanel";
 import RiskWidget from "@/components/charts/RiskWidget";
 import { PAIR_CATALOG, tvSymbolFor } from "@/lib/pairs";
+import SnapToNote from "@/components/charts/SnapToNote";
 import { captureChartArea } from "@/lib/captureChart";
 import { usePairs } from "@/lib/usePairs";
 
@@ -166,6 +167,7 @@ export default function ChartsPage() {
         >
           Analysis log
         </button>
+        {canSnap && <SnapToNote symbol={current} />}
         {canSnap && (
         <button
           onClick={snapshot}

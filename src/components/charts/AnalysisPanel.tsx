@@ -292,15 +292,7 @@ export default function AnalysisPanel({
     setSentToNotebook(true);
   }
 
-  // ---- Snap to note: capture the chart and file it in a note directly,
-  // without creating an analysis log entry. ----
-  const [snapPath, setSnapPath] = useState<string | null>(null);
   const [snapBusy, setSnapBusy] = useState(false);
-
-  const stampNow = () => {
-    const d = new Date();
-    return `${d.toLocaleDateString(undefined, { day: "numeric", month: "short" })} ${d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}`;
-  };
 
   async function captureToStorage(prefix: string): Promise<string | null> {
     setErr(null);
@@ -327,35 +319,6 @@ export default function AnalysisPanel({
       return null;
     }
     return path;
-  }
-
-  async function snapChart() {
-    setInfo(null);
-    const path = await captureToStorage("snap");
-    if (!path) return;
-    setSnapPath(path);
-    loadRecentNotes();
-  }
-
-  const snapBlocks = (path: string): NoteBlock[] => [
-    { id: uid(), type: "text", text: `${symbol} chart - ${stampNow()}` },
-    { id: uid(), type: "img", text: path },
-  ];
-
-  async function snapToNewNote() {
-    if (!snapPath) return;
-    if (!(await createNoteWithBlocks(`${symbol} chart ${stampNow()}`, snapBlocks(snapPath), symbol))) return;
-    setSnapPath(null);
-    setNoteQuery("");
-    setInfo("Chart sent to a new note.");
-  }
-
-  async function snapToNote(noteId: string, title: string) {
-    if (!snapPath) return;
-    if (!(await appendBlocksToNote(noteId, snapBlocks(snapPath)))) return;
-    setSnapPath(null);
-    setNoteQuery("");
-    setInfo(`Chart added to "${title || "Untitled"}".`);
   }
 
   // ---- Add another chart to an already-saved analysis. ----
@@ -397,14 +360,6 @@ export default function AnalysisPanel({
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg" style={{ fontFamily: "var(--font-display)" }}>Analysis log</h2>
           <div className="flex items-center gap-2">
-            <button
-              onClick={snapChart}
-              disabled={snapBusy}
-              className="rounded-lg border border-border2 px-3 py-2 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground disabled:opacity-50"
-              title="Capture the chart and send it straight to a note (no log entry)"
-            >
-              {snapBusy ? "Uploading..." : "Snap to note"}
-            </button>
             {!adding && (
               <button onClick={() => { setAdding(true); setInfo(null); }} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white">+ Save analysis</button>
             )}
@@ -414,48 +369,6 @@ export default function AnalysisPanel({
 
         {err && <p className="mb-3 text-sm text-danger">{err}</p>}
         {info && !err && <p className="mb-3 text-sm text-success">{info}</p>}
-
-        {snapPath && (
-          <div className="mb-4 rounded-xl border border-border2 bg-surface2/50 p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs text-dim">Chart captured. Add it to which note?</span>
-              <button
-                onClick={() => { setSnapPath(null); setNoteQuery(""); }}
-                className="rounded-md px-2 py-1 text-xs text-muted hover:text-foreground"
-              >
-                Cancel
-              </button>
-            </div>
-            <input
-              value={noteQuery}
-              onChange={(e) => setNoteQuery(e.target.value)}
-              placeholder="Search notes..."
-              className="jfield mb-2"
-            />
-            <div className="max-h-56 space-y-1 overflow-y-auto">
-              <button
-                onClick={snapToNewNote}
-                className="block w-full rounded-md px-2.5 py-2 text-left text-sm font-medium text-accent2 transition hover:bg-surface2"
-              >
-                + New note
-              </button>
-              {recentNotes
-                .filter((n) => !noteQuery.trim() || (n.title || "Untitled").toLowerCase().includes(noteQuery.toLowerCase()))
-                .map((n) => (
-                  <button
-                    key={n.id}
-                    onClick={() => snapToNote(n.id, n.title)}
-                    className="flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-sm text-foreground transition hover:bg-surface2"
-                  >
-                    <span className="truncate">{n.title || "Untitled"}</span>
-                    <span className="shrink-0 text-xs text-dim">
-                      {new Date(n.updated_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
-                    </span>
-                  </button>
-                ))}
-            </div>
-          </div>
-        )}
 
         {adding && (
           <div className="mb-5 space-y-3 rounded-xl border border-border p-4">

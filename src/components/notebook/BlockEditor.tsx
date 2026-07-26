@@ -241,6 +241,8 @@ export default function BlockEditor({
     direction: string | null;
     notes: string | null;
     image_path: string | null;
+    // optional until migration 0008 adds the column
+    extra_images?: string[] | null;
     created_at: string;
   };
   const [showAnalyses, setShowAnalyses] = useState(false);
@@ -249,7 +251,7 @@ export default function BlockEditor({
   async function openAnalyses() {
     const { data } = await createClient()
       .from("chart_analyses")
-      .select("id, symbol, timeframe, direction, notes, image_path, created_at")
+      .select("*")
       .order("created_at", { ascending: false })
       .limit(50);
     setAnalyses((data as AnalysisRow[]) ?? []);
@@ -264,6 +266,7 @@ export default function BlockEditor({
     if (a.direction) add.push({ id: uid(), type: "text", text: `Bias: ${a.direction}` });
     if (a.notes) add.push({ id: uid(), type: "text", text: a.notes });
     if (a.image_path) add.push({ id: uid(), type: "img", text: a.image_path });
+    for (const pth of a.extra_images ?? []) add.push({ id: uid(), type: "img", text: pth });
     setBlocks((bs) => [...bs, ...add]);
     setShowAnalyses(false);
   }
