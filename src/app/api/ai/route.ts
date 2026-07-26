@@ -129,6 +129,7 @@ export async function POST(request: Request) {
       buffer += decoder.decode(value, { stream: true });
       const frames = buffer.split("\n");
       buffer = frames.pop() ?? "";
+      let finished = false;
       for (const line of frames) {
         if (!line.startsWith("data:")) continue;
         const payload = line.slice(5).trim();
@@ -138,14 +139,26 @@ export async function POST(request: Request) {
           const parts: { text?: string }[] =
             json?.candidates?.[0]?.content?.parts ?? [];
           for (const p of parts) if (p.text) controller.enqueue(encoder.encode(p.text));
-          if (json?.candidates?.[0]?.finishReason === "MAX_TOKENS") {
+          const fin = json?.candidates?.[0]?.finishReason;
+          if (fin === "MAX_TOKENS") {
             controller.enqueue(encoder.encode("\n\n(Answer hit the length limit. Ask me to continue.)"));
           }
+          if (fin) finished = true;
           const block = json?.promptFeedback?.blockReason;
-          if (block) controller.enqueue(encoder.encode(`\n(Request blocked by the AI provider: ${block})`));
+          if (block) {
+            controller.enqueue(encoder.encode(`\n(Request blocked by the AI provider: ${block})`));
+            finished = true;
+          }
         } catch {
           // Partial frame: leave for the next chunk via buffer.
         }
+      }
+      // Gemini can hold the connection open after the final chunk, which
+      // leaves the client waiting forever ("writing" never ends, replies
+      // never save). finishReason marks the true end, so close there.
+      if (finished) {
+        controller.close();
+        reader.cancel().catch(() => {});
       }
     },
     cancel() {
