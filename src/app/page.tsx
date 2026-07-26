@@ -57,9 +57,16 @@ export default async function Home({
       <section className="mx-auto max-w-6xl px-5 pb-16 pt-10 md:px-8 md:pb-24 md:pt-16">
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div>
-            <p className="mb-4 inline-block rounded-full border border-border2 px-3 py-1 font-mono text-xs text-muted">
-              Free · Self-hosted · Playbooks · Journal · Risk
-            </p>
+            <div className="mb-4 flex flex-wrap gap-1.5">
+              {["Free", "Self-hosted", "Playbooks", "Journal", "Risk"].map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full border border-border2 px-2.5 py-1 font-mono text-xs text-muted"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
             <h1
               className="text-4xl leading-tight md:text-5xl"
               style={{ fontFamily: "var(--font-display)" }}
