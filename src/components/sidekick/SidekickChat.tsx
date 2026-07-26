@@ -17,8 +17,14 @@ type Msg = {
   // stored, so render a chip instead of the image.
   hadImage?: boolean;
   strategyName?: string;
+  // Notebook note attached via the /note command. Content rides along to
+  // the model only for the message being sent; history keeps the title.
+  noteTitle?: string;
+  noteContent?: string;
   error?: boolean;
 };
+
+type NoteOption = { id: string; title: string; content: string | null; updated_at: string };
 
 const SUGGESTIONS = [
   "Am I breaking my risk rules?",
@@ -57,6 +63,9 @@ export default function SidekickChat({
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [attach, setAttach] = useState<{ mimeType: string; data: string; previewUrl: string } | null>(null);
+  const [noteAttach, setNoteAttach] = useState<{ title: string; content: string } | null>(null);
+  const [notesList, setNotesList] = useState<NoteOption[] | null>(null);
+  const [slashIndex, setSlashIndex] = useState(0);
   const [strategyId, setStrategyId] = useState("");
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -84,12 +93,16 @@ export default function SidekickChat({
       if (error) console.warn("[sidekick] load messages failed:", error.message);
       setMessages(
         ((data as { role: "user" | "model"; content: string; strategy_name: string | null; has_image: boolean }[]) ?? []).map(
-          (m) => ({
-            role: m.role,
-            text: m.content,
-            hadImage: m.has_image,
-            strategyName: m.strategy_name ?? undefined,
-          })
+          (m) => {
+            const noteMatch = m.content.match(/^\[note: (.*?)\] /);
+            return {
+              role: m.role,
+              text: noteMatch ? m.content.slice(noteMatch[0].length) : m.content,
+              noteTitle: noteMatch?.[1],
+              hadImage: m.has_image,
+              strategyName: m.strategy_name ?? undefined,
+            };
+          }
         )
       );
     },
@@ -115,6 +128,34 @@ export default function SidekickChat({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  // /note command: typing "/" opens the command hint, "/note foo" filters
+  // notes by title. Notes are fetched once, on first use.
+  const slashQuery = input.match(/^\/note\s*(.*)$/i)?.[1] ?? null;
+  const slashHint = input === "/" || input === "/n" || input === "/no" || input === "/not";
+  useEffect(() => {
+    if ((slashQuery !== null || slashHint) && notesList === null) {
+      (async () => {
+        const { data } = await supabase
+          .from("notes")
+          .select("id, title, content, updated_at")
+          .order("updated_at", { ascending: false })
+          .limit(50);
+        setNotesList((data as NoteOption[]) ?? []);
+      })();
+    }
+  }, [slashQuery, slashHint, notesList, supabase]);
+  const slashOptions =
+    slashQuery !== null && notesList
+      ? notesList.filter((n) => n.title.toLowerCase().includes(slashQuery.toLowerCase())).slice(0, 8)
+      : [];
+
+  function pickNote(n: NoteOption) {
+    setNoteAttach({ title: n.title, content: (n.content ?? "").trim() });
+    setInput("");
+    setSlashIndex(0);
+    inputRef.current?.focus();
+  }
 
   function newChat() {
     abortRef.current?.abort();
@@ -165,7 +206,8 @@ export default function SidekickChat({
     const { error } = await supabase.from("ai_messages").insert({
       conversation_id: conversationId,
       role: m.role,
-      content: m.text,
+      // Note titles ride inside content as a parseable prefix (no migration).
+      content: m.noteTitle ? `[note: ${m.noteTitle}] ${m.text}` : m.text,
       strategy_name: m.strategyName ?? null,
       has_image: !!(m.image || m.hadImage),
     });
@@ -184,11 +226,14 @@ export default function SidekickChat({
   async function send(textOverride?: string) {
     const text = (textOverride ?? input).trim();
     // busyRef (not state) so two Enter presses in the same tick can't double-send.
-    if ((!text && !attach) || busyRef.current) return;
+    if ((!text && !attach && !noteAttach) || busyRef.current) return;
+    // Don't send a bare slash command as a message.
+    if (slashQuery !== null || slashHint) return;
 
     const userMsg: Msg = {
       role: "user",
-      text: text || "Check this setup against my rules.",
+      text: text || (attach ? "Check this setup against my rules." : "Thoughts on this note?"),
+      ...(noteAttach ? { noteTitle: noteAttach.title, noteContent: noteAttach.content } : {}),
       ...(attach
         ? {
             imageUrl: attach.previewUrl,
@@ -202,6 +247,7 @@ export default function SidekickChat({
     setInput("");
     const sentStrategyId = attach ? strategyId : "";
     setAttach(null);
+    setNoteAttach(null);
     setBusy(true);
     busyRef.current = true;
 
@@ -239,13 +285,20 @@ export default function SidekickChat({
           strategyId: sentStrategyId || null,
           messages: history.map((m, i) => ({
             role: m.role,
-            // Only the message being sent now carries image bytes.
-            text:
-              (m.imageUrl || m.hadImage) && i < history.length - 1
-                ? `(a chart screenshot was attached here${m.strategyName ? `, checked against "${m.strategyName}"` : ""}) ${m.text}`
-                : m.strategyName && i === history.length - 1
-                  ? `(setup check against strategy "${m.strategyName}") ${m.text}`
-                  : m.text,
+            // Only the message being sent now carries image bytes / note text.
+            text: (() => {
+              let t = m.text;
+              if (i === history.length - 1) {
+                if (m.strategyName) t = `(setup check against strategy "${m.strategyName}") ${t}`;
+                if (m.noteContent)
+                  t = `(attached notebook note "${m.noteTitle}")\n${m.noteContent}\n(end of note)\n\n${t}`;
+              } else {
+                if (m.imageUrl || m.hadImage)
+                  t = `(a chart screenshot was attached here${m.strategyName ? `, checked against "${m.strategyName}"` : ""}) ${t}`;
+                if (m.noteTitle) t = `(notebook note "${m.noteTitle}" was attached here) ${t}`;
+              }
+              return t;
+            })(),
             ...(i === history.length - 1 && m.image ? { image: m.image } : {}),
           })),
         }),
@@ -424,6 +477,12 @@ export default function SidekickChat({
                         {m.strategyName}
                       </div>
                     )}
+                    {m.noteTitle && (
+                      <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-full border border-border2 px-2.5 py-0.5 text-xs text-muted">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15.5 3.5a2.12 2.12 0 0 1 3 3L8 17l-4 1 1-4z" /></svg>
+                        {m.noteTitle}
+                      </div>
+                    )}
                     <div className="whitespace-pre-wrap">{m.text}</div>
                   </div>
                 </div>
@@ -467,6 +526,16 @@ export default function SidekickChat({
         {/* composer */}
         <div className="shrink-0 border-t border-border bg-bg2 px-4 pb-3 pt-3 md:px-6">
           <div className="mx-auto max-w-3xl">
+            {noteAttach && (
+              <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-3 py-1 text-xs text-accent2">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15.5 3.5a2.12 2.12 0 0 1 3 3L8 17l-4 1 1-4z" /></svg>
+                  {noteAttach.title}
+                  <button onClick={() => setNoteAttach(null)} aria-label="Remove note" className="ml-0.5 text-muted hover:text-danger">✕</button>
+                </span>
+                <span className="text-xs text-dim">Note text goes to Sidekick with your message.</span>
+              </div>
+            )}
             {attach && (
               <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
                 <div className="relative">
@@ -496,7 +565,35 @@ export default function SidekickChat({
                 <span className="text-xs text-dim">Rules compliance only, never a trade call.</span>
               </div>
             )}
-            <div className="flex items-end gap-2 rounded-2xl border border-border2 bg-card p-1.5 transition focus-within:border-accent/60">
+            <div className="relative flex items-end gap-2 rounded-2xl border border-border2 bg-card p-1.5 transition focus-within:border-accent/60">
+              {(slashQuery !== null || slashHint) && (
+                <div className="absolute bottom-full left-0 z-10 mb-2 w-full max-w-sm overflow-hidden rounded-xl border border-border2 bg-card shadow-2xl">
+                  {slashHint && (
+                    <div className="px-3 py-2.5 text-[13px] text-muted">
+                      <span className="font-mono text-accent2">/note</span> — attach a notebook note
+                    </div>
+                  )}
+                  {slashQuery !== null && notesList === null && (
+                    <div className="px-3 py-2.5 text-[13px] text-dim">Loading notes…</div>
+                  )}
+                  {slashQuery !== null && notesList !== null && slashOptions.length === 0 && (
+                    <div className="px-3 py-2.5 text-[13px] text-dim">No notes match “{slashQuery}”.</div>
+                  )}
+                  {slashOptions.map((n, i) => (
+                    <button
+                      key={n.id}
+                      onClick={() => pickNote(n)}
+                      onMouseEnter={() => setSlashIndex(i)}
+                      className={`flex w-full items-baseline justify-between gap-3 px-3 py-2 text-left text-[13px] transition ${
+                        i === slashIndex ? "bg-accent-soft text-accent2" : "text-foreground hover:bg-surface2"
+                      }`}
+                    >
+                      <span className="truncate">{n.title}</span>
+                      <span className="shrink-0 font-mono text-[11px] text-dim">{n.updated_at.slice(0, 10)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <input ref={fileRef} type="file" accept="image/*" onChange={onPickFile} className="hidden" />
               <button
                 onClick={() => fileRef.current?.click()}
@@ -517,17 +614,38 @@ export default function SidekickChat({
                   autogrow(e.target);
                 }}
                 onKeyDown={(e) => {
+                  if (slashQuery !== null && slashOptions.length) {
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      setSlashIndex((i) => (i + 1) % slashOptions.length);
+                      return;
+                    }
+                    if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      setSlashIndex((i) => (i - 1 + slashOptions.length) % slashOptions.length);
+                      return;
+                    }
+                    if (e.key === "Enter" || e.key === "Tab") {
+                      e.preventDefault();
+                      pickNote(slashOptions[Math.min(slashIndex, slashOptions.length - 1)]);
+                      return;
+                    }
+                    if (e.key === "Escape") {
+                      setInput("");
+                      return;
+                    }
+                  }
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     send();
                   }
                 }}
-                placeholder="Ask about your trading…"
+                placeholder="Ask about your trading… ( / for commands )"
                 className="max-h-[140px] flex-1 resize-none bg-transparent py-1.5 text-sm leading-relaxed outline-none placeholder:text-dim"
               />
               <button
                 onClick={() => send()}
-                disabled={busy || (!input.trim() && !attach)}
+                disabled={busy || (!input.trim() && !attach && !noteAttach) || slashQuery !== null || slashHint}
                 title="Send"
                 aria-label="Send"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent text-white shadow-[0_6px_16px_rgba(106,88,240,0.35)] transition hover:brightness-110 disabled:opacity-40 disabled:shadow-none"
