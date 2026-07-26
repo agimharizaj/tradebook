@@ -179,7 +179,7 @@ export default function ProfileForm({
         </p>
       )}
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-6 space-y-5">
         <div className="rounded-2xl bg-card p-6 ring-1 ring-border">
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-soft text-lg font-semibold text-accent2">
@@ -351,17 +351,27 @@ export default function ProfileForm({
           )}
         </div>
 
-        <form action="/auth/signout" method="post">
-          <button
-            type="submit"
-            className="rounded-lg border border-border2 px-4 py-2 text-sm font-medium text-muted transition hover:border-danger hover:text-danger"
-          >
-            Sign out
-          </button>
-        </form>
+        <div className="rounded-2xl bg-card p-6 ring-1 ring-border">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted">Session</div>
+              <p className="mt-1 text-sm text-muted">Sign out of Tradebook on this device.</p>
+            </div>
+            <form action="/auth/signout" method="post">
+              <button
+                type="submit"
+                className="shrink-0 rounded-lg border border-border2 px-4 py-2 text-sm font-medium text-muted transition hover:border-danger hover:text-danger"
+              >
+                Sign out
+              </button>
+            </form>
+          </div>
+        </div>
       </div>
 
-      <DeleteAccount />
+      <div className="mt-12 border-t border-border pt-8">
+        <DeleteAccount />
+      </div>
 
     </div>
   );
