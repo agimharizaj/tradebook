@@ -384,9 +384,8 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
                 <div className="rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed">
                 <p>
                   I read your journal, strategies and stats before every answer. Ask where
-                  you&apos;re leaking money, which rules you broke, or whether a setup actually
-                  matches your playbook. No predictions, no signals. Your data, your rules,
-                  your call.
+                  you&apos;re leaking money, which rules you broke, or whether a setup matches
+                  your playbook.
                 </p>
                 <p className="mt-2 text-[13px] text-muted">
                   For a setup check, attach a chart screenshot and pick a strategy. Each chat
