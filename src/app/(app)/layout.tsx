@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import Sidebar from "@/components/Sidebar";
 import MobileNav from "@/components/MobileNav";
 import LogoMark from "@/components/LogoMark";
+import SidekickDock from "@/components/sidekick/SidekickDock";
 
 export default async function AppLayout({
   children,
@@ -41,6 +42,7 @@ export default async function AppLayout({
         />
         <main className="flex-1 overflow-y-auto bg-bg2">{children}</main>
         <MobileNav />
+        <SidekickDock />
       </div>
     </div>
   );

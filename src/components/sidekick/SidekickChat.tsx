@@ -41,7 +41,15 @@ async function fileToImage(file: File): Promise<{ mimeType: string; data: string
   return { mimeType: "image/jpeg", data: dataUrl.split(",")[1], previewUrl: dataUrl };
 }
 
-export default function SidekickChat({ strategies }: { strategies: Strategy[] }) {
+export default function SidekickChat({
+  strategies,
+  compact = false,
+}: {
+  strategies: Strategy[];
+  // Compact: used inside the floating dock panel; history lives in a
+  // dropdown instead of the side list.
+  compact?: boolean;
+}) {
   const supabase = useMemo(() => createClient(), []);
   const [convos, setConvos] = useState<Convo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -305,7 +313,7 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
   return (
     <div className="flex h-full">
       {/* history panel (desktop) */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-background md:flex">
+      <aside className={compact ? "hidden" : "hidden w-60 shrink-0 flex-col border-r border-border bg-background md:flex"}>
         <div className="p-3">
           <button
             onClick={newChat}
@@ -350,8 +358,8 @@ export default function SidekickChat({ strategies }: { strategies: Strategy[] })
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* history picker (mobile) */}
-        <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 md:hidden">
+        {/* history picker (mobile / compact dock) */}
+        <div className={`flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 ${compact ? "" : "md:hidden"}`}>
           <select
             value={activeId ?? ""}
             onChange={(e) => (e.target.value ? loadConversation(e.target.value) : newChat())}

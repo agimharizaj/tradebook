@@ -43,7 +43,7 @@ function lines(rows: LineRow[] | null, strategyId: string): string {
 }
 
 export async function buildAiContext(supabase: SupabaseClient, user: User): Promise<string> {
-  const [tradesRes, stratRes, entryRes, exitRes, tmrRes, notesRes] = await Promise.all([
+  const [tradesRes, stratRes, entryRes, exitRes, tmrRes, notesRes, analysesRes] = await Promise.all([
     supabase
       .from("trades")
       .select("pnl, r_multiple, pair, direction, traded_on, size_lots, emotion, notes, strategy_id")
@@ -54,7 +54,16 @@ export async function buildAiContext(supabase: SupabaseClient, user: User): Prom
     supabase.from("entry_criteria").select("strategy_id, content, sort_order"),
     supabase.from("exit_criteria").select("strategy_id, content, sort_order"),
     supabase.from("trade_management_rules").select("strategy_id, content, sort_order"),
-    supabase.from("notes").select("title, updated_at").order("updated_at", { ascending: false }).limit(30),
+    supabase
+      .from("notes")
+      .select("title, content, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("chart_analyses")
+      .select("symbol, timeframe, direction, notes, created_at")
+      .order("created_at", { ascending: false })
+      .limit(10),
   ]);
 
   const trades = (tradesRes.data as TradeRow[]) ?? [];
@@ -165,7 +174,27 @@ export async function buildAiContext(supabase: SupabaseClient, user: User): Prom
       return `- ${bits.join(" | ")}`;
     });
 
-  const noteTitles = ((notesRes.data as { title: string }[]) ?? []).map((x) => `- ${x.title}`);
+  const noteBlocks = (
+    (notesRes.data as { title: string; content: string | null; updated_at: string }[]) ?? []
+  ).map((x) => {
+    const body = (x.content ?? "").trim();
+    const capped = body.length > 1200 ? body.slice(0, 1200) + " …(truncated)" : body;
+    return `### Note: ${x.title} (updated ${x.updated_at.slice(0, 10)})\n${capped || "(empty)"}`;
+  });
+
+  const analysisLines = (
+    (analysesRes.data as {
+      symbol: string;
+      timeframe: string | null;
+      direction: string | null;
+      notes: string | null;
+      created_at: string;
+    }[]) ?? []
+  ).map((a) => {
+    const body = (a.notes ?? "").trim();
+    const capped = body.length > 600 ? body.slice(0, 600) + " …(truncated)" : body;
+    return `- ${a.created_at.slice(0, 10)} ${a.symbol}${a.timeframe ? ` ${a.timeframe}` : ""}${a.direction ? ` (${a.direction})` : ""}: ${capped || "(no text, screenshot only)"}`;
+  });
 
   return [
     `## Account`,
@@ -195,7 +224,10 @@ export async function buildAiContext(supabase: SupabaseClient, user: User): Prom
     `## Most recent trades (up to 50, newest first)`,
     recent.length ? recent.join("\n") : "(none)",
     ``,
-    `## Notebook note titles (latest ${noteTitles.length})`,
-    noteTitles.length ? noteTitles.join("\n") : "(none)",
+    `## Chart analysis log (latest ${analysisLines.length})`,
+    analysisLines.length ? analysisLines.join("\n") : "(none)",
+    ``,
+    `## Notebook notes (latest ${noteBlocks.length}, full text)`,
+    noteBlocks.length ? noteBlocks.join("\n\n") : "(none)",
   ].join("\n");
 }
