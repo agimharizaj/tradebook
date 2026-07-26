@@ -29,6 +29,7 @@ type StrategyRow = {
   trading_window: string | null;
   trading_window_2: string | null;
   strategy_date: string | null;
+  pair: string | null;
 };
 
 type LineRow = { strategy_id: string; content: string; sort_order: number };
@@ -51,7 +52,7 @@ export async function buildAiContext(supabase: SupabaseClient, user: User): Prom
       .select("pnl, r_multiple, pair, direction, traded_on, size_lots, emotion, notes, strategy_id")
       .order("traded_on", { ascending: true }),
     supabase.from("strategies").select(
-      "id, name, plan_type, is_active, max_trades_per_day, max_daily_loss, max_daily_profit, risk_per_trade_pct, trading_window, trading_window_2, strategy_date"
+      "id, name, plan_type, is_active, max_trades_per_day, max_daily_loss, max_daily_profit, risk_per_trade_pct, trading_window, trading_window_2, strategy_date, pair"
     ),
     supabase.from("entry_criteria").select("strategy_id, content, sort_order"),
     supabase.from("exit_criteria").select("strategy_id, content, sort_order"),
@@ -155,7 +156,7 @@ export async function buildAiContext(supabase: SupabaseClient, user: User): Prom
     if (s.trading_window) rc.push(`trading window ${s.trading_window}`);
     if (s.trading_window_2) rc.push(`second window ${s.trading_window_2}`);
     return [
-      `### Strategy: ${s.name}${s.plan_type ? ` (${s.plan_type})` : ""}${s.is_active ? " [active]" : ""}${s.strategy_date ? ` [date: ${s.strategy_date}]` : ""} [id: ${s.id}]`,
+      `### Strategy: ${s.name}${s.plan_type ? ` (${s.plan_type})` : ""}${s.pair ? ` [pair: ${s.pair}]` : ""}${s.is_active ? " [active]" : ""}${s.strategy_date ? ` [date: ${s.strategy_date}]` : ""} [id: ${s.id}]`,
       `Risk controls: ${rc.length ? rc.join(", ") : "(none set)"}`,
       `Entry criteria:\n${lines(entryRes.data as LineRow[], s.id)}`,
       `Exit criteria:\n${lines(exitRes.data as LineRow[], s.id)}`,

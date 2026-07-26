@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { usePairs } from "@/lib/usePairs";
 
 type ListItem = { key: string; id?: string; text: string; checked: boolean };
 type ImgItem = { key: string; path: string; url: string };
@@ -23,9 +25,17 @@ type Draft = {
   window: string;
   window2: string;
   date: string;
+  pair: string;
 };
 
-type StrategyRow = { id: string; name: string; plan_type: string | null };
+type StrategyRow = {
+  id: string;
+  name: string;
+  plan_type: string | null;
+  pair: string | null;
+  strategy_date: string | null;
+  created_at: string;
+};
 
 const BUCKET = "entry-models";
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -48,6 +58,7 @@ function emptyDraft(): Draft {
     window: "",
     window2: "",
     date: "",
+    pair: "",
   };
 }
 
@@ -78,6 +89,8 @@ export default function StrategyWorkspace() {
       if (!Number.isNaN(n) && n > 0) setAccountSize(n);
     });
   }, [supabase]);
+  // Pair watchlist from the profile, for the strategy pair tag.
+  const watchlist = usePairs();
   const [list, setList] = useState<StrategyRow[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,12 +121,29 @@ export default function StrategyWorkspace() {
   const loadList = useCallback(async () => {
     const { data } = await supabase
       .from("strategies")
-      .select("id, name, plan_type")
+      .select("id, name, plan_type, pair, strategy_date, created_at")
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
     setList((data as StrategyRow[]) ?? []);
     setLoading(false);
   }, [supabase]);
+
+  // Search + date filter, mirroring the Notebook list. Search covers name,
+  // plan type and pair; the date range checks the strategy's own date when
+  // set, otherwise its created date.
+  const [q, setQ] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const filteredList = list.filter((s) => {
+    if (q.trim()) {
+      const hay = `${s.name} ${s.plan_type ?? ""} ${s.pair ?? ""}`.toLowerCase();
+      if (!hay.includes(q.trim().toLowerCase())) return false;
+    }
+    const d = s.strategy_date ?? s.created_at?.slice(0, 10) ?? "";
+    if (fromDate && d < fromDate) return false;
+    if (toDate && d > toDate) return false;
+    return true;
+  });
 
   useEffect(() => {
     loadList();
@@ -214,6 +244,7 @@ export default function StrategyWorkspace() {
       window: s.trading_window ?? "",
       window2: s.trading_window_2 ?? "",
       date: s.strategy_date ?? "",
+      pair: s.pair ?? "",
     });
     setMode("view");
   }
@@ -333,6 +364,7 @@ export default function StrategyWorkspace() {
       trading_window: draft.window || null,
       trading_window_2: draft.window2 || null,
       strategy_date: draft.date || null,
+      pair: draft.pair || null,
     };
 
     let sid = draft.id;
@@ -459,13 +491,48 @@ export default function StrategyWorkspace() {
             + New
           </button>
         </div>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search plans..."
+          className="jfield mb-2"
+        />
+        <div className="mb-3 flex items-center gap-1.5">
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="jfield min-w-0"
+            aria-label="Date from"
+            title="Date from"
+          />
+          <span className="shrink-0 text-xs text-dim">to</span>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="jfield min-w-0"
+            aria-label="Date to"
+            title="Date to"
+          />
+        </div>
+        {(q || fromDate || toDate) && (
+          <button
+            onClick={() => { setQ(""); setFromDate(""); setToDate(""); }}
+            className="mb-2 text-xs text-accent2 hover:underline"
+          >
+            Clear filters ({filteredList.length} of {list.length})
+          </button>
+        )}
         {loading ? (
           <p className="text-sm text-muted">Loading...</p>
         ) : list.length === 0 ? (
           <p className="text-sm text-muted">No plans yet. Create one.</p>
+        ) : filteredList.length === 0 ? (
+          <p className="text-sm text-muted">No plans match.</p>
         ) : (
           <div className="space-y-1.5">
-            {list.map((s) => {
+            {filteredList.map((s) => {
               const active = draft?.id === s.id;
               return (
                 <button
@@ -480,8 +547,11 @@ export default function StrategyWorkspace() {
                   <div className={`truncate text-sm font-medium ${active ? "text-accent2" : "text-foreground"}`}>
                     {s.name}
                   </div>
-                  {s.plan_type && (
-                    <div className="mt-0.5 truncate text-xs text-dim">{s.plan_type}</div>
+                  {(s.plan_type || s.pair) && (
+                    <div className="mt-0.5 flex items-baseline gap-2">
+                      {s.plan_type && <span className="truncate text-xs text-dim">{s.plan_type}</span>}
+                      {s.pair && <span className="shrink-0 font-mono text-[11px] text-muted">{s.pair}</span>}
+                    </div>
                   )}
                 </button>
               );
@@ -491,6 +561,14 @@ export default function StrategyWorkspace() {
       </aside>
 
       <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">
+        <div className="mb-2 md:hidden">
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search plans..."
+            className="jfield"
+          />
+        </div>
         <div className="mb-4 flex gap-2 overflow-x-auto pb-1 md:hidden">
           <button
             onClick={newStrategy}
@@ -498,7 +576,7 @@ export default function StrategyWorkspace() {
           >
             + New
           </button>
-          {list.map((s) => (
+          {filteredList.map((s) => (
             <button
               key={s.id}
               onClick={() => openStrategy(s.id)}
@@ -648,6 +726,24 @@ export default function StrategyWorkspace() {
                   style={{ fontFamily: "var(--font-mono)" }}
                   aria-label="Strategy date"
                 />
+              </Section>
+              <Section label="Pair">
+                <div className="flex items-center gap-2">
+                  <select
+                    value={draft.pair}
+                    onChange={(e) => patch({ pair: e.target.value })}
+                    className="field"
+                    aria-label="Pair this strategy trades"
+                    title="Tag this strategy with a pair (edit the list in Profile)"
+                  >
+                    <option value="">No pair</option>
+                    {watchlist.map((p) => (<option key={p} value={p}>{p}</option>))}
+                    {draft.pair && !watchlist.includes(draft.pair) && (
+                      <option value={draft.pair}>{draft.pair}</option>
+                    )}
+                  </select>
+                  <Link href="/profile/pairs" className="shrink-0 text-[11px] text-accent2 hover:underline">Edit</Link>
+                </div>
               </Section>
             </div>
 
@@ -1039,6 +1135,11 @@ function StrategyView({
         <div>
           <h1 className="text-2xl">{draft.name || "Untitled"}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-2">
+            {draft.pair && (
+              <span className="rounded-md border border-border2 px-2 py-0.5 font-mono text-xs text-muted">
+                {draft.pair}
+              </span>
+            )}
             {draft.plan_type && <span className="text-muted">{draft.plan_type}</span>}
             {draft.date && (
               <span className="font-mono text-xs text-dim">
