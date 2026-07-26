@@ -228,40 +228,6 @@ export default async function Home({
         </div>
       </section>
 
-      {/* Free, plainly */}
-      <section className="mx-auto max-w-6xl px-5 py-16 md:px-8 md:py-20">
-        <h2 className="text-2xl md:text-3xl" style={{ fontFamily: "var(--font-display)" }}>
-          Free. Not freemium.
-        </h2>
-        <p className="mt-2 max-w-xl text-muted">
-          Most journals charge $30 to $50 a month and hold your history if you
-          stop paying. Tradebook takes a different deal.
-        </p>
-        <div className="mt-8 grid gap-5 sm:grid-cols-3">
-          {[
-            {
-              t: "No price tag",
-              d: "No tiers, no trial clock, no feature gates. Every tool on this page is included, for as long as you use it.",
-            },
-            {
-              t: "Your own database",
-              d: "Self-hosted on your Supabase project. Your trades, notes and screenshots sit in infrastructure you control, exportable any day.",
-            },
-            {
-              t: "No lock-in",
-              d: "No ads, no data selling, no broker upsell. If you leave, everything comes with you.",
-            },
-          ].map((f) => (
-            <div key={f.t} className="rounded-2xl bg-card p-6 ring-1 ring-border">
-              <h3 className="font-medium" style={{ fontFamily: "var(--font-display)" }}>
-                {f.t}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted">{f.d}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* CTA */}
       <section className="border-t border-border bg-bg2">
         <div className="mx-auto max-w-6xl px-5 py-16 text-center md:px-8">
