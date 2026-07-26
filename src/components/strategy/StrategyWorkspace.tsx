@@ -90,16 +90,20 @@ export default function StrategyWorkspace() {
   const dirtyEdit = useRef(false);
   const [pendingNav, setPendingNav] = useState<{ kind: "open"; id: string } | { kind: "new" } | { kind: "close" } | null>(null);
 
-  // While editing, flag the body so the floating Sidekick launcher hides
-  // (see globals.css); otherwise it sits on top of the Save/Edit pill in
-  // the bottom-right corner.
+  // The floating Edit/Save pill shares the bottom-right corner with the
+  // Sidekick launcher. Flag the body while a strategy is open so the
+  // launcher lifts above the pill (data-fab), and hide it entirely while
+  // editing (data-editing). Rules live in globals.css.
   useEffect(() => {
-    if (mode === "edit") document.body.dataset.editing = "1";
+    if (draft) document.body.dataset.fab = "1";
+    else delete document.body.dataset.fab;
+    if (draft && mode === "edit") document.body.dataset.editing = "1";
     else delete document.body.dataset.editing;
     return () => {
+      delete document.body.dataset.fab;
       delete document.body.dataset.editing;
     };
-  }, [mode]);
+  }, [draft, mode]);
 
   const loadList = useCallback(async () => {
     const { data } = await supabase

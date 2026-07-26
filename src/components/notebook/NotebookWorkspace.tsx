@@ -64,16 +64,20 @@ export default function NotebookWorkspace() {
   const [toDate, setToDate] = useState("");
   const dirty = useRef(false);
 
-  // While editing, flag the body so the floating Sidekick launcher hides
-  // (see globals.css); otherwise it sits on top of the Done/Save pill in
-  // the bottom-right corner.
+  // The floating Edit/Done pill shares the bottom-right corner with the
+  // Sidekick launcher. Flag the body while a note is open so the launcher
+  // lifts above the pill (data-fab), and hide it entirely while editing
+  // (data-editing). Rules live in globals.css.
   useEffect(() => {
-    if (noteMode === "edit") document.body.dataset.editing = "1";
+    if (note) document.body.dataset.fab = "1";
+    else delete document.body.dataset.fab;
+    if (note && noteMode === "edit") document.body.dataset.editing = "1";
     else delete document.body.dataset.editing;
     return () => {
+      delete document.body.dataset.fab;
       delete document.body.dataset.editing;
     };
-  }, [noteMode]);
+  }, [note, noteMode]);
 
   // Search by title plus optional created-date range.
   const filteredList = list.filter((n) => {

@@ -252,9 +252,16 @@ input[type="time"] {
   .sk-avatar-live, .sk-bubble-live, .sk-in { animation: none; }
 }
 
-/* While a strategy or note is being edited (body[data-editing] set by those
-   workspaces), hide the floating Sidekick launcher: it shares the bottom-right
-   corner with the Save/Done pill and the two buttons mesh together. */
+/* The floating Edit/Save pill (open note or strategy) shares the bottom-right
+   corner with the Sidekick launcher. While one is on screen (body[data-fab],
+   set by the workspaces) lift the launcher above the pill on desktop; on
+   mobile the pill already sits higher (bottom-40 vs bottom-20). While
+   actually editing (body[data-editing]) hide the launcher entirely. */
+@media (min-width: 768px) {
+  body[data-fab="1"] .sk-dock-launcher {
+    bottom: 5.5rem;
+  }
+}
 body[data-editing="1"] .sk-dock-launcher {
   display: none;
 }
