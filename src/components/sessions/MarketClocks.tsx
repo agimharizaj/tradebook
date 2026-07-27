@@ -418,26 +418,19 @@ export default function MarketClocks() {
       {/* Converter */}
       <div className="rounded-2xl bg-card p-5 ring-1 ring-border">
         <div className="mb-3 text-xs font-medium uppercase tracking-wide text-muted">Convert a market time</div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <input
             type="time"
             value={convTime}
             onChange={(e) => setConvTime(e.target.value)}
-            className="field !w-auto"
+            className="field !w-auto !px-2 !py-1.5 sm:!px-3 sm:!py-2"
             aria-label="Time to convert"
           />
-          <button
-            onClick={setToLocalNow}
-            className="rounded-lg border border-border2 px-3 py-2 text-sm text-muted transition hover:border-accent hover:text-foreground"
-            title="Switch the source to your device's timezone and fill in your local time now"
-          >
-            Local time
-          </button>
           <span className="text-xs text-dim">in</span>
           <select
             value={convFrom}
             onChange={(e) => setConvFrom(e.target.value)}
-            className="field !w-auto"
+            className="field !w-auto !px-2 !py-1.5 sm:!px-3 sm:!py-2"
             aria-label="Source market"
           >
             {MARKETS.map((m) => (
@@ -449,6 +442,13 @@ export default function MarketClocks() {
               <option value={localTz}>Local ({localTz.split("/").pop()?.replace(/_/g, " ")})</option>
             )}
           </select>
+          <button
+            onClick={setToLocalNow}
+            className="rounded-lg border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground sm:px-3 sm:py-2 sm:text-sm"
+            title="Switch the source to your device's timezone and fill in your local time now"
+          >
+            Local time
+          </button>
         </div>
         {converted && (
           <div className="mt-4 divide-y divide-border">
