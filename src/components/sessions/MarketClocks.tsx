@@ -418,39 +418,37 @@ export default function MarketClocks() {
       {/* Converter */}
       <div className="rounded-2xl bg-card p-5 ring-1 ring-border">
         <div className="mb-3 text-xs font-medium uppercase tracking-wide text-muted">Convert a market time</div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <div className="flex items-center gap-2">
-            <input
-              type="time"
-              value={convTime}
-              onChange={(e) => setConvTime(e.target.value)}
-              className="field !w-auto"
-              aria-label="Time to convert"
-            />
-            <span className="text-xs text-dim">in</span>
-            <select
-              value={convFrom}
-              onChange={(e) => setConvFrom(e.target.value)}
-              className="field !w-auto"
-              aria-label="Source market"
-            >
-              {MARKETS.map((m) => (
-                <option key={m.tz} value={m.tz}>
-                  {m.name}
-                </option>
-              ))}
-              {!localIsMarket && (
-                <option value={localTz}>Local ({localTz.split("/").pop()?.replace(/_/g, " ")})</option>
-              )}
-            </select>
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="time"
+            value={convTime}
+            onChange={(e) => setConvTime(e.target.value)}
+            className="field !w-auto"
+            aria-label="Time to convert"
+          />
           <button
             onClick={setToLocalNow}
-            className="w-full rounded-lg border border-border2 px-3 py-2 text-sm text-muted transition hover:border-accent hover:text-foreground sm:w-auto"
+            className="rounded-lg border border-border2 px-3 py-2 text-sm text-muted transition hover:border-accent hover:text-foreground"
             title="Switch the source to your device's timezone and fill in your local time now"
           >
-            My local time
+            Local time
           </button>
+          <span className="text-xs text-dim">in</span>
+          <select
+            value={convFrom}
+            onChange={(e) => setConvFrom(e.target.value)}
+            className="field !w-auto"
+            aria-label="Source market"
+          >
+            {MARKETS.map((m) => (
+              <option key={m.tz} value={m.tz}>
+                {m.name}
+              </option>
+            ))}
+            {!localIsMarket && (
+              <option value={localTz}>Local ({localTz.split("/").pop()?.replace(/_/g, " ")})</option>
+            )}
+          </select>
         </div>
         {converted && (
           <div className="mt-4 divide-y divide-border">
