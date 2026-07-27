@@ -24,8 +24,15 @@ export default function Sidebar({ email, name }: { email: string; name?: string 
 
   const MIN = 200;
   const MAX = 380;
+  // Drag the handle left past this pointer-x and the sidebar collapses (same
+  // end state as the button); drag right past it to expand again. Between this
+  // and MIN the width just floors at MIN, so it "can't shrink more" until you
+  // pull past the threshold.
+  const COLLAPSE_X = 150;
   const widthRef = useRef(width);
   widthRef.current = width;
+  const collapsedRef = useRef(collapsed);
+  collapsedRef.current = collapsed;
 
   useEffect(() => {
     // Landscape phones (short viewports) start collapsed so the content gets
@@ -45,13 +52,27 @@ export default function Sidebar({ email, name }: { email: string; name?: string 
     document.body.style.userSelect = "none";
     document.body.style.cursor = "col-resize";
     const onMove = (e: PointerEvent) => {
-      const w = Math.min(MAX, Math.max(MIN, e.clientX));
-      widthRef.current = w;
-      setWidth(w);
+      const x = e.clientX;
+      if (x <= COLLAPSE_X) {
+        // Pulled past the floor: collapse to icon-only.
+        if (!collapsedRef.current) {
+          collapsedRef.current = true;
+          setCollapsed(true);
+        }
+      } else {
+        if (collapsedRef.current) {
+          collapsedRef.current = false;
+          setCollapsed(false);
+        }
+        const w = Math.min(MAX, Math.max(MIN, x));
+        widthRef.current = w;
+        setWidth(w);
+      }
     };
     const onUp = () => {
       setDragging(false);
       localStorage.setItem("tb_sidebar_width", String(widthRef.current));
+      localStorage.setItem("tb_sidebar_collapsed", collapsedRef.current ? "1" : "0");
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
@@ -148,20 +169,21 @@ export default function Sidebar({ email, name }: { email: string; name?: string 
         </div>
       </div>
 
-      {!collapsed && (
-        <div
-          onPointerDown={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDoubleClick={() => {
-            setWidth(240);
-            localStorage.setItem("tb_sidebar_width", "240");
-          }}
-          title="Drag to resize, double-click to reset"
-          className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize transition hover:bg-accent/40"
-        />
-      )}
+      <div
+        onPointerDown={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDoubleClick={() => {
+          setWidth(240);
+          setCollapsed(false);
+          collapsedRef.current = false;
+          localStorage.setItem("tb_sidebar_width", "240");
+          localStorage.setItem("tb_sidebar_collapsed", "0");
+        }}
+        title="Drag to resize or collapse, double-click to reset"
+        className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize transition hover:bg-accent/40"
+      />
     </aside>
     {dragging && <div className="fixed inset-0 z-[60] cursor-col-resize" />}
     </>
