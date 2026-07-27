@@ -45,6 +45,57 @@ function lines(rows: LineRow[] | null, strategyId: string): string {
   return list.length ? list.join("\n") : "- (none written)";
 }
 
+// Current wall-clock context: what time it is in each major session, which are
+// open, and which ICT kill zone is live. Lets Sidekick actually judge
+// "session active" / trading-window criteria instead of saying "cannot tell".
+// Uses IANA zones, so DST is handled by the runtime.
+const pad = (n: number) => String(n).padStart(2, "0");
+function nowContext(): string {
+  const now = new Date();
+  const partsOf = (tz: string) => {
+    const p = new Intl.DateTimeFormat("en-GB", {
+      timeZone: tz,
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(now);
+    const get = (t: string) => p.find((x) => x.type === t)?.value ?? "";
+    const h = +get("hour") % 24;
+    const mi = +get("minute");
+    return { wd: get("weekday"), h, mi, mins: h * 60 + mi };
+  };
+  // Indicative session hours in each market's local time (same as the Sessions page).
+  const sessions: [string, string, number, number][] = [
+    ["Sydney", "Australia/Sydney", 7 * 60, 16 * 60],
+    ["Tokyo", "Asia/Tokyo", 9 * 60, 18 * 60],
+    ["London", "Europe/London", 8 * 60, 16 * 60 + 30],
+    ["New York", "America/New_York", 8 * 60, 17 * 60],
+  ];
+  const sessionLines = sessions.map(([name, tz, o, c]) => {
+    const { wd, h, mi, mins } = partsOf(tz);
+    const weekday = wd !== "Sat" && wd !== "Sun";
+    const open = weekday && mins >= o && mins < c;
+    return `${name} ${pad(h)}:${pad(mi)} ${wd} (${open ? "OPEN" : "closed"})`;
+  });
+  // ICT kill zones in New York local time.
+  const ny = partsOf("America/New_York");
+  const kz: [string, number, number][] = [
+    ["Asia", 20 * 60, 24 * 60],
+    ["London", 2 * 60, 5 * 60],
+    ["NY AM", 9 * 60 + 30, 11 * 60],
+    ["NY Lunch", 12 * 60, 13 * 60],
+    ["NY PM", 13 * 60 + 30, 16 * 60],
+  ];
+  const activeKz = kz.find(([, f, t]) => ny.mins >= f && ny.mins < t)?.[0] ?? "none";
+  return [
+    `Current time UTC: ${now.toISOString().slice(0, 16).replace("T", " ")}. New York: ${pad(ny.h)}:${pad(ny.mi)} ${ny.wd}.`,
+    `Market sessions right now: ${sessionLines.join("; ")}.`,
+    `Active ICT kill zone (New York time): ${activeKz}.`,
+    `Use these when a criterion asks whether a session is active or price is inside the strategy's trading window.`,
+  ].join("\n");
+}
+
 export async function buildAiContext(supabase: SupabaseClient, user: User): Promise<string> {
   const [tradesRes, stratRes, entryRes, exitRes, tmrRes, notesRes, analysesRes, newsRes] = await Promise.all([
     supabase
@@ -215,6 +266,9 @@ export async function buildAiContext(supabase: SupabaseClient, user: User): Prom
   );
 
   return [
+    `## Right now`,
+    nowContext(),
+    ``,
     `## Account`,
     `Currency: ${cur}.${accountSize > 0 ? ` Account size: ${n1(accountSize)} ${cur}.` : ""} Trades logged: ${trades.length} (${withPnl.length} with PnL).`,
     ``,
