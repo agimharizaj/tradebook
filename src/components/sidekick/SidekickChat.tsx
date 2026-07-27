@@ -99,11 +99,17 @@ async function fileToImage(file: Blob): Promise<{ mimeType: string; data: string
 export default function SidekickChat({
   strategies,
   compact = false,
+  pendingImage = null,
+  onPendingImageUsed,
 }: {
   strategies: Strategy[];
   // Compact: used inside the floating dock panel; history lives in a
   // dropdown instead of the side list.
   compact?: boolean;
+  // A chart image captured elsewhere (e.g. "Snap to Sidekick" on Charts) to
+  // attach to the composer as soon as the chat mounts.
+  pendingImage?: Blob | null;
+  onPendingImageUsed?: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
   // Sent with every request so Sidekick knows which app page is on screen
@@ -125,6 +131,20 @@ export default function SidekickChat({
   const [analysesList, setAnalysesList] = useState<AnalysisRow[] | null>(null);
   const [slashIndex, setSlashIndex] = useState(0);
   const [strategyId, setStrategyId] = useState("");
+
+  // A chart snapped in from the Charts page: attach it to the composer once.
+  useEffect(() => {
+    if (!pendingImage) return;
+    let cancelled = false;
+    fileToImage(pendingImage).then((img) => {
+      if (!cancelled) setAttach(img);
+      onPendingImageUsed?.();
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingImage]);
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);

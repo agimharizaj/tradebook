@@ -18,6 +18,9 @@ export default function SidekickDock() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [strategies, setStrategies] = useState<Strategy[] | null>(null);
+  // A chart captured by "Snap to Sidekick" on the Charts page, waiting to be
+  // attached once the chat mounts.
+  const [pendingImage, setPendingImage] = useState<Blob | null>(null);
   // Draggable launcher: null = default corner position (Tailwind classes);
   // set once the user drags it, anchored right/bottom and persisted.
   const [pos, setPos] = useState<{ right: number; bottom: number } | null>(null);
@@ -91,6 +94,19 @@ export default function SidekickDock() {
       setOpen(true);
     }
   }
+
+  // "Snap to Sidekick" (Charts page) dispatches a chart blob; open the drawer
+  // and hold the image until the chat mounts and consumes it.
+  useEffect(() => {
+    const onSnap = (e: Event) => {
+      const blob = (e as CustomEvent<{ blob?: Blob }>).detail?.blob;
+      if (!blob) return;
+      setPendingImage(blob);
+      setOpen(true);
+    };
+    window.addEventListener("tb:snap-to-sidekick", onSnap);
+    return () => window.removeEventListener("tb:snap-to-sidekick", onSnap);
+  }, []);
 
   useEffect(() => {
     if (!open || strategies !== null) return;
@@ -182,7 +198,12 @@ export default function SidekickDock() {
               {strategies === null ? (
                 <div className="flex h-full items-center justify-center text-sm text-dim">Loading…</div>
               ) : (
-                <SidekickChat strategies={strategies} compact />
+                <SidekickChat
+                  strategies={strategies}
+                  compact
+                  pendingImage={pendingImage}
+                  onPendingImageUsed={() => setPendingImage(null)}
+                />
               )}
             </div>
           </div>
