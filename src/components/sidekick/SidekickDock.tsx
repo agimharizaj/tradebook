@@ -140,7 +140,7 @@ export default function SidekickDock() {
           title="Ask Sidekick (drag to move)"
           aria-label="Ask Sidekick"
           style={pos ? { right: pos.right, bottom: pos.bottom } : undefined}
-          className="sk-dock-launcher fixed bottom-24 right-4 z-40 flex h-12 w-12 cursor-grab touch-none items-center justify-center rounded-2xl bg-accent text-white shadow-[0_8px_24px_rgba(106,88,240,0.45)] hover:brightness-110 active:cursor-grabbing md:bottom-10 md:right-6"
+          className="sk-dock-launcher fixed bottom-24 right-4 z-40 hidden h-12 w-12 cursor-grab touch-none items-center justify-center rounded-2xl bg-accent text-white shadow-[0_8px_24px_rgba(106,88,240,0.45)] hover:brightness-110 active:cursor-grabbing md:bottom-10 md:right-6 md:flex"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3zM18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" />
