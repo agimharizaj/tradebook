@@ -123,6 +123,10 @@ export default function SidekickChat({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameVal, setRenameVal] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  // Bulk select: tick several chats and archive/delete them in one go.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmBulk, setConfirmBulk] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [attach, setAttach] = useState<{ mimeType: string; data: string; previewUrl: string } | null>(null);
@@ -236,6 +240,44 @@ export default function SidekickChat({
       .then(({ error }) => {
         if (error) console.warn("[sidekick] update conversation failed:", error.message);
       });
+  }
+
+  function toggleSelect(id: string) {
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+    setConfirmBulk(false);
+  }
+  function exitSelect() {
+    setSelectMode(false);
+    setSelected(new Set());
+    setConfirmBulk(false);
+  }
+  // Archive (or unarchive, in the archived view) every ticked chat at once.
+  async function bulkArchive() {
+    const ids = [...selected];
+    if (!ids.length) return;
+    const archived = !showArchived;
+    setConvos((cur) => cur.map((x) => (selected.has(x.id) ? { ...x, archived } : x)));
+    setSelected(new Set());
+    setConfirmBulk(false);
+    await supabase.from("ai_conversations").update({ archived }).in("id", ids);
+  }
+  async function bulkDelete() {
+    const ids = [...selected];
+    if (!ids.length) return;
+    if (!confirmBulk) {
+      setConfirmBulk(true);
+      return;
+    }
+    const removing = new Set(selected);
+    setConvos((c) => c.filter((x) => !removing.has(x.id)));
+    if (activeId && removing.has(activeId)) newChat();
+    exitSelect();
+    await supabase.from("ai_conversations").delete().in("id", ids);
   }
 
   function startRename(c: Convo) {
@@ -636,7 +678,7 @@ export default function SidekickChat({
     <div className="flex h-full">
       {/* history panel (desktop) */}
       <aside className={compact ? "hidden" : "hidden w-60 shrink-0 flex-col border-r border-border bg-background md:flex"}>
-        <div className="p-3">
+        <div className="space-y-2 p-3">
           <button
             onClick={newChat}
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-border2 bg-card px-3 py-2 text-sm font-medium transition hover:border-accent/50 hover:bg-accent-soft hover:text-accent2"
@@ -644,6 +686,41 @@ export default function SidekickChat({
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
             New chat
           </button>
+          {selectMode ? (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={bulkArchive}
+                disabled={selected.size === 0}
+                className="flex-1 rounded-lg border border-border2 px-2 py-1.5 text-xs font-medium text-muted transition hover:border-accent hover:text-foreground disabled:opacity-40"
+              >
+                {showArchived ? "Unarchive" : "Archive"}
+                {selected.size ? ` (${selected.size})` : ""}
+              </button>
+              <button
+                onClick={bulkDelete}
+                disabled={selected.size === 0}
+                className="flex-1 rounded-lg border border-border2 px-2 py-1.5 text-xs font-medium text-muted transition hover:border-danger hover:text-danger disabled:opacity-40"
+              >
+                {confirmBulk ? "Sure?" : "Delete"}
+                {selected.size ? ` (${selected.size})` : ""}
+              </button>
+              <button
+                onClick={exitSelect}
+                className="rounded-lg px-2 py-1.5 text-xs text-dim transition hover:text-foreground"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            convos.length > 0 && (
+              <button
+                onClick={() => setSelectMode(true)}
+                className="w-full text-right text-xs text-dim transition hover:text-accent2"
+              >
+                Select
+              </button>
+            )
+          )}
         </div>
         {showArchived && (
           <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-dim">Archived</div>
@@ -656,7 +733,25 @@ export default function SidekickChat({
                 c.id === activeId ? "bg-accent-soft" : "hover:bg-surface2"
               }`}
             >
-              {renamingId === c.id ? (
+              {selectMode ? (
+                <button
+                  onClick={() => toggleSelect(c.id)}
+                  className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left text-[13px]"
+                >
+                  <span
+                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition ${
+                      selected.has(c.id) ? "border-accent bg-accent text-white" : "border-border2"
+                    }`}
+                  >
+                    {selected.has(c.id) && (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    )}
+                  </span>
+                  <span className="truncate text-muted">{c.title}</span>
+                </button>
+              ) : renamingId === c.id ? (
                 <input
                   autoFocus
                   value={renameVal}
@@ -686,23 +781,25 @@ export default function SidekickChat({
                   <span className={`truncate ${c.unread ? "font-medium text-foreground" : ""}`}>{c.title}</span>
                 </button>
               )}
-              <button
-                onClick={() => {
-                  setConfirmDeleteId(null);
-                  setMenuId(menuId === c.id ? null : c.id);
-                }}
-                aria-label={`Options for "${c.title}"`}
-                aria-expanded={menuId === c.id}
-                className={`shrink-0 rounded-md px-1 py-1 text-dim transition hover:bg-surface2 hover:text-foreground ${
-                  menuId === c.id ? "" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                }`}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" />
-                </svg>
-              </button>
+              {!selectMode && (
+                <button
+                  onClick={() => {
+                    setConfirmDeleteId(null);
+                    setMenuId(menuId === c.id ? null : c.id);
+                  }}
+                  aria-label={`Options for "${c.title}"`}
+                  aria-expanded={menuId === c.id}
+                  className={`shrink-0 rounded-md px-1 py-1 text-dim transition hover:bg-surface2 hover:text-foreground ${
+                    menuId === c.id ? "" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                  }`}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" />
+                  </svg>
+                </button>
+              )}
 
-              {menuId === c.id && (
+              {!selectMode && menuId === c.id && (
                 <>
                   <div
                     className="fixed inset-0 z-20"
