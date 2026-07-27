@@ -60,7 +60,7 @@ export default function SidekickDock() {
           onClick={() => setOpen(true)}
           title="Ask Sidekick"
           aria-label="Ask Sidekick"
-          className="sk-dock-launcher fixed bottom-20 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-white shadow-[0_8px_24px_rgba(106,88,240,0.45)] transition hover:brightness-110 md:bottom-6 md:right-6"
+          className="sk-dock-launcher fixed bottom-24 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-white shadow-[0_8px_24px_rgba(106,88,240,0.45)] transition hover:brightness-110 md:bottom-10 md:right-6"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" />
