@@ -31,7 +31,7 @@ export default function NewsFeed({ height = 720 }: { height?: number }) {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(false);
-  const [open, setOpen] = useState<number | null>(0);
+  const [open, setOpen] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
