@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { moneySigned, sym } from "@/lib/format";
 import { DailyBars, EquityCurve, HBars } from "@/components/dashboard/Charts";
+import KillZones from "@/components/sessions/KillZones";
 
 export const dynamic = "force-dynamic";
 
@@ -203,6 +204,10 @@ export default async function DashboardPage() {
                 <Mini label="Max win streak" value={String(maxW)} tone="up" />
                 <Mini label="Max loss streak" value={String(maxL)} tone="down" />
             </div>
+          </div>
+
+          <div className="mt-6">
+            <KillZones />
           </div>
         </>
       ) : (

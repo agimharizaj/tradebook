@@ -1,5 +1,4 @@
 import MarketClocks from "@/components/sessions/MarketClocks";
-import KillZones from "@/components/sessions/KillZones";
 
 export const metadata = { title: "Sessions · Tradebook" };
 
@@ -10,9 +9,8 @@ export default function SessionsPage() {
       <p className="mt-1 text-sm text-muted">
         Market clocks, what&apos;s open right now, and a converter between the majors.
       </p>
-      <div className="mt-6 space-y-6">
+      <div className="mt-6">
         <MarketClocks />
-        <KillZones />
       </div>
     </div>
   );
