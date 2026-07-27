@@ -106,18 +106,74 @@ export default function MarketClocks() {
     typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
   const localIsMarket = MARKETS.some((m) => m.tz === localTz);
 
-  // Fill the input with the current wall-clock time in the selected source.
-  function setToNow() {
-    const p = zoneParts(new Date(), convFrom);
-    setConvTime(`${two(p.h)}:${two(p.mi)}`);
-  }
-
   // Switch the source to the device's own zone and fill in local time now.
   function setToLocalNow() {
     const p = zoneParts(new Date(), localTz);
     setConvFrom(localTz);
     setConvTime(`${two(p.h)}:${two(p.mi)}`);
   }
+
+  // Overlap timeline: a 24h axis across the user's local day (midnight to
+  // midnight). Each session is drawn where it is open in local time, and the
+  // stretches where two or more sessions are open at once are shaded - those
+  // are the deep-liquidity overlaps. Everything is computed from UTC instants
+  // via IANA zones, so DST (and mismatched clock-change dates) is handled.
+  const timeline = useMemo(() => {
+    if (!now) return null;
+    const dayMs = 86_400_000;
+    const rp = zoneParts(now, localTz);
+    const dayStart = wallToUtc(localTz, rp.y, rp.mo, rp.d, 0, 0).getTime();
+    const dayEnd = dayStart + dayMs;
+
+    // Raw open/close instants for each market across yesterday/today/tomorrow
+    // (a session can spill over the local-midnight edges of the window).
+    const raw = MARKETS.map((m) => {
+      const iv: [number, number][] = [];
+      for (const off of [-1, 0, 1]) {
+        const p = zoneParts(new Date(now.getTime() + off * dayMs), m.tz);
+        if (p.wd === 0 || p.wd === 6) continue; // FX shut over the weekend
+        const o = wallToUtc(m.tz, p.y, p.mo, p.d, Math.floor(m.open / 60), m.open % 60).getTime();
+        const c = wallToUtc(m.tz, p.y, p.mo, p.d, Math.floor(m.close / 60), m.close % 60).getTime();
+        iv.push([o, c]);
+      }
+      return iv;
+    });
+
+    const pct = (t: number) => ((t - dayStart) / dayMs) * 100;
+    const segsByMarket = raw.map((iv) => {
+      const segs: { x0: number; x1: number }[] = [];
+      for (const [o, c] of iv) {
+        const s = Math.max(o, dayStart);
+        const e = Math.min(c, dayEnd);
+        if (e > s) segs.push({ x0: pct(s), x1: pct(e) });
+      }
+      return segs;
+    });
+
+    // Sample every 5 minutes; a band is a run where 2+ markets are open.
+    const N = 288;
+    const bands: { x0: number; x1: number }[] = [];
+    let i = 0;
+    while (i < N) {
+      const open = (k: number) => {
+        const t = dayStart + ((k + 0.5) / N) * dayMs;
+        return raw.filter((iv) => iv.some(([o, c]) => t >= o && t < c)).length;
+      };
+      if (open(i) >= 2) {
+        let j = i;
+        while (j < N && open(j) >= 2) j++;
+        bands.push({ x0: (i / N) * 100, x1: (j / N) * 100 });
+        i = j;
+      } else i++;
+    }
+
+    return {
+      segsByMarket,
+      bands,
+      nowPct: pct(now.getTime()),
+      hasAny: segsByMarket.some((s) => s.length > 0),
+    };
+  }, [now, localTz]);
 
   const converted = useMemo(() => {
     if (!now) return null;
@@ -214,6 +270,86 @@ export default function MarketClocks() {
         ))}
       </div>
 
+      {/* Overlap timeline */}
+      {timeline && (
+        <div className="rounded-2xl bg-card p-5 ring-1 ring-border">
+          <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted">Overlaps today</span>
+            <span className="text-xs text-dim">Your local day · shaded = two or more sessions open</span>
+          </div>
+
+          {timeline.hasAny ? (
+            <div className="mt-4">
+              {/* Hour axis */}
+              <div className="flex">
+                <div className="w-16 shrink-0" />
+                <div className="relative h-4 flex-1">
+                  {[0, 6, 12, 18, 24].map((h) => (
+                    <span
+                      key={h}
+                      className="absolute -translate-x-1/2 font-mono text-[10px] text-dim"
+                      style={{ left: `${(h / 24) * 100}%` }}
+                    >
+                      {two(h)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Rows + shared overlay for bands and the now line */}
+              <div className="relative">
+                {MARKETS.map((m, idx) => (
+                  <div key={m.name} className="flex items-center py-1.5">
+                    <span className="w-16 shrink-0 pr-2 text-xs text-muted">{m.name}</span>
+                    <div className="relative h-6 flex-1 overflow-hidden rounded-md bg-surface2/50">
+                      {timeline.segsByMarket[idx].map((s, k) => (
+                        <div
+                          key={k}
+                          className="absolute inset-y-0 rounded-md bg-accent"
+                          style={{ left: `${s.x0}%`, width: `${Math.max(s.x1 - s.x0, 0.5)}%` }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Overlay spans the track area only (left-16 clears labels) */}
+                <div className="pointer-events-none absolute inset-y-0 left-16 right-0">
+                  {timeline.bands.map((b, k) => (
+                    <div
+                      key={k}
+                      className="absolute inset-y-0 border-x border-success/40 bg-success/15"
+                      style={{ left: `${b.x0}%`, width: `${b.x1 - b.x0}%` }}
+                    />
+                  ))}
+                  {timeline.nowPct >= 0 && timeline.nowPct <= 100 && (
+                    <div
+                      className="absolute inset-y-0 w-px bg-foreground/70"
+                      style={{ left: `${timeline.nowPct}%` }}
+                    >
+                      <span className="absolute -top-0.5 -translate-x-1/2 rounded bg-foreground px-1 py-px text-[9px] font-medium text-background">
+                        now
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-dim">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-3 rounded-sm bg-accent" /> Session open
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-3 rounded-sm border border-success/40 bg-success/15" /> Overlap (deep liquidity)
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-muted">Markets are shut for the weekend - no sessions today.</p>
+          )}
+        </div>
+      )}
+
       {/* Converter */}
       <div className="rounded-2xl bg-card p-5 ring-1 ring-border">
         <div className="mb-3 text-xs font-medium uppercase tracking-wide text-muted">Convert a time</div>
@@ -241,13 +377,6 @@ export default function MarketClocks() {
               <option value={localTz}>Local ({localTz.split("/").pop()?.replace(/_/g, " ")})</option>
             )}
           </select>
-          <button
-            onClick={setToNow}
-            className="rounded-lg border border-border2 px-3 py-2 text-sm text-muted transition hover:border-accent hover:text-foreground"
-            title="Set to the current time in the selected market"
-          >
-            Now
-          </button>
           <button
             onClick={setToLocalNow}
             className="rounded-lg border border-border2 px-3 py-2 text-sm text-muted transition hover:border-accent hover:text-foreground"
