@@ -49,6 +49,7 @@ type AnalysisRow = {
 
 // Chart-analysis screenshots live in the entry-models bucket (see 0005).
 const ANALYSIS_BUCKET = "entry-models";
+const uid = () => Math.random().toString(36).slice(2, 10);
 
 const SLASH_COMMANDS: { cmd: AttachKind; desc: string }[] = [
   { cmd: "note", desc: "attach a notebook note" },
@@ -174,25 +175,57 @@ export default function SidekickChat({
       // migration 0011).
       setConvos((cur) => cur.map((x) => (x.id === id && x.unread ? { ...x, unread: false } : x)));
       supabase.from("ai_conversations").update({ unread: false }).eq("id", id).then(() => {});
-      const { data, error } = await supabase
+      // Prefer the full select (with image_path); fall back to the pre-0012
+      // column set if that column isn't there yet.
+      type Row = {
+        role: "user" | "model";
+        content: string;
+        strategy_name: string | null;
+        has_image: boolean;
+        image_path?: string | null;
+      };
+      let rows: Row[] = [];
+      const full = await supabase
         .from("ai_messages")
-        .select("role, content, strategy_name, has_image")
+        .select("role, content, strategy_name, has_image, image_path")
         .eq("conversation_id", id)
         .order("created_at", { ascending: true });
-      if (error) console.warn("[sidekick] load messages failed:", error.message);
+      if (!full.error) {
+        rows = (full.data as Row[]) ?? [];
+      } else {
+        const basic = await supabase
+          .from("ai_messages")
+          .select("role, content, strategy_name, has_image")
+          .eq("conversation_id", id)
+          .order("created_at", { ascending: true });
+        if (basic.error) console.warn("[sidekick] load messages failed:", basic.error.message);
+        rows = (basic.data as Row[]) ?? [];
+      }
+      // Sign the stored screenshots so they render inline again.
+      const urlMap: Record<string, string> = {};
+      const paths = rows.map((r) => r.image_path).filter((p): p is string => !!p);
+      if (paths.length) {
+        const signed = await Promise.all(
+          paths.map((p) => supabase.storage.from(ANALYSIS_BUCKET).createSignedUrl(p, 3600))
+        );
+        paths.forEach((p, i) => {
+          const url = signed[i].data?.signedUrl;
+          if (url) urlMap[p] = url;
+        });
+      }
       setMessages(
-        ((data as { role: "user" | "model"; content: string; strategy_name: string | null; has_image: boolean }[]) ?? []).map(
-          (m) => {
-            const attMatch = m.content.match(ATT_PREFIX);
-            return {
-              role: m.role,
-              text: attMatch ? m.content.slice(attMatch[0].length) : m.content,
-              ...(attMatch ? { att: { kind: attMatch[1] as AttachKind, title: attMatch[2] } } : {}),
-              hadImage: m.has_image,
-              strategyName: m.strategy_name ?? undefined,
-            };
-          }
-        )
+        rows.map((m) => {
+          const attMatch = m.content.match(ATT_PREFIX);
+          const url = m.image_path ? urlMap[m.image_path] : undefined;
+          return {
+            role: m.role,
+            text: attMatch ? m.content.slice(attMatch[0].length) : m.content,
+            ...(attMatch ? { att: { kind: attMatch[1] as AttachKind, title: attMatch[2] } } : {}),
+            hadImage: m.has_image,
+            ...(url ? { imageUrl: url } : {}),
+            strategyName: m.strategy_name ?? undefined,
+          };
+        })
       );
     },
     [supabase]
@@ -525,7 +558,28 @@ export default function SidekickChat({
       console.warn("[sidekick] no conversation id, message not saved:", m.role);
       return;
     }
-    const { error } = await supabase.from("ai_messages").insert({
+    // Persist the chart screenshot to storage so it survives a reload (before
+    // migration 0012 the image_path column is absent; the insert falls back).
+    let imagePath: string | null = null;
+    if (m.image) {
+      try {
+        const bytes = Uint8Array.from(atob(m.image.data), (ch) => ch.charCodeAt(0));
+        const blob = new Blob([bytes], { type: m.image.mimeType });
+        const { data: u } = await supabase.auth.getUser();
+        if (u.user) {
+          const ext = m.image.mimeType.includes("png") ? "png" : "jpg";
+          const path = `${u.user.id}/sidekick/${uid()}.${ext}`;
+          const { error: upErr } = await supabase.storage
+            .from(ANALYSIS_BUCKET)
+            .upload(path, blob, { contentType: m.image.mimeType });
+          if (upErr) console.warn("[sidekick] screenshot upload failed:", upErr.message);
+          else imagePath = path;
+        }
+      } catch (e) {
+        console.warn("[sidekick] screenshot encode/upload failed:", e);
+      }
+    }
+    const base = {
       conversation_id: conversationId,
       role: m.role,
       // Attachment kind+title ride inside content as a parseable prefix
@@ -533,7 +587,14 @@ export default function SidekickChat({
       content: m.att ? `[${m.att.kind}: ${m.att.title}] ${m.text}` : m.text,
       strategy_name: m.strategyName ?? null,
       has_image: !!(m.image || m.hadImage),
-    });
+    };
+    let { error } = await supabase
+      .from("ai_messages")
+      .insert((imagePath ? { ...base, image_path: imagePath } : base) as typeof base);
+    // Column missing (migration 0012 not applied): retry without it.
+    if (error && imagePath && /image_path|column/i.test(error.message)) {
+      ({ error } = await supabase.from("ai_messages").insert(base));
+    }
     if (error) console.warn(`[sidekick] save ${m.role} message failed:`, error.message);
     await supabase
       .from("ai_conversations")
