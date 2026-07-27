@@ -127,6 +127,8 @@ export default function SidekickChat({
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmBulk, setConfirmBulk] = useState(false);
+  // Anchor row for shift-click range selection.
+  const lastIndexRef = useRef<number | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [attach, setAttach] = useState<{ mimeType: string; data: string; previewUrl: string } | null>(null);
@@ -242,14 +244,32 @@ export default function SidekickChat({
       });
   }
 
-  function toggleSelect(id: string) {
+  function toggleSelect(id: string, idx: number, shift: boolean) {
+    setConfirmBulk(false);
+    // Shift-click extends selection from the last-clicked row to this one.
+    if (shift && lastIndexRef.current != null) {
+      const lo = Math.min(lastIndexRef.current, idx);
+      const hi = Math.max(lastIndexRef.current, idx);
+      const rangeIds = visibleConvos.slice(lo, hi + 1).map((c) => c.id);
+      setSelected((s) => {
+        const n = new Set(s);
+        rangeIds.forEach((r) => n.add(r));
+        return n;
+      });
+      return;
+    }
+    lastIndexRef.current = idx;
     setSelected((s) => {
       const n = new Set(s);
       if (n.has(id)) n.delete(id);
       else n.add(id);
       return n;
     });
+  }
+  const allSelected = visibleConvos.length > 0 && visibleConvos.every((c) => selected.has(c.id));
+  function toggleSelectAll() {
     setConfirmBulk(false);
+    setSelected(allSelected ? new Set() : new Set(visibleConvos.map((c) => c.id)));
   }
   function exitSelect() {
     setSelectMode(false);
@@ -687,36 +707,60 @@ export default function SidekickChat({
             New chat
           </button>
           {selectMode ? (
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={bulkArchive}
-                disabled={selected.size === 0}
-                className="flex-1 rounded-lg border border-border2 px-2 py-1.5 text-xs font-medium text-muted transition hover:border-accent hover:text-foreground disabled:opacity-40"
-              >
-                {showArchived ? "Unarchive" : "Archive"}
-                {selected.size ? ` (${selected.size})` : ""}
-              </button>
-              <button
-                onClick={bulkDelete}
-                disabled={selected.size === 0}
-                className="flex-1 rounded-lg border border-border2 px-2 py-1.5 text-xs font-medium text-muted transition hover:border-danger hover:text-danger disabled:opacity-40"
-              >
-                {confirmBulk ? "Sure?" : "Delete"}
-                {selected.size ? ` (${selected.size})` : ""}
-              </button>
-              <button
-                onClick={exitSelect}
-                className="rounded-lg px-2 py-1.5 text-xs text-dim transition hover:text-foreground"
-              >
-                Cancel
-              </button>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between px-0.5 text-xs">
+                <button
+                  onClick={toggleSelectAll}
+                  title="Tip: shift-click a chat to select a range"
+                  className="flex items-center gap-1.5 text-muted transition hover:text-foreground"
+                >
+                  <span
+                    className={`flex h-4 w-4 items-center justify-center rounded border transition ${
+                      allSelected ? "border-accent bg-accent text-white" : "border-border2"
+                    }`}
+                  >
+                    {allSelected && (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    )}
+                  </span>
+                  {allSelected ? "Clear all" : "Select all"}
+                </button>
+                <span className="text-dim">{selected.size} selected</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={bulkArchive}
+                  disabled={selected.size === 0}
+                  className="flex-1 rounded-lg border border-border2 px-2 py-1.5 text-xs font-medium text-muted transition hover:border-accent hover:text-foreground disabled:opacity-40"
+                >
+                  {showArchived ? "Unarchive" : "Archive"}
+                </button>
+                <button
+                  onClick={bulkDelete}
+                  disabled={selected.size === 0}
+                  className="flex-1 rounded-lg border border-border2 px-2 py-1.5 text-xs font-medium text-muted transition hover:border-danger hover:text-danger disabled:opacity-40"
+                >
+                  {confirmBulk ? "Sure?" : "Delete"}
+                </button>
+                <button
+                  onClick={exitSelect}
+                  className="rounded-lg px-2 py-1.5 text-xs text-dim transition hover:text-foreground"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           ) : (
             convos.length > 0 && (
               <button
                 onClick={() => setSelectMode(true)}
-                className="w-full text-right text-xs text-dim transition hover:text-accent2"
+                className="flex items-center gap-1.5 text-xs text-dim transition hover:text-accent2"
               >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 11l3 3 8-8M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9" />
+                </svg>
                 Select
               </button>
             )
@@ -735,7 +779,7 @@ export default function SidekickChat({
             >
               {selectMode ? (
                 <button
-                  onClick={() => toggleSelect(c.id)}
+                  onClick={(e) => toggleSelect(c.id, idx, e.shiftKey)}
                   className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left text-[13px]"
                 >
                   <span
