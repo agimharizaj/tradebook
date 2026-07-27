@@ -166,6 +166,7 @@ const PAGE_NOTES: [string, string][] = [
   ["/charts", "the Charts page: a live TradingView chart of a pair from their watchlist, with a log of their saved chart analyses"],
   ["/risk", "the Risk calculator: position sizing (account size and risk in, lot size out) with live prices"],
   ["/news", "the News page: market headlines and the economic calendar (recent headlines are in the snapshot below)"],
+  ["/sessions", "the Sessions page: live market clocks for Sydney, Tokyo, London and New York with open/closed status, and a converter between those market times"],
   ["/notebook", "the Notebook: their free-form trading notes (recent notes are in the snapshot below)"],
   ["/strategy", "the Strategy page: their playbooks with charting process, entry/exit criteria, management rules and risk controls (all in the snapshot below)"],
   ["/sanctuary", "the Sanctuary: a box-breathing and trading-psychology page"],

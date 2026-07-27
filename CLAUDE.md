@@ -72,7 +72,7 @@ The approved look is the dark "terminal" concept in `design/tradebook-brand-conc
 3. Journal — monthly calendar with per-day trade summaries you can open, plus weekly and monthly breakdowns.
 4. Risk calculator — DONE.
 
-Done beyond the core four: PWA (installable, manifest + icons), responsive mobile layout with bottom tab nav, Charts (TradingView embed with drawing tools) at `/charts`, Notebook (notes CRUD, autosave) at `/notebook` (table in `0003_notes.sql`), News (TradingView market-news timeline + economic calendar) at `/news`, Sanctuary (box-breathing + psychology prompts) at `/sanctuary`. Profile moved to the sidebar footer.
+Done beyond the core four: PWA (installable, manifest + icons), responsive mobile layout with bottom tab nav, Charts (TradingView embed with drawing tools) at `/charts`, Notebook (notes CRUD, autosave) at `/notebook` (table in `0003_notes.sql`), News (TradingView market-news timeline + economic calendar) at `/news`, Sessions (live Sydney/Tokyo/London/New York market clocks with open-closed status + cross-market time converter, pure client-side Intl, no libs; session hours are indicative constants in `src/components/sessions/MarketClocks.tsx`) at `/sessions`, Sanctuary (box-breathing + psychology prompts) at `/sanctuary`. Profile moved to the sidebar footer.
 
 Done beyond that: Sidekick, the AI assistant, at `/sidekick` (see Current status).
 
