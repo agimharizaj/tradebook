@@ -855,7 +855,9 @@ export default function StrategyWorkspace() {
                 <div className="col-span-2">
                   <WindowPicker value={draft.window} on={(v) => patch({ window: v })} />
                 </div>
-                <div className="col-span-2">
+                {/* col-start-2 keeps it directly under Trading window 1 on
+                    the 3-column layout */}
+                <div className="col-span-2 sm:col-start-2">
                   <WindowPicker
                     label="Trading window 2 (optional)"
                     value={draft.window2}
@@ -1097,8 +1099,9 @@ function WindowPicker({
           className="field !w-auto min-w-0"
           aria-label="Timezone"
         >
-          {TZS.map((z) => (<option key={z} value={z}>{z}</option>))}
-          {!TZS.includes(tz) && <option value={tz}>{tz}</option>}
+          {/* Values stay IANA ids; labels drop the underscores (New_York). */}
+          {TZS.map((z) => (<option key={z} value={z}>{z.replace(/_/g, " ")}</option>))}
+          {!TZS.includes(tz) && <option value={tz}>{tz.replace(/_/g, " ")}</option>}
         </select>
       </div>
     </label>
@@ -1125,8 +1128,9 @@ function StrategyView({
     ["Max daily loss", draft.maxLoss],
     ["Max daily profit", draft.maxProfit],
     ["Risk per trade %", draft.riskPct],
-    ["Trading window", draft.window],
-    ["Trading window 2", draft.window2],
+    // Underscores are IANA timezone ids (America/New_York); display without.
+    ["Trading window", draft.window.replace(/_/g, " ")],
+    ["Trading window 2", draft.window2.replace(/_/g, " ")],
   ].filter(([, v]) => v && v.toString().trim());
 
   return (
