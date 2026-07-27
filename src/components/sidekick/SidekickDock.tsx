@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import SidekickChat from "@/components/sidekick/SidekickChat";
@@ -10,10 +10,87 @@ type Strategy = { id: string; name: string };
 // Floating Sidekick: available on every app page except /sidekick itself.
 // The chat component is only mounted after the first open, so pages don't
 // pay for it until it's used.
+const POS_KEY = "sk-dock-pos";
+const BTN = 48; // launcher size (h-12 w-12)
+const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
+
 export default function SidekickDock() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [strategies, setStrategies] = useState<Strategy[] | null>(null);
+  // Draggable launcher: null = default corner position (Tailwind classes);
+  // set once the user drags it, anchored right/bottom and persisted.
+  const [pos, setPos] = useState<{ right: number; bottom: number } | null>(null);
+  const dragRef = useRef<{ startX: number; startY: number; right: number; bottom: number; moved: boolean } | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(POS_KEY);
+      if (raw) setPos(JSON.parse(raw));
+    } catch {
+      // Corrupt value: fall back to the default corner.
+    }
+  }, []);
+
+  // Keep a custom position inside the viewport when the window resizes.
+  useEffect(() => {
+    const onResize = () =>
+      setPos((p) =>
+        p
+          ? {
+              right: clamp(p.right, 8, window.innerWidth - BTN - 8),
+              bottom: clamp(p.bottom, 8, window.innerHeight - BTN - 8),
+            }
+          : p
+      );
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  function onLauncherDown(e: React.PointerEvent<HTMLButtonElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      right: window.innerWidth - rect.right,
+      bottom: window.innerHeight - rect.bottom,
+      moved: false,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function onLauncherMove(e: React.PointerEvent<HTMLButtonElement>) {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+    // Below ~6px it's a tap, not a drag.
+    if (!d.moved && Math.hypot(dx, dy) < 6) return;
+    d.moved = true;
+    setPos({
+      right: clamp(d.right - dx, 8, window.innerWidth - BTN - 8),
+      bottom: clamp(d.bottom - dy, 8, window.innerHeight - BTN - 8),
+    });
+  }
+
+  function onLauncherUp() {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (d?.moved) {
+      setPos((p) => {
+        if (p) {
+          try {
+            localStorage.setItem(POS_KEY, JSON.stringify(p));
+          } catch {
+            // Storage full/blocked: position just won't persist.
+          }
+        }
+        return p;
+      });
+    } else {
+      setOpen(true);
+    }
+  }
 
   useEffect(() => {
     if (!open || strategies !== null) return;
@@ -57,10 +134,13 @@ export default function SidekickDock() {
     <>
       {!open && (
         <button
-          onClick={() => setOpen(true)}
-          title="Ask Sidekick"
+          onPointerDown={onLauncherDown}
+          onPointerMove={onLauncherMove}
+          onPointerUp={onLauncherUp}
+          title="Ask Sidekick (drag to move)"
           aria-label="Ask Sidekick"
-          className="sk-dock-launcher fixed bottom-24 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-white shadow-[0_8px_24px_rgba(106,88,240,0.45)] transition hover:brightness-110 md:bottom-10 md:right-6"
+          style={pos ? { right: pos.right, bottom: pos.bottom } : undefined}
+          className="sk-dock-launcher fixed bottom-24 right-4 z-40 flex h-12 w-12 cursor-grab touch-none items-center justify-center rounded-2xl bg-accent text-white shadow-[0_8px_24px_rgba(106,88,240,0.45)] hover:brightness-110 active:cursor-grabbing md:bottom-10 md:right-6"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" />

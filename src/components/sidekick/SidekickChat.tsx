@@ -43,8 +43,12 @@ type AnalysisRow = {
   timeframe: string | null;
   direction: string | null;
   notes: string | null;
+  image_path: string | null;
   created_at: string;
 };
+
+// Chart-analysis screenshots live in the entry-models bucket (see 0005).
+const ANALYSIS_BUCKET = "entry-models";
 
 const SLASH_COMMANDS: { cmd: AttachKind; desc: string }[] = [
   { cmd: "note", desc: "attach a notebook note" },
@@ -78,7 +82,8 @@ const SUGGESTIONS = [
 const ATT_PREFIX = /^\[(note|strategy|analysis): (.*?)\] /;
 
 // Downscale to keep the request small and inside Gemini's inline-data limits.
-async function fileToImage(file: File): Promise<{ mimeType: string; data: string; previewUrl: string }> {
+// Takes any Blob: uploaded files and screenshots downloaded from storage.
+async function fileToImage(file: Blob): Promise<{ mimeType: string; data: string; previewUrl: string }> {
   const bitmap = await createImageBitmap(file);
   const MAX = 1568;
   const scale = Math.min(1, MAX / Math.max(bitmap.width, bitmap.height));
@@ -287,7 +292,7 @@ export default function SidekickChat({
       (async () => {
         const { data } = await supabase
           .from("chart_analyses")
-          .select("id, symbol, timeframe, direction, notes, created_at")
+          .select("id, symbol, timeframe, direction, notes, image_path, created_at")
           .order("created_at", { ascending: false })
           .limit(50);
         setAnalysesList((data as AnalysisRow[]) ?? []);
@@ -337,6 +342,17 @@ export default function SidekickChat({
     if (exactCmd === "analysis") {
       const a = analysesList?.find((x) => x.id === opt.id);
       finishPick("analysis", opt.title, (a?.notes ?? "").trim() || "(no text, screenshot-only entry)");
+      // Attach the saved screenshot too, so Sidekick can actually see the
+      // chart, not just the written notes. Falls back to text-only if the
+      // image can't be loaded.
+      if (a?.image_path) {
+        try {
+          const { data } = await supabase.storage.from(ANALYSIS_BUCKET).download(a.image_path);
+          if (data) setAttach(await fileToImage(data));
+        } catch (e) {
+          console.warn("[sidekick] analysis screenshot load failed:", e);
+        }
+      }
       return;
     }
     // Strategy: pull its written rules so the conversation can quote them.
@@ -459,7 +475,9 @@ export default function SidekickChat({
       role: "user",
       text:
         text ||
-        (attach ? "Check this setup against my rules." : `Thoughts on this ${ctxAttach?.kind ?? "attachment"}?`),
+        (ctxAttach
+          ? `Thoughts on this ${ctxAttach.kind}?`
+          : "Check this setup against my rules."),
       ...(ctxAttach ? { att: { ...ctxAttach } } : {}),
       ...(attach
         ? {
@@ -876,7 +894,8 @@ export default function SidekickChat({
                 <span className="text-xs text-dim">
                   {ctxAttach.kind === "note" && "Note text goes to Sidekick with your message."}
                   {ctxAttach.kind === "strategy" && "The strategy's written rules go with your message."}
-                  {ctxAttach.kind === "analysis" && "The analysis text goes with your message."}
+                  {ctxAttach.kind === "analysis" &&
+                    (attach ? "The analysis text and its screenshot go with your message." : "The analysis text goes with your message.")}
                 </span>
               </div>
             )}
