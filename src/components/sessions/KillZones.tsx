@@ -117,13 +117,14 @@ export default function KillZones() {
     const barPct = agg ? (Math.abs(b.net) / agg.maxAbs) * 100 : 0;
     const pos = b.net >= 0;
     return (
-      <div key={name} className="flex items-center gap-3 py-2.5">
-        <div className="w-24 shrink-0">
-          <div className={`text-sm ${muted ? "text-dim" : "text-foreground"}`}>{name}</div>
+      <div key={name} className="flex items-center gap-2 py-2.5 sm:gap-3">
+        <div className="w-20 shrink-0 sm:w-24">
+          <div className={`truncate text-sm ${muted ? "text-dim" : "text-foreground"}`}>{name}</div>
           <div className="font-mono text-[10px] text-dim">{ny}</div>
         </div>
-        {/* Diverging bar: net PnL magnitude, coloured by sign, from the centre */}
-        <div className="relative h-5 min-w-0 flex-1">
+        {/* Diverging bar: net PnL magnitude, coloured by sign, from the centre.
+            Hidden on mobile where the row is too narrow for it plus the numbers. */}
+        <div className="relative hidden h-5 min-w-0 flex-1 sm:block">
           <div className="absolute inset-y-0 left-1/2 w-px bg-border2" />
           {b.count > 0 && (
             <div
@@ -136,15 +137,15 @@ export default function KillZones() {
             />
           )}
         </div>
-        <div className="w-14 shrink-0 text-right font-mono text-xs text-muted">
+        <div className="w-11 shrink-0 text-right font-mono text-[11px] text-muted sm:w-14 sm:text-xs">
           {b.count > 0 ? `${b.count}` : "-"}
           <span className="text-dim"> tr</span>
         </div>
-        <div className="w-12 shrink-0 text-right font-mono text-xs text-muted">
+        <div className="w-9 shrink-0 text-right font-mono text-[11px] text-muted sm:w-12 sm:text-xs">
           {winRate == null ? "-" : `${winRate}%`}
         </div>
         <div
-          className={`w-20 shrink-0 text-right font-mono text-sm ${
+          className={`min-w-0 flex-1 text-right font-mono text-xs sm:w-20 sm:flex-none sm:text-sm ${
             b.count === 0 ? "text-dim" : pos ? "text-success" : "text-danger"
           }`}
         >
@@ -155,7 +156,7 @@ export default function KillZones() {
   };
 
   return (
-    <div className="rounded-2xl bg-card p-5 ring-1 ring-border">
+    <div className="rounded-2xl bg-card p-4 ring-1 ring-border sm:p-5">
       <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3">
         <span className="text-xs font-medium uppercase tracking-wide text-muted">Kill zones</span>
         <span className="text-xs text-dim">Your trades by ICT kill zone (New York time)</span>
@@ -201,12 +202,12 @@ export default function KillZones() {
         <p className="mt-4 text-sm text-muted">No trades in this range.</p>
       ) : (
         <>
-          <div className="mt-3 flex items-center gap-3 border-b border-border pb-1.5 text-[10px] font-medium uppercase tracking-wide text-dim">
-            <span className="w-24 shrink-0">Zone</span>
-            <span className="min-w-0 flex-1 text-center">Net PnL</span>
-            <span className="w-14 shrink-0 text-right">Trades</span>
-            <span className="w-12 shrink-0 text-right">Win</span>
-            <span className="w-20 shrink-0 text-right">PnL</span>
+          <div className="mt-3 flex items-center gap-2 border-b border-border pb-1.5 text-[10px] font-medium uppercase tracking-wide text-dim sm:gap-3">
+            <span className="w-20 shrink-0 sm:w-24">Zone</span>
+            <span className="hidden min-w-0 flex-1 text-center sm:block">Net PnL</span>
+            <span className="w-11 shrink-0 text-right sm:w-14">Trades</span>
+            <span className="w-9 shrink-0 text-right sm:w-12">Win</span>
+            <span className="min-w-0 flex-1 text-right sm:w-20 sm:flex-none">PnL</span>
           </div>
           <div className="divide-y divide-border">
             {ZONES.map((z) => row(z.name, z.ny, agg.buckets[z.key]))}
