@@ -63,6 +63,9 @@ export default function NotebookWorkspace() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const dirty = useRef(false);
+  // Content as it was when edit mode was entered, so "Cancel edits" can revert
+  // the autosaved changes back to that state.
+  const editSnapshot = useRef<{ title: string; content: string; pair?: string | null } | null>(null);
 
   // The floating Edit/Done pill shares the bottom-right corner with the
   // Sidekick launcher. Flag the body while a note is open so the launcher
@@ -230,6 +233,37 @@ export default function NotebookWorkspace() {
   function edit(patch: Partial<Note>) {
     dirty.current = true;
     setNote((n) => (n ? { ...n, ...patch } : n));
+  }
+
+  // Snapshot the note when edit mode opens (once), clear it back in view mode.
+  useEffect(() => {
+    if (note && noteMode === "edit") {
+      if (!editSnapshot.current) {
+        editSnapshot.current = { title: note.title, content: note.content, pair: note.pair };
+      }
+    } else {
+      editSnapshot.current = null;
+    }
+  }, [note, noteMode]);
+
+  // Discard edits made in this session: restore the snapshot, persist the
+  // revert (autosave may already have written interim changes), leave edit mode.
+  async function cancelEdits() {
+    const snap = editSnapshot.current;
+    if (note && snap) {
+      dirty.current = false;
+      setNote({ ...note, ...snap });
+      const patch: { title: string; content: string; pair?: string | null } = {
+        title: snap.title || "Untitled",
+        content: snap.content,
+      };
+      if (snap.pair !== undefined) patch.pair = snap.pair || null;
+      await supabase.from("notes").update(patch).eq("id", note.id);
+      setStatus("Reverted");
+      setList((ls) => ls.map((n) => (n.id === note.id ? { ...n, title: snap.title || "Untitled" } : n)));
+    }
+    editSnapshot.current = null;
+    setNoteMode("view");
   }
 
   useEffect(() => {
@@ -462,6 +496,15 @@ export default function NotebookWorkspace() {
               >
                 {noteMode === "edit" ? "Done" : "Edit"}
               </button>
+              {noteMode === "edit" && (
+                <button
+                  onClick={cancelEdits}
+                  title="Discard changes made since you opened the editor"
+                  className="rounded-lg border border-border2 px-2.5 py-2 text-sm text-muted transition hover:border-danger hover:text-danger"
+                >
+                  Cancel edits
+                </button>
+              )}
               <button onClick={togglePin} title="Pin" className={`rounded-lg border px-2.5 py-2 text-sm ${note.pinned ? "border-accent text-accent2" : "border-border2 text-muted"}`}>
                 {note.pinned ? "Pinned" : "Pin"}
               </button>

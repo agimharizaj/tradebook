@@ -100,6 +100,25 @@ export default function MarketClocks() {
   const [convTime, setConvTime] = useState("08:00");
   const [convFrom, setConvFrom] = useState("Europe/London");
 
+  // The device's own zone as an extra source, unless it already matches a
+  // market (a London user just uses London).
+  const localTz =
+    typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
+  const localIsMarket = MARKETS.some((m) => m.tz === localTz);
+
+  // Fill the input with the current wall-clock time in the selected source.
+  function setToNow() {
+    const p = zoneParts(new Date(), convFrom);
+    setConvTime(`${two(p.h)}:${two(p.mi)}`);
+  }
+
+  // Switch the source to the device's own zone and fill in local time now.
+  function setToLocalNow() {
+    const p = zoneParts(new Date(), localTz);
+    setConvFrom(localTz);
+    setConvTime(`${two(p.h)}:${two(p.mi)}`);
+  }
+
   const converted = useMemo(() => {
     if (!now) return null;
     const m = convTime.match(/^(\d{1,2}):(\d{2})$/);
@@ -218,7 +237,24 @@ export default function MarketClocks() {
                 {m.name}
               </option>
             ))}
+            {!localIsMarket && (
+              <option value={localTz}>Local ({localTz.split("/").pop()?.replace(/_/g, " ")})</option>
+            )}
           </select>
+          <button
+            onClick={setToNow}
+            className="rounded-lg border border-border2 px-3 py-2 text-sm text-muted transition hover:border-accent hover:text-foreground"
+            title="Set to the current time in the selected market"
+          >
+            Now
+          </button>
+          <button
+            onClick={setToLocalNow}
+            className="rounded-lg border border-border2 px-3 py-2 text-sm text-muted transition hover:border-accent hover:text-foreground"
+            title="Switch the source to your device's timezone and fill in your local time now"
+          >
+            My local time
+          </button>
         </div>
         {converted && (
           <div className="mt-4 divide-y divide-border">
