@@ -798,24 +798,6 @@ export default function SidekickChat({
         {/* thread */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6 md:px-6">
-            <div className="flex gap-3">
-              <Avatar />
-              <div className="min-w-0">
-                <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-dim">Sidekick · AI</div>
-                <div className="rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed">
-                <p>
-                  I read your journal, strategies, notes and stats before every answer, and
-                  I know which page you&apos;re on. Ask for a chart read, advice on a setup,
-                  what the news means, or where you&apos;re leaking money.
-                </p>
-                <p className="mt-2 text-[13px] text-muted">
-                  Attach a chart screenshot for analysis, or type <span className="font-mono text-accent2">/</span> to
-                  attach a note, strategy or chart analysis to the conversation.
-                </p>
-                </div>
-              </div>
-            </div>
-
             {messages.map((m, i) =>
               m.role === "user" ? (
                 <div key={i} className="sk-in flex flex-row-reverse gap-3">
@@ -866,16 +848,27 @@ export default function SidekickChat({
             )}
 
             {messages.length === 0 && (
-              <div className="ml-10 flex flex-wrap gap-2">
-                {SUGGESTIONS.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => send(s)}
-                    className="rounded-full border border-border2 bg-card px-3.5 py-1.5 text-[13px] text-muted transition hover:border-accent/50 hover:bg-accent-soft hover:text-accent2"
-                  >
-                    {s}
-                  </button>
-                ))}
+              <div className="flex flex-col items-center gap-4 py-10 text-center">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent shadow-[0_4px_14px_rgba(106,88,240,0.35)]">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3zM18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="font-display text-lg font-semibold">How can I help?</div>
+                  <div className="mt-1 text-sm text-muted">I read your journal, strategies, notes and stats before every answer.</div>
+                </div>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {SUGGESTIONS.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => send(s)}
+                      className="rounded-full border border-border2 bg-card px-3.5 py-1.5 text-[13px] text-muted transition hover:border-accent/50 hover:bg-accent-soft hover:text-accent2"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
