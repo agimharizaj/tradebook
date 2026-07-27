@@ -649,7 +649,7 @@ export default function SidekickChat({
           <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-dim">Archived</div>
         )}
         <div className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-3">
-          {visibleConvos.map((c) => (
+          {visibleConvos.map((c, idx) => (
             <div
               key={c.id}
               className={`group relative flex items-center gap-1 rounded-lg px-1 transition ${
@@ -712,7 +712,11 @@ export default function SidekickChat({
                     }}
                     aria-hidden="true"
                   />
-                  <div className="absolute right-0 top-full z-30 w-48 overflow-hidden rounded-xl border border-border2 bg-card py-1 shadow-2xl">
+                  <div
+                    className={`absolute right-0 z-30 w-48 overflow-hidden rounded-xl border border-border2 bg-card py-1 shadow-2xl ${
+                      idx >= visibleConvos.length - 2 ? "bottom-full mb-1" : "top-full"
+                    }`}
+                  >
                     <MenuItem
                       k="P"
                       label={c.pinned ? "Unpin" : "Pin"}
