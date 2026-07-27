@@ -151,7 +151,7 @@ export default function SidekickDock() {
       {open && (
         <>
           <div className="fixed inset-0 z-40 bg-black/40" onClick={close} aria-hidden="true" />
-          <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-bg2 shadow-2xl">
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-bg2 pt-[env(safe-area-inset-top)] shadow-2xl">
             <div className="flex h-12 shrink-0 items-center justify-between border-b border-border pl-2 pr-2 md:pl-4">
               {/* Mobile: a proper back control with a generous touch target,
                   so leaving the drawer doesn't mean hunting for a small X. */}
