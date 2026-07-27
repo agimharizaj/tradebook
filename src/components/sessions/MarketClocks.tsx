@@ -113,6 +113,15 @@ export default function MarketClocks() {
     setConvTime(`${two(p.h)}:${two(p.mi)}`);
   }
 
+  // Overlap-timeline scrubber: the cursor position as a 0-100 percentage of
+  // the local day, or null when the pointer is away.
+  const [hoverPct, setHoverPct] = useState<number | null>(null);
+  function onScrub(e: React.PointerEvent<HTMLDivElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    setHoverPct(Math.min(Math.max(x, 0), 100));
+  }
+
   // Overlap timeline: a 24h axis across the user's local day (midnight to
   // midnight). Each session is drawn where it is open in local time, and the
   // stretches where two or more sessions are open at once are shaded - those
@@ -298,20 +307,28 @@ export default function MarketClocks() {
 
               {/* Rows + shared overlay for bands and the now line */}
               <div className="relative">
-                {MARKETS.map((m, idx) => (
-                  <div key={m.name} className="flex items-center py-1.5">
-                    <span className="w-16 shrink-0 pr-2 text-xs text-muted">{m.name}</span>
-                    <div className="relative h-6 flex-1 overflow-hidden rounded-md bg-surface2/50">
-                      {timeline.segsByMarket[idx].map((s, k) => (
-                        <div
-                          key={k}
-                          className="absolute inset-y-0 rounded-md bg-accent"
-                          style={{ left: `${s.x0}%`, width: `${Math.max(s.x1 - s.x0, 0.5)}%` }}
-                        />
-                      ))}
+                {MARKETS.map((m, idx) => {
+                  const rowOpen =
+                    hoverPct !== null &&
+                    timeline.segsByMarket[idx].some((s) => hoverPct >= s.x0 && hoverPct < s.x1);
+                  return (
+                    <div key={m.name} className="flex items-center py-1.5">
+                      <span className={`w-16 shrink-0 pr-2 text-xs transition-colors ${rowOpen ? "text-accent2" : "text-muted"}`}>{m.name}</span>
+                      <div className="relative h-6 flex-1 overflow-hidden rounded-md bg-surface2/50">
+                        {timeline.segsByMarket[idx].map((s, k) => {
+                          const hit = hoverPct !== null && hoverPct >= s.x0 && hoverPct < s.x1;
+                          return (
+                            <div
+                              key={k}
+                              className={`absolute inset-y-0 rounded-md transition-opacity ${hit || hoverPct === null ? "bg-accent opacity-100" : "bg-accent opacity-55"}`}
+                              style={{ left: `${s.x0}%`, width: `${Math.max(s.x1 - s.x0, 0.5)}%` }}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {/* Overlay spans the track area only (left-16 clears labels) */}
                 <div className="pointer-events-none absolute inset-y-0 left-16 right-0">
@@ -333,6 +350,53 @@ export default function MarketClocks() {
                     </div>
                   )}
                 </div>
+
+                {/* Interaction layer: scrub the day to read the exact time and
+                    which sessions are open there. Sits above the bars. */}
+                <div
+                  className="absolute inset-y-0 left-16 right-0 z-10"
+                  style={{ touchAction: "none" }}
+                  onPointerMove={onScrub}
+                  onPointerDown={onScrub}
+                  onPointerLeave={() => setHoverPct(null)}
+                >
+                  {hoverPct !== null &&
+                    (() => {
+                      const hp = hoverPct;
+                      if (hp === null) return null;
+                      const mins = Math.round((hp / 100) * 1440) % 1440;
+                      const timeStr = `${two(Math.floor(mins / 60))}:${two(mins % 60)}`;
+                      const openMk = MARKETS.filter((_, idx) =>
+                        timeline.segsByMarket[idx].some((s) => hp >= s.x0 && hp < s.x1)
+                      );
+                      return (
+                        <>
+                          <div
+                            className="pointer-events-none absolute inset-y-0 w-px bg-foreground"
+                            style={{ left: `${hp}%` }}
+                          />
+                          <div
+                            className="pointer-events-none absolute bottom-full z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-border2 bg-card px-2.5 py-1.5 shadow-xl"
+                            style={{ left: `${Math.min(Math.max(hp, 14), 86)}%` }}
+                          >
+                            <div className="font-mono text-sm text-foreground">{timeStr}</div>
+                            {openMk.length ? (
+                              <div className="mt-0.5 flex items-center gap-1.5 text-xs">
+                                <span className={openMk.length >= 2 ? "text-success" : "text-muted"}>
+                                  {openMk.map((m) => m.name).join(" · ")}
+                                </span>
+                                {openMk.length >= 2 && (
+                                  <span className="rounded bg-success/15 px-1 text-[10px] text-success">overlap</span>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="mt-0.5 text-xs text-dim">No session open</div>
+                            )}
+                          </div>
+                        </>
+                      );
+                    })()}
+                </div>
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-dim">
@@ -342,6 +406,7 @@ export default function MarketClocks() {
                 <span className="flex items-center gap-1.5">
                   <span className="h-2 w-3 rounded-sm border border-success/40 bg-success/15" /> Overlap (deep liquidity)
                 </span>
+                <span className="text-dim">Hover or drag across to read any time</span>
               </div>
             </div>
           ) : (
