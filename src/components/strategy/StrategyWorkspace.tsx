@@ -101,6 +101,9 @@ export default function StrategyWorkspace() {
   // Unsaved-edit guard: clicking another plan (or +New) with unsaved changes
   // prompts to save or discard instead of silently dropping the draft.
   const dirtyEdit = useRef(false);
+  // Reactive mirror of dirtyEdit for the UI: the floating Cancel only appears
+  // once the user has actually changed something in this edit session.
+  const [hasEdits, setHasEdits] = useState(false);
   const [pendingNav, setPendingNav] = useState<{ kind: "open"; id: string } | { kind: "new" } | { kind: "close" } | null>(null);
 
   // The floating Edit/Save pill shares the bottom-right corner with the
@@ -260,14 +263,20 @@ export default function StrategyWorkspace() {
     setMode("edit");
   }
 
+  // Entering/leaving edit mode (or switching plans) starts a fresh session
+  // with no edits yet, so the Cancel button hides until the first change.
+  useEffect(() => {
+    if (mode !== "edit") setHasEdits(false);
+  }, [mode]);
+
   function patch(p: Partial<Draft>) {
-    if (mode === "edit") dirtyEdit.current = true;
+    if (mode === "edit") { dirtyEdit.current = true; setHasEdits(true); }
     setDraft((d) => (d ? { ...d, ...p } : d));
   }
 
   type Sec = "charting" | "entry" | "rules" | "exit";
   function updateSec(sec: Sec, fn: (arr: ListItem[]) => ListItem[]) {
-    if (mode === "edit") dirtyEdit.current = true;
+    if (mode === "edit") { dirtyEdit.current = true; setHasEdits(true); }
     setDraft((d) => (d ? { ...d, [sec]: fn(d[sec]) } : d));
   }
   function addItem(sec: Sec) {
@@ -597,18 +606,20 @@ export default function StrategyWorkspace() {
             mode, Save while editing, so long plans never need a scroll to
             the header. */}
         {draft && mode === "edit" ? (
-          <div className="fixed bottom-40 right-3 z-40 flex flex-col items-end gap-2 md:bottom-8 md:right-8">
-            <button
-              onClick={() => {
-                dirtyEdit.current = false;
-                if (draft.id) openStrategy(draft.id);
-                else setDraft(null);
-              }}
-              disabled={saving}
-              className="rounded-full border border-border2 bg-card/95 px-4 py-2.5 text-sm font-medium text-muted shadow-xl backdrop-blur transition hover:border-foreground hover:text-foreground disabled:opacity-60"
-            >
-              Cancel
-            </button>
+          <div className="fixed bottom-40 right-3 z-40 flex items-center gap-2 md:bottom-8 md:right-8">
+            {hasEdits && (
+              <button
+                onClick={() => {
+                  dirtyEdit.current = false;
+                  if (draft.id) openStrategy(draft.id);
+                  else setDraft(null);
+                }}
+                disabled={saving}
+                className="rounded-full border border-border2 bg-card/95 px-4 py-2.5 text-sm font-medium text-muted shadow-xl backdrop-blur transition hover:border-danger hover:text-danger disabled:opacity-60"
+              >
+                Cancel
+              </button>
+            )}
             <button
               onClick={save}
               disabled={saving}

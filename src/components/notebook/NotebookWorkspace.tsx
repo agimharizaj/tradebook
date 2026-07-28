@@ -63,6 +63,9 @@ export default function NotebookWorkspace() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const dirty = useRef(false);
+  // Reactive flag for the UI: the floating Cancel only appears once the user
+  // has actually changed something in this edit session.
+  const [hasEdits, setHasEdits] = useState(false);
   // Content as it was when edit mode was entered, so "Cancel edits" can revert
   // the autosaved changes back to that state.
   const editSnapshot = useRef<{ title: string; content: string; pair?: string | null } | null>(null);
@@ -232,8 +235,15 @@ export default function NotebookWorkspace() {
 
   function edit(patch: Partial<Note>) {
     dirty.current = true;
+    if (noteMode === "edit") setHasEdits(true);
     setNote((n) => (n ? { ...n, ...patch } : n));
   }
+
+  // A fresh edit session (entering edit mode or switching notes) starts with
+  // no edits yet, so the Cancel button hides until the first change.
+  useEffect(() => {
+    setHasEdits(false);
+  }, [noteMode, note?.id]);
 
   // Snapshot the note when edit mode opens (once), clear it back in view mode.
   useEffect(() => {
@@ -515,14 +525,16 @@ export default function NotebookWorkspace() {
                 by side, matching the strategy editor. Sits above the mobile
                 tab bar and clear of the floating palette's default spot. */}
             {noteMode === "edit" ? (
-              <div className="fixed bottom-40 right-3 z-40 flex flex-col items-end gap-2 md:bottom-8 md:right-8">
-                <button
-                  onClick={cancelEdits}
-                  title="Discard changes made since you opened the editor"
-                  className="rounded-full border border-border2 bg-card/95 px-4 py-2.5 text-sm font-medium text-muted shadow-xl backdrop-blur transition hover:border-danger hover:text-danger"
-                >
-                  Cancel
-                </button>
+              <div className="fixed bottom-40 right-3 z-40 flex items-center gap-2 md:bottom-8 md:right-8">
+                {hasEdits && (
+                  <button
+                    onClick={cancelEdits}
+                    title="Discard changes made since you opened the editor"
+                    className="rounded-full border border-border2 bg-card/95 px-4 py-2.5 text-sm font-medium text-muted shadow-xl backdrop-blur transition hover:border-danger hover:text-danger"
+                  >
+                    Cancel
+                  </button>
+                )}
                 <button
                   onClick={() => setNoteMode("view")}
                   className="rounded-full bg-accent px-4 py-2.5 text-sm font-medium text-white shadow-xl backdrop-blur transition hover:opacity-90"
