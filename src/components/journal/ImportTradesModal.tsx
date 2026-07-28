@@ -196,13 +196,24 @@ export default function ImportTradesModal({
     const userId = u.user.id;
 
     // Existing imported rows (by ticket) so re-import updates instead of duplicating.
-    const { data: existing } = await supabase
-      .from("trades")
-      .select("id, ext_id")
-      .not("ext_id", "is", null);
-    const idByExt = new Map<string, string>(
-      ((existing as { id: string; ext_id: string }[]) ?? []).map((x) => [x.ext_id, x.id])
+    // Look up only the tickets in THIS file: a blanket select is capped at
+    // PostgREST's 1000-row default, so past ~1000 trades most existing tickets
+    // went unseen and override silently inserted duplicates instead of updating.
+    const idByExt = new Map<string, string>();
+    const wantedExtIds = Array.from(
+      new Set(trades.map((t) => t.ext_id).filter((x): x is string => !!x))
     );
+    for (let i = 0; i < wantedExtIds.length; i += 300) {
+      const chunk = wantedExtIds.slice(i, i + 300);
+      const { data: existing, error } = await supabase
+        .from("trades")
+        .select("id, ext_id")
+        .in("ext_id", chunk);
+      if (error) { setResult(`Import error: ${error.message}`); setImporting(false); return; }
+      for (const x of (existing as { id: string; ext_id: string }[]) ?? []) {
+        idByExt.set(x.ext_id, x.id);
+      }
+    }
 
     // Updates (already imported, matched by ticket) and inserts (new trades)
     // must be sent separately: a mixed batch makes PostgREST send id: null
