@@ -271,7 +271,7 @@ export default function ImportTradesModal({
         </div>
 
         <label className="flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-border2 py-6 text-sm text-muted transition hover:border-accent hover:text-accent2">
-          {fileName ? `Selected: ${fileName}` : "Choose MT5 report (.html or .csv)"}
+          {fileName ? `Selected: ${fileName}` : "Choose file (.html or .csv)"}
           <input type="file" accept=".csv,.html,.htm,.txt" onChange={onFile} className="hidden" />
         </label>
 
