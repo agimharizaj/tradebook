@@ -45,6 +45,24 @@ const isoDaysAgo = (n: number) => {
   return d.toISOString().slice(0, 10);
 };
 
+// Minutes a timezone is ahead of UTC at a given instant (handles DST).
+function tzOffsetMinutes(timeZone: string, at: Date): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone, hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+  const map: Record<string, string> = {};
+  for (const p of dtf.formatToParts(at)) map[p.type] = p.value;
+  const asUTC = Date.UTC(+map.year, +map.month - 1, +map.day, +map.hour, +map.minute, +map.second);
+  return Math.round((asUTC - at.getTime()) / 60000);
+}
+// Minutes-from-midnight -> "HH:MM", wrapping across midnight.
+function hm(mins: number): string {
+  const m = ((mins % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+}
+
 const fmtMoney = (n: number) =>
   `${n >= 0 ? "+" : "-"}${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 
@@ -53,9 +71,20 @@ type Bucket = { count: number; net: number; wins: number; withPnl: number };
 export default function KillZones() {
   const [trades, setTrades] = useState<Trade[] | null>(null);
   const [error, setError] = useState("");
-  const [preset, setPreset] = useState<"14" | "30" | "90" | "all" | "custom">("90");
+  const [preset, setPreset] = useState<"0" | "7" | "14" | "30" | "90" | "all" | "custom">("90");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  // Window labels shown in New York time (how ICT zones are defined) or the
+  // viewer's local time. The bucketing itself is always New York based.
+  const [tz, setTz] = useState<"ny" | "local">("ny");
+
+  // How far to shift a NY wall-clock time to get the local wall-clock time.
+  const localShift = useMemo(() => {
+    const now = new Date();
+    return -now.getTimezoneOffset() - tzOffsetMinutes("America/New_York", now);
+  }, []);
+  const zoneLabel = (z: { ny: string; from: number; to: number }) =>
+    tz === "local" ? `${hm(z.from + localShift)}-${hm(z.to + localShift)}` : z.ny;
 
   useEffect(() => {
     (async () => {
@@ -71,8 +100,7 @@ export default function KillZones() {
   const range = useMemo(() => {
     if (preset === "custom") return { from: from || "0000-01-01", to: to || "9999-12-31" };
     if (preset === "all") return { from: "0000-01-01", to: "9999-12-31" };
-    const days = preset === "14" ? 14 : preset === "30" ? 30 : 90;
-    return { from: isoDaysAgo(days), to: "9999-12-31" };
+    return { from: isoDaysAgo(Number(preset)), to: "9999-12-31" };
   }, [preset, from, to]);
 
   const agg = useMemo(() => {
@@ -159,11 +187,13 @@ export default function KillZones() {
     <div className="rounded-2xl bg-card p-4 ring-1 ring-border sm:p-5">
       <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3">
         <span className="text-xs font-medium uppercase tracking-wide text-muted">Kill zones</span>
-        <span className="text-xs text-dim">Your trades by ICT kill zone (New York time)</span>
+        <span className="text-xs text-dim">Your trades by ICT kill zone ({tz === "local" ? "your local time" : "New York time"})</span>
       </div>
 
       {/* Date filter */}
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        {presetBtn("0", "Today")}
+        {presetBtn("7", "1 week")}
         {presetBtn("14", "2 weeks")}
         {presetBtn("30", "1 month")}
         {presetBtn("90", "3 months")}
@@ -192,6 +222,20 @@ export default function KillZones() {
           aria-label="To date"
           title="To date"
         />
+        <span className="mx-1 text-dim">|</span>
+        {(["ny", "local"] as const).map((id) => (
+          <button
+            key={id}
+            onClick={() => setTz(id)}
+            className={`rounded-lg border px-2.5 py-1 text-xs transition ${
+              tz === id
+                ? "border-accent bg-accent-soft text-accent2"
+                : "border-border2 text-muted hover:border-accent hover:text-foreground"
+            }`}
+          >
+            {id === "ny" ? "NY time" : "Local time"}
+          </button>
+        ))}
       </div>
 
       {error ? (
@@ -210,12 +254,12 @@ export default function KillZones() {
             <span className="min-w-0 flex-1 text-right sm:w-20 sm:flex-none">PnL</span>
           </div>
           <div className="divide-y divide-border">
-            {ZONES.map((z) => row(z.name, z.ny, agg.buckets[z.key]))}
+            {ZONES.map((z) => row(z.name, zoneLabel(z), agg.buckets[z.key]))}
             {row("Outside", "no zone", agg.buckets.outside, true)}
           </div>
           <p className="mt-3 text-[11.5px] text-dim">
-            {agg.total} trade{agg.total === 1 ? "" : "s"} in range, bucketed by each trade&apos;s
-            recorded time converted to New York. DST is handled automatically.
+            {agg.total} trade{agg.total === 1 ? "" : "s"} in range. Always bucketed by each trade&apos;s
+            time in New York (how ICT zones are defined){tz === "local" ? "; window times shown in your local time" : ""}. DST is handled automatically.
           </p>
         </>
       )}
