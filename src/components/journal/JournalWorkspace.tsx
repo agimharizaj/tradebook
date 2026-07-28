@@ -175,7 +175,7 @@ export default function JournalWorkspace() {
             onClick={() => setShowImport(true)}
             className="rounded-lg border border-border2 px-4 py-2 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground"
           >
-            Import MT5
+            Import trades
           </button>
           <button
             onClick={() => setSelectedDay(todayStr)}
@@ -372,6 +372,7 @@ function DayModal({
   const supabase = createClient();
   const watchlist = usePairs();
   const [adding, setAdding] = useState(trades.length === 0);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [pair, setPair] = useState("");
   const [direction, setDirection] = useState("long");
@@ -389,6 +390,35 @@ function DayModal({
 
   const num = (v: string) => (v.trim() === "" ? null : Number(v));
 
+  function resetForm() {
+    setPair(""); setDirection("long"); setPnl(""); setR(""); setEntry(""); setStop("");
+    setExit(""); setSize(""); setEmotion(""); setNotes(""); setStrategyId("");
+    setEditingId(null);
+    setErr(null);
+  }
+
+  function startEdit(t: Trade) {
+    setPair(t.pair ?? "");
+    setDirection(t.direction ?? "long");
+    setPnl(t.pnl != null ? String(t.pnl) : "");
+    setR(t.r_multiple != null ? String(t.r_multiple) : "");
+    setEntry(t.entry_price != null ? String(t.entry_price) : "");
+    setStop(t.stop_price != null ? String(t.stop_price) : "");
+    setExit(t.exit_price != null ? String(t.exit_price) : "");
+    setSize(t.size_lots != null ? String(t.size_lots) : "");
+    setEmotion(t.emotion ?? "");
+    setNotes(t.notes ?? "");
+    setStrategyId(t.strategy_id ?? "");
+    setEditingId(t.id);
+    setErr(null);
+    setAdding(true);
+  }
+
+  function cancelForm() {
+    resetForm();
+    setAdding(false);
+  }
+
   async function save() {
     setSaving(true);
     setErr(null);
@@ -398,9 +428,7 @@ function DayModal({
       setSaving(false);
       return;
     }
-    const { error } = await supabase.from("trades").insert({
-      user_id: u.user.id,
-      traded_on: day,
+    const payload = {
       pair: pair || null,
       direction,
       entry_price: num(entry),
@@ -412,15 +440,18 @@ function DayModal({
       emotion: emotion || null,
       notes: notes || null,
       strategy_id: strategyId || null,
-    });
+    };
+    // Editing an existing trade updates in place; otherwise insert a new one
+    // (traded_on stays fixed to this day and is only set on insert).
+    const { error } = editingId
+      ? await supabase.from("trades").update(payload).eq("id", editingId)
+      : await supabase.from("trades").insert({ user_id: u.user.id, traded_on: day, ...payload });
     setSaving(false);
     if (error) {
       setErr(error.message);
       return;
     }
-    setPair(""); setPnl(""); setR(""); setEntry(""); setStop("");
-    setExit(""); setSize(""); setEmotion(""); setNotes(""); setStrategyId("");
-    setAdding(false);
+    cancelForm();
     onSaved();
   }
 
@@ -439,21 +470,28 @@ function DayModal({
         {trades.length > 0 && (
           <div className="mb-4 space-y-2">
             {trades.map((t) => (
-              <div key={t.id} className="flex items-center justify-between rounded-lg bg-surface2 px-3 py-2">
+              <div key={t.id} className={`flex items-center justify-between rounded-lg bg-surface2 px-3 py-2 ${editingId === t.id ? "ring-1 ring-accent" : ""}`}>
                 <div className="text-sm">
                   <span className="font-medium">{t.pair ?? "Trade"}</span>{" "}
                   <span className="text-dim">{t.direction}</span>
                   {t.notes && <div className="text-xs text-muted">{t.notes}</div>}
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   {t.pnl != null && (
                     <span
-                      className={`text-sm font-medium ${t.pnl > 0 ? "text-success" : t.pnl < 0 ? "text-danger" : "text-muted"}`}
+                      className={`mr-1 text-sm font-medium ${t.pnl > 0 ? "text-success" : t.pnl < 0 ? "text-danger" : "text-muted"}`}
                       style={{ fontFamily: "var(--font-mono)" }}
                     >
                       {moneySigned(t.pnl, cur)}
                     </span>
                   )}
+                  <button
+                    onClick={() => startEdit(t)}
+                    className="rounded-md p-2 text-muted transition hover:bg-accent/15 hover:text-accent2"
+                    aria-label="Edit trade"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
+                  </button>
                   {confirmingId === t.id ? (
                     <span className="flex items-center gap-1.5">
                       <button
@@ -486,6 +524,9 @@ function DayModal({
 
         {adding ? (
           <div className="space-y-3">
+            <div className="text-xs font-medium uppercase tracking-wide text-dim">
+              {editingId ? "Edit trade" : "New trade"}
+            </div>
             {err && <p className="text-sm text-danger">{err}</p>}
             <div className="grid grid-cols-2 gap-3">
               <Field label="Pair">
@@ -523,17 +564,15 @@ function DayModal({
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="jfield resize-y" />
             </Field>
             <div className="flex justify-end gap-2 pt-1">
-              {trades.length > 0 && (
-                <button onClick={() => setAdding(false)} className="rounded-lg border border-border2 px-4 py-2 text-sm text-muted hover:text-foreground">Cancel</button>
-              )}
+              <button onClick={cancelForm} className="rounded-lg border border-border2 px-4 py-2 text-sm text-muted hover:text-foreground">Cancel</button>
               <button onClick={save} disabled={saving} className="rounded-lg bg-accent px-5 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50">
-                {saving ? "Saving..." : "Save trade"}
+                {saving ? "Saving..." : editingId ? "Save changes" : "Save trade"}
               </button>
             </div>
           </div>
         ) : (
-          <button onClick={() => setAdding(true)} className="w-full rounded-lg border border-dashed border-border2 py-2.5 text-sm text-muted transition hover:border-accent hover:text-accent2">
-            + Add another trade
+          <button onClick={() => { resetForm(); setAdding(true); }} className="w-full rounded-lg border border-dashed border-border2 py-2.5 text-sm text-muted transition hover:border-accent hover:text-accent2">
+            {trades.length ? "+ Add another trade" : "+ Add trade"}
           </button>
         )}
       </div>

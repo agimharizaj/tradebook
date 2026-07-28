@@ -195,51 +195,46 @@ export default function ImportTradesModal({
     if (!u.user) { setResult("Not signed in."); setImporting(false); return; }
     const userId = u.user.id;
 
-    // Existing imported rows (by ticket) so re-import updates instead of duplicating.
-    // Look up only the tickets in THIS file: a blanket select is capped at
-    // PostgREST's 1000-row default, so past ~1000 trades most existing tickets
-    // went unseen and override silently inserted duplicates instead of updating.
-    const idByExt = new Map<string, string>();
+    // Which of this file's tickets already exist? Look them up in batches
+    // (a blanket select is capped at PostgREST's 1000-row default).
     const wantedExtIds = Array.from(
       new Set(trades.map((t) => t.ext_id).filter((x): x is string => !!x))
     );
+    const existingExtIds = new Set<string>();
     for (let i = 0; i < wantedExtIds.length; i += 300) {
       const chunk = wantedExtIds.slice(i, i + 300);
       const { data: existing, error } = await supabase
         .from("trades")
-        .select("id, ext_id")
+        .select("ext_id")
         .in("ext_id", chunk);
       if (error) { setResult(`Import error: ${error.message}`); setImporting(false); return; }
-      for (const x of (existing as { id: string; ext_id: string }[]) ?? []) {
-        idByExt.set(x.ext_id, x.id);
-      }
+      for (const x of (existing as { ext_id: string }[]) ?? []) existingExtIds.add(x.ext_id);
     }
 
-    // Updates (already imported, matched by ticket) and inserts (new trades)
-    // must be sent separately: a mixed batch makes PostgREST send id: null
-    // for the new rows, which violates the not-null constraint.
-    const toUpdate: (typeof trades[number] & { user_id: string; id: string })[] = [];
-    const toInsert: (typeof trades[number] & { user_id: string })[] = [];
+    // A single MT5/MT4 position can span several deal rows that share one
+    // ticket, so we never assume the ticket is unique.
+    let toInsert: (typeof trades[number] & { user_id: string })[];
     let skipped = 0;
-    for (const t of trades) {
-      const id = t.ext_id ? idByExt.get(t.ext_id) : undefined;
-      if (id) {
-        // Existing ticket: overwrite only when the toggle is on, else skip it.
-        if (override) toUpdate.push({ ...t, user_id: userId, id });
-        else skipped++;
-      } else {
-        toInsert.push({ ...t, user_id: userId });
+    let overwritten = 0;
+    if (override) {
+      // Replace every trade carrying one of this file's tickets: delete them,
+      // then insert the file's rows fresh. Preserves multi-row positions and
+      // clears out any duplicates left by earlier imports.
+      for (let i = 0; i < wantedExtIds.length; i += 300) {
+        const chunk = wantedExtIds.slice(i, i + 300);
+        const { error } = await supabase.from("trades").delete().in("ext_id", chunk);
+        if (error) { setResult(`Import error: ${error.message}`); setImporting(false); return; }
       }
+      overwritten = existingExtIds.size;
+      toInsert = trades.map((t) => ({ ...t, user_id: userId }));
+    } else {
+      // Skip any ticket already imported; add only genuinely new rows.
+      const rows = trades.filter((t) => !(t.ext_id && existingExtIds.has(t.ext_id)));
+      skipped = trades.length - rows.length;
+      toInsert = rows.map((t) => ({ ...t, user_id: userId }));
     }
 
-    let updated = 0;
     let inserted = 0;
-    for (let i = 0; i < toUpdate.length; i += 500) {
-      const chunk = toUpdate.slice(i, i + 500);
-      const { error } = await supabase.from("trades").upsert(chunk);
-      if (error) { setResult(`Import error: ${error.message}`); setImporting(false); return; }
-      updated += chunk.length;
-    }
     for (let i = 0; i < toInsert.length; i += 500) {
       const chunk = toInsert.slice(i, i + 500);
       const { error } = await supabase.from("trades").insert(chunk);
@@ -248,8 +243,8 @@ export default function ImportTradesModal({
     }
     setImporting(false);
     const parts = [`imported ${inserted}`];
-    if (updated) parts.push(`overwrote ${updated}`);
-    if (skipped) parts.push(`skipped ${skipped} existing`);
+    if (overwritten) parts.push(`replaced ${overwritten} existing ${overwritten === 1 ? "ticket" : "tickets"}`);
+    if (skipped) parts.push(`skipped ${skipped} already imported`);
     setResult(`Done: ${parts.join(", ")}. Closing...`);
     onImported();
     setTimeout(onClose, 1400);
@@ -262,9 +257,9 @@ export default function ImportTradesModal({
       <div className="max-h-[85dvh] w-full max-w-2xl overflow-y-auto rounded-t-2xl bg-card p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] ring-1 ring-border2 sm:rounded-2xl sm:pb-6">
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h2 className="text-lg" style={{ fontFamily: "var(--font-display)" }}>Import trades from MT5 / FTMO</h2>
+            <h2 className="text-lg" style={{ fontFamily: "var(--font-display)" }}>Import trades</h2>
             <p className="mt-1 text-sm text-muted">
-              In MT5: History tab, right-click, Report, save as HTML (or export CSV). Upload it here.
+              Export your trade history from your platform (in MT4/MT5: History tab, right-click, Report, save as HTML, or export CSV), then upload it here.
             </p>
           </div>
           <button onClick={onClose} className="-m-2 shrink-0 rounded-md p-2 text-muted hover:text-foreground" aria-label="Close">✕</button>
