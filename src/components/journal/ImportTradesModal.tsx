@@ -164,9 +164,12 @@ export default function ImportTradesModal({
         const date = parseDate(col(r, "date") ?? "");
         if (!date) return null;
         // Skip non-trade rows: FTMO/MT5 reports include cash adjustments,
-        // deposits and withdrawals under pseudo-symbols like "USCASH".
+        // deposits and withdrawals under pseudo-symbols like "USCASH". But do
+        // NOT skip real instruments whose symbol ends in ".cash" (e.g.
+        // US30.cash, US100.cash - index CFDs). The dot before "cash" tells the
+        // two apart: "USCASH" is an adjustment, "US30.cash" is a tradable.
         const rawSym = (col(r, "symbol") ?? "").trim();
-        if (/cash|deposit|withdraw|balance|credit/i.test(rawSym)) return null;
+        if (/deposit|withdraw|balance|credit/i.test(rawSym) || /(^|[^.])cash/i.test(rawSym)) return null;
         const dir = (col(r, "direction") ?? "").toLowerCase();
         const profit = num(col(r, "pnl"));
         const commissions = num(col(r, "commissions")) ?? 0;
@@ -245,11 +248,10 @@ export default function ImportTradesModal({
     const parts = [`imported ${inserted} new`];
     if (overwritten) parts.push(`replaced ${overwritten} existing ${overwritten === 1 ? "ticket" : "tickets"}`);
     if (skipped) parts.push(`skipped ${skipped} already imported`);
-    // Keep the result on screen (no auto-close) so the outcome is visible.
-    // Re-importing an unchanged file with override on legitimately shows no
-    // calendar change; this line is the proof it ran.
-    setResult(`Done: ${parts.join(", ")}.`);
+    setResult(`Done: ${parts.join(", ")}. Closing...`);
     onImported();
+    // Show the result long enough to read (incl. "replaced N"), then close.
+    setTimeout(onClose, 2200);
   }
 
   const missingRequired = FIELDS.filter((f) => f.required && (mapping[f.key] ?? -1) < 0);
