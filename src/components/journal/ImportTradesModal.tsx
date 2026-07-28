@@ -141,6 +141,9 @@ export default function ImportTradesModal({
   const [fileName, setFileName] = useState("");
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  // Off by default: rows whose ticket already exists are left untouched.
+  // On: re-import overwrites those existing trades with the file's values.
+  const [override, setOverride] = useState(false);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -206,29 +209,39 @@ export default function ImportTradesModal({
     // for the new rows, which violates the not-null constraint.
     const toUpdate: (typeof trades[number] & { user_id: string; id: string })[] = [];
     const toInsert: (typeof trades[number] & { user_id: string })[] = [];
+    let skipped = 0;
     for (const t of trades) {
       const id = t.ext_id ? idByExt.get(t.ext_id) : undefined;
-      if (id) toUpdate.push({ ...t, user_id: userId, id });
-      else toInsert.push({ ...t, user_id: userId });
+      if (id) {
+        // Existing ticket: overwrite only when the toggle is on, else skip it.
+        if (override) toUpdate.push({ ...t, user_id: userId, id });
+        else skipped++;
+      } else {
+        toInsert.push({ ...t, user_id: userId });
+      }
     }
 
-    let done = 0;
+    let updated = 0;
+    let inserted = 0;
     for (let i = 0; i < toUpdate.length; i += 500) {
       const chunk = toUpdate.slice(i, i + 500);
       const { error } = await supabase.from("trades").upsert(chunk);
       if (error) { setResult(`Import error: ${error.message}`); setImporting(false); return; }
-      done += chunk.length;
+      updated += chunk.length;
     }
     for (let i = 0; i < toInsert.length; i += 500) {
       const chunk = toInsert.slice(i, i + 500);
       const { error } = await supabase.from("trades").insert(chunk);
       if (error) { setResult(`Import error: ${error.message}`); setImporting(false); return; }
-      done += chunk.length;
+      inserted += chunk.length;
     }
     setImporting(false);
-    setResult(`Imported / updated ${done} trade${done === 1 ? "" : "s"}. Closing...`);
+    const parts = [`imported ${inserted}`];
+    if (updated) parts.push(`overwrote ${updated}`);
+    if (skipped) parts.push(`skipped ${skipped} existing`);
+    setResult(`Done: ${parts.join(", ")}. Closing...`);
     onImported();
-    setTimeout(onClose, 1200);
+    setTimeout(onClose, 1400);
   }
 
   const missingRequired = FIELDS.filter((f) => f.required && (mapping[f.key] ?? -1) < 0);
@@ -313,7 +326,22 @@ export default function ImportTradesModal({
               )}
             </div>
 
-            <div className="mt-5 flex items-center gap-3">
+            <label className="mt-5 flex items-start gap-2.5 text-sm text-muted">
+              <input
+                type="checkbox"
+                checked={override}
+                onChange={(e) => setOverride(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)]"
+              />
+              <span>
+                Overwrite existing trades
+                <span className="block text-xs text-dim">
+                  Off by default: trades already imported (same ticket) are left as they are, only new ones are added. Turn on to overwrite them with this file&apos;s values.
+                </span>
+              </span>
+            </label>
+
+            <div className="mt-4 flex items-center gap-3">
               <button
                 onClick={doImport}
                 disabled={importing || trades.length === 0 || missingRequired.length > 0}

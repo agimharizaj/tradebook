@@ -837,7 +837,10 @@ export default function StrategyWorkspace() {
             </Section>
 
             <Section label="Risk controls">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {/* Numeric limits in a tidy grid; the two trading windows sit as
+                  their own stacked full-width rows below so they line up with
+                  each other instead of colliding with the shorter fields. */}
+              <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3">
                 <Num label="Max trades / day" v={draft.maxTrades} on={(v) => patch({ maxTrades: v })} />
                 <MoneyOrPct
                   label="Max daily loss"
@@ -852,18 +855,14 @@ export default function StrategyWorkspace() {
                   accountSize={accountSize}
                 />
                 <Num label="Risk per trade %" v={draft.riskPct} on={(v) => patch({ riskPct: v })} />
-                <div className="col-span-2">
-                  <WindowPicker value={draft.window} on={(v) => patch({ window: v })} />
-                </div>
-                {/* col-start-2 keeps it directly under Trading window 1 on
-                    the 3-column layout */}
-                <div className="col-span-2 sm:col-start-2">
-                  <WindowPicker
-                    label="Trading window 2 (optional)"
-                    value={draft.window2}
-                    on={(v) => patch({ window2: v })}
-                  />
-                </div>
+              </div>
+              <div className="mt-3 space-y-3">
+                <WindowPicker value={draft.window} on={(v) => patch({ window: v })} />
+                <WindowPicker
+                  label="Trading window 2 (optional)"
+                  value={draft.window2}
+                  on={(v) => patch({ window2: v })}
+                />
               </div>
             </Section>
           </div>
