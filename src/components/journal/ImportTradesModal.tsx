@@ -242,12 +242,14 @@ export default function ImportTradesModal({
       inserted += chunk.length;
     }
     setImporting(false);
-    const parts = [`imported ${inserted}`];
+    const parts = [`imported ${inserted} new`];
     if (overwritten) parts.push(`replaced ${overwritten} existing ${overwritten === 1 ? "ticket" : "tickets"}`);
     if (skipped) parts.push(`skipped ${skipped} already imported`);
-    setResult(`Done: ${parts.join(", ")}. Closing...`);
+    // Keep the result on screen (no auto-close) so the outcome is visible.
+    // Re-importing an unchanged file with override on legitimately shows no
+    // calendar change; this line is the proof it ran.
+    setResult(`Done: ${parts.join(", ")}.`);
     onImported();
-    setTimeout(onClose, 1400);
   }
 
   const missingRequired = FIELDS.filter((f) => f.required && (mapping[f.key] ?? -1) < 0);
