@@ -23,9 +23,11 @@ type StrategyRow = {
   plan_type: string | null;
   is_active: boolean;
   max_trades_per_day: number | null;
-  max_daily_loss: number | null;
-  max_daily_profit: number | null;
-  risk_per_trade_pct: number | null;
+  // Since migration 0013 these are text: either a figure ("200") or a percent
+  // of account ("5%"). Resolve percents against the current account size.
+  max_daily_loss: string | null;
+  max_daily_profit: string | null;
+  risk_per_trade_pct: string | null;
   trading_window: string | null;
   trading_window_2: string | null;
   strategy_date: string | null;
@@ -36,6 +38,20 @@ type LineRow = { strategy_id: string; content: string; sort_order: number };
 
 const n1 = (v: number) => (Math.round(v * 100) / 100).toLocaleString("en-US");
 const pctOf = (part: number, whole: number) => (whole ? ((part / whole) * 100).toFixed(1) + "%" : "n/a");
+
+// A risk limit is either a figure ("200") or a percent of account ("5%").
+// Resolve to an absolute number using the account size (null if a percent
+// can't be resolved because no account size is set).
+function resolveAmount(v: string | null, accountSize: number): number | null {
+  if (!v) return null;
+  const s = v.trim();
+  if (s.endsWith("%")) {
+    const p = parseFloat(s.slice(0, -1));
+    return Number.isNaN(p) || !(accountSize > 0) ? null : (p / 100) * accountSize;
+  }
+  const n = parseFloat(s);
+  return Number.isNaN(n) ? null : n;
+}
 
 function lines(rows: LineRow[] | null, strategyId: string): string {
   const list = (rows ?? [])
@@ -188,22 +204,35 @@ export async function buildAiContext(supabase: SupabaseClient, user: User): Prom
     strategies.find((s) => s.max_trades_per_day != null || s.max_daily_loss != null);
   const breachLines: string[] = [];
   if (limits) {
+    const lossCap = resolveAmount(limits.max_daily_loss, accountSize);
     for (const [date, v] of Array.from(dayMap.entries()).sort((a, b) => a[0].localeCompare(b[0]))) {
       if (limits.max_trades_per_day != null && v.count > limits.max_trades_per_day) {
         breachLines.push(`${date}: ${v.count} trades (cap ${limits.max_trades_per_day})`);
       }
-      if (limits.max_daily_loss != null && v.net < -Math.abs(limits.max_daily_loss)) {
-        breachLines.push(`${date}: net ${n1(v.net)} ${cur} (daily loss cap ${n1(Math.abs(limits.max_daily_loss))})`);
+      if (lossCap != null && v.net < -Math.abs(lossCap)) {
+        breachLines.push(`${date}: net ${n1(v.net)} ${cur} (daily loss cap ${n1(Math.abs(lossCap))} ${cur})`);
       }
     }
   }
 
+  // Display a limit as entered, adding the resolved figure when it's a percent.
+  const fmtLimit = (v: string | null) => {
+    if (!v) return null;
+    const s = v.trim();
+    if (s.endsWith("%")) {
+      const abs = resolveAmount(s, accountSize);
+      return abs != null ? `${s} (${n1(Math.abs(abs))} ${cur})` : s;
+    }
+    const n = parseFloat(s);
+    return Number.isNaN(n) ? s : `${n1(Math.abs(n))} ${cur}`;
+  };
+
   const stratBlocks = strategies.map((s) => {
     const rc: string[] = [];
     if (s.max_trades_per_day != null) rc.push(`max trades/day ${s.max_trades_per_day}`);
-    if (s.max_daily_loss != null) rc.push(`max daily loss ${n1(Math.abs(s.max_daily_loss))} ${cur}`);
-    if (s.max_daily_profit != null) rc.push(`max daily profit ${n1(s.max_daily_profit)} ${cur}`);
-    if (s.risk_per_trade_pct != null) rc.push(`risk per trade ${s.risk_per_trade_pct}%`);
+    if (fmtLimit(s.max_daily_loss)) rc.push(`max daily loss ${fmtLimit(s.max_daily_loss)}`);
+    if (fmtLimit(s.max_daily_profit)) rc.push(`max daily profit ${fmtLimit(s.max_daily_profit)}`);
+    if (fmtLimit(s.risk_per_trade_pct)) rc.push(`risk per trade ${fmtLimit(s.risk_per_trade_pct)}`);
     if (s.trading_window) rc.push(`trading window ${s.trading_window}`);
     if (s.trading_window_2) rc.push(`second window ${s.trading_window_2}`);
     return [

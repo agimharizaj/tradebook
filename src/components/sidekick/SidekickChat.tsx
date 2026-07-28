@@ -491,7 +491,7 @@ export default function SidekickChat({
       s.max_trades_per_day != null ? `max trades/day ${s.max_trades_per_day}` : null,
       s.max_daily_loss != null ? `max daily loss ${s.max_daily_loss}` : null,
       s.max_daily_profit != null ? `max daily profit ${s.max_daily_profit}` : null,
-      s.risk_per_trade_pct != null ? `risk per trade ${s.risk_per_trade_pct}%` : null,
+      s.risk_per_trade_pct != null ? `risk per trade ${s.risk_per_trade_pct}` : null,
       s.trading_window ? `trading window ${s.trading_window}` : null,
       s.trading_window_2 ? `second window ${s.trading_window_2}` : null,
       s.strategy_date ? `date ${s.strategy_date}` : null,

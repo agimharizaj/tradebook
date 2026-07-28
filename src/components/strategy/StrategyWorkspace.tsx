@@ -352,15 +352,18 @@ export default function StrategyWorkspace() {
     }
 
     const num = (v: string) => (v.trim() === "" ? null : Number(v));
+    // Risk limits are stored verbatim (figure or "5%") so percents stay live
+    // against the current account size (columns are text since migration 0013).
+    const txt = (v: string) => (v.trim() === "" ? null : v.trim());
     const row = {
       user_id: userId,
       name: draft.name || "Untitled",
       plan_type: draft.plan_type || null,
       trading_notes: draft.notes || null,
       max_trades_per_day: num(draft.maxTrades),
-      max_daily_loss: num(draft.maxLoss),
-      max_daily_profit: num(draft.maxProfit),
-      risk_per_trade_pct: num(draft.riskPct),
+      max_daily_loss: txt(draft.maxLoss),
+      max_daily_profit: txt(draft.maxProfit),
+      risk_per_trade_pct: txt(draft.riskPct),
       trading_window: draft.window || null,
       trading_window_2: draft.window2 || null,
       strategy_date: draft.date || null,
@@ -840,7 +843,7 @@ export default function StrategyWorkspace() {
               {/* Numeric limits in a tidy grid; the two trading windows sit as
                   their own stacked full-width rows below so they line up with
                   each other instead of colliding with the shorter fields. */}
-              <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
                 <Num label="Max trades / day" v={draft.maxTrades} on={(v) => patch({ maxTrades: v })} />
                 <MoneyOrPct
                   label="Max daily loss"
@@ -854,7 +857,12 @@ export default function StrategyWorkspace() {
                   on={(v) => patch({ maxProfit: v })}
                   accountSize={accountSize}
                 />
-                <Num label="Risk per trade %" v={draft.riskPct} on={(v) => patch({ riskPct: v })} />
+                <MoneyOrPct
+                  label="Risk per trade"
+                  v={draft.riskPct}
+                  on={(v) => patch({ riskPct: v })}
+                  accountSize={accountSize}
+                />
               </div>
               <div className="mt-3 space-y-3">
                 <WindowPicker value={draft.window} on={(v) => patch({ window: v })} />
@@ -979,8 +987,10 @@ function Num({ label, v, on }: { label: string; v: string; on: (v: string) => vo
   );
 }
 
-// Money field that also accepts a percentage: typing "1%" converts to a
-// figure using the profile account size the moment focus leaves the field.
+// Field that accepts either a figure ("500") or a percent of account ("5%").
+// The value is kept verbatim - percents are NOT converted to a figure - so a
+// "5%" cap tracks the account size wherever it's later read. A live preview
+// shows what the percent works out to right now.
 function MoneyOrPct({
   label,
   v,
@@ -1004,16 +1014,13 @@ function MoneyOrPct({
         inputMode="decimal"
         value={v}
         onChange={(e) => on(e.target.value)}
-        onBlur={() => {
-          if (preview != null) on(String(preview));
-        }}
         placeholder={accountSize > 0 ? "500 or 5%" : "500"}
         className="field"
         style={{ fontFamily: "var(--font-mono)" }}
       />
       <span className="mt-0.5 block text-[11px] text-dim">
         {preview != null
-          ? `= ${preview.toLocaleString()} of ${accountSize.toLocaleString()}`
+          ? `= ${preview.toLocaleString()} of ${accountSize.toLocaleString()} now`
           : accountSize > 0
             ? "Type a figure or % of account"
             : "\u00A0"}
@@ -1126,7 +1133,7 @@ function StrategyView({
     ["Max trades / day", draft.maxTrades],
     ["Max daily loss", draft.maxLoss],
     ["Max daily profit", draft.maxProfit],
-    ["Risk per trade %", draft.riskPct],
+    ["Risk per trade", draft.riskPct],
     // Underscores are IANA timezone ids (America/New_York); display without.
     ["Trading window", draft.window.replace(/_/g, " ")],
     ["Trading window 2", draft.window2.replace(/_/g, " ")],
