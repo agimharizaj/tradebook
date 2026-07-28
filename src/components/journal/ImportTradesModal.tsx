@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type Grid = { headers: string[]; rows: string[][] };
@@ -141,15 +141,24 @@ export default function ImportTradesModal({
   const [fileName, setFileName] = useState("");
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
-  // Off by default: rows whose ticket already exists are left untouched.
-  // On: re-import overwrites those existing trades with the file's values.
-  const [override, setOverride] = useState(false);
+  // How the import writes to the journal:
+  //  append - add every row, duplicates included (no matching at all)
+  //  select - import only the ticked rows; each replaces any existing trade
+  //           with the same ticket, others are left alone
+  //  wipe   - delete ALL existing trades first, then import the whole file
+  const [mode, setMode] = useState<"append" | "select" | "wipe">("append");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [confirmWipe, setConfirmWipe] = useState(false);
+  const lastIdx = useRef<number | null>(null);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
     setResult(null);
+    setSelected(new Set());
+    setConfirmWipe(false);
+    lastIdx.current = null;
     const text = await file.text();
     const g = /\.html?$/i.test(file.name) || /<table/i.test(text) ? parseHTML(text) : parseCSV(text);
     setGrid(g);
@@ -191,6 +200,24 @@ export default function ImportTradesModal({
       .filter((t): t is NonNullable<typeof t> => t !== null && t.pair !== "");
   }, [grid, mapping]);
 
+  // Row selection for "Choose which to replace". Plain click toggles one row;
+  // Shift-click selects the whole range from the last-clicked row.
+  function toggleRow(i: number, shift: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (shift && lastIdx.current != null) {
+        const [a, b] = lastIdx.current < i ? [lastIdx.current, i] : [i, lastIdx.current];
+        for (let k = a; k <= b; k++) next.add(k);
+      } else if (next.has(i)) {
+        next.delete(i);
+      } else {
+        next.add(i);
+      }
+      return next;
+    });
+    lastIdx.current = i;
+  }
+
   async function doImport() {
     setImporting(true);
     setResult(null);
@@ -198,45 +225,37 @@ export default function ImportTradesModal({
     if (!u.user) { setResult("Not signed in."); setImporting(false); return; }
     const userId = u.user.id;
 
-    // Which of this file's tickets already exist? Look them up in batches
-    // (a blanket select is capped at PostgREST's 1000-row default).
-    const wantedExtIds = Array.from(
-      new Set(trades.map((t) => t.ext_id).filter((x): x is string => !!x))
-    );
-    const existingExtIds = new Set<string>();
-    for (let i = 0; i < wantedExtIds.length; i += 300) {
-      const chunk = wantedExtIds.slice(i, i + 300);
-      const { data: existing, error } = await supabase
-        .from("trades")
-        .select("ext_id")
-        .in("ext_id", chunk);
-      if (error) { setResult(`Import error: ${error.message}`); setImporting(false); return; }
-      for (const x of (existing as { ext_id: string }[]) ?? []) existingExtIds.add(x.ext_id);
-    }
+    // Rows to insert depend on the mode; deletes happen first where needed.
+    let rows = trades;
+    let wiped = 0;
+    let replaced = 0;
 
-    // A single MT5/MT4 position can span several deal rows that share one
-    // ticket, so we never assume the ticket is unique.
-    let toInsert: (typeof trades[number] & { user_id: string })[];
-    let skipped = 0;
-    let overwritten = 0;
-    if (override) {
-      // Replace every trade carrying one of this file's tickets: delete them,
-      // then insert the file's rows fresh. Preserves multi-row positions and
-      // clears out any duplicates left by earlier imports.
-      for (let i = 0; i < wantedExtIds.length; i += 300) {
-        const chunk = wantedExtIds.slice(i, i + 300);
+    if (mode === "wipe") {
+      // Full reset: delete every existing trade for this user, then import all.
+      const { count } = await supabase
+        .from("trades")
+        .select("id", { count: "exact", head: true });
+      const { error } = await supabase.from("trades").delete().eq("user_id", userId);
+      if (error) { setResult(`Import error: ${error.message}`); setImporting(false); return; }
+      wiped = count ?? 0;
+    } else if (mode === "select") {
+      // Import only ticked rows; each replaces existing trades with its ticket.
+      rows = trades.filter((_, i) => selected.has(i));
+      const extIds = Array.from(new Set(rows.map((t) => t.ext_id).filter((x): x is string => !!x)));
+      for (let i = 0; i < extIds.length; i += 300) {
+        const chunk = extIds.slice(i, i + 300);
+        const { count } = await supabase
+          .from("trades")
+          .select("id", { count: "exact", head: true })
+          .in("ext_id", chunk);
+        replaced += count ?? 0;
         const { error } = await supabase.from("trades").delete().in("ext_id", chunk);
         if (error) { setResult(`Import error: ${error.message}`); setImporting(false); return; }
       }
-      overwritten = existingExtIds.size;
-      toInsert = trades.map((t) => ({ ...t, user_id: userId }));
-    } else {
-      // Skip any ticket already imported; add only genuinely new rows.
-      const rows = trades.filter((t) => !(t.ext_id && existingExtIds.has(t.ext_id)));
-      skipped = trades.length - rows.length;
-      toInsert = rows.map((t) => ({ ...t, user_id: userId }));
     }
+    // mode === "append": no deletes, insert everything (duplicates allowed).
 
+    const toInsert = rows.map((t) => ({ ...t, user_id: userId }));
     let inserted = 0;
     for (let i = 0; i < toInsert.length; i += 500) {
       const chunk = toInsert.slice(i, i + 500);
@@ -244,13 +263,15 @@ export default function ImportTradesModal({
       if (error) { setResult(`Import error: ${error.message}`); setImporting(false); return; }
       inserted += chunk.length;
     }
+
     setImporting(false);
-    const parts = [`imported ${inserted} new`];
-    if (overwritten) parts.push(`replaced ${overwritten} existing ${overwritten === 1 ? "ticket" : "tickets"}`);
-    if (skipped) parts.push(`skipped ${skipped} already imported`);
+    const parts: string[] = [];
+    if (wiped) parts.push(`wiped ${wiped}`);
+    parts.push(`imported ${inserted}`);
+    if (replaced) parts.push(`replaced ${replaced} existing`);
     setResult(`Done: ${parts.join(", ")}. Closing...`);
     onImported();
-    // Show the result long enough to read (incl. "replaced N"), then close.
+    // Show the result long enough to read, then close.
     setTimeout(onClose, 2200);
   }
 
@@ -263,7 +284,7 @@ export default function ImportTradesModal({
           <div>
             <h2 className="text-lg" style={{ fontFamily: "var(--font-display)" }}>Import trades</h2>
             <p className="mt-1 text-sm text-muted">
-              Export your trade history from your platform (in MT4/MT5: History tab, right-click, Report, save as HTML, or export CSV), then upload it here.
+              Upload your broker&apos;s trade history export (HTML or CSV).
             </p>
           </div>
           <button onClick={onClose} className="-m-2 shrink-0 rounded-md p-2 text-muted hover:text-foreground" aria-label="Close">✕</button>
@@ -298,13 +319,26 @@ export default function ImportTradesModal({
             </div>
 
             <div className="mt-5">
-              <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
-                Preview ({trades.length} trades detected)
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted">
+                  Preview ({trades.length} trades detected)
+                </span>
+                {mode === "select" && trades.length > 0 && (
+                  <span className="flex items-center gap-3 text-xs">
+                    <button type="button" onClick={() => setSelected(new Set(trades.map((_, i) => i)))} className="text-accent2 hover:underline">
+                      Select all
+                    </button>
+                    <button type="button" onClick={() => setSelected(new Set())} className="text-muted hover:text-foreground">
+                      Clear ({selected.size})
+                    </button>
+                  </span>
+                )}
               </div>
-              <div className="overflow-x-auto rounded-lg border border-border">
+              <div className={`overflow-auto rounded-lg border border-border ${mode === "select" ? "max-h-72" : "overflow-x-auto"}`}>
                 <table className="w-full text-left text-xs">
                   <thead className="text-dim">
                     <tr className="whitespace-nowrap">
+                      {mode === "select" && <th className="w-8 p-2"></th>}
                       <th className="p-2">Date</th><th className="p-2">Pair</th><th className="p-2">Dir</th>
                       <th className="p-2">Lots</th><th className="p-2">Entry</th><th className="p-2">Stop</th>
                       <th className="p-2">Exit</th><th className="p-2">PnL</th><th className="p-2">Fees</th>
@@ -312,8 +346,18 @@ export default function ImportTradesModal({
                     </tr>
                   </thead>
                   <tbody>
-                    {trades.slice(0, 10).map((t, i) => (
-                      <tr key={i} className="whitespace-nowrap border-t border-border" style={{ fontFamily: "var(--font-mono)" }}>
+                    {(mode === "select" ? trades : trades.slice(0, 10)).map((t, i) => (
+                      <tr
+                        key={i}
+                        onClick={mode === "select" ? (e) => toggleRow(i, e.shiftKey) : undefined}
+                        className={`whitespace-nowrap border-t border-border ${mode === "select" ? "cursor-pointer select-none" : ""} ${mode === "select" && selected.has(i) ? "bg-accent-soft" : ""}`}
+                        style={{ fontFamily: "var(--font-mono)" }}
+                      >
+                        {mode === "select" && (
+                          <td className="p-2">
+                            <input type="checkbox" readOnly checked={selected.has(i)} className="h-4 w-4 accent-[var(--accent)]" />
+                          </td>
+                        )}
                         <td className="p-2">{t.traded_on.slice(0, 16)}</td>
                         <td className="p-2" style={{ fontFamily: "var(--font-sans)" }}>{t.pair}</td>
                         <td className="p-2" style={{ fontFamily: "var(--font-sans)" }}>{t.direction ?? "-"}</td>
@@ -329,6 +373,11 @@ export default function ImportTradesModal({
                   </tbody>
                 </table>
               </div>
+              {mode === "select" ? (
+                <p className="mt-1 text-xs text-dim">Click rows to select. Shift-click for a range.</p>
+              ) : trades.length > 10 ? (
+                <p className="mt-1 text-xs text-dim">Showing first 10 of {trades.length}.</p>
+              ) : null}
               {trades.length === 0 && (
                 <p className="mt-2 text-xs text-danger">
                   No trades detected. Check the column mapping above, especially Close date and Symbol.
@@ -336,28 +385,53 @@ export default function ImportTradesModal({
               )}
             </div>
 
-            <label className="mt-5 flex items-start gap-2.5 text-sm text-muted">
-              <input
-                type="checkbox"
-                checked={override}
-                onChange={(e) => setOverride(e.target.checked)}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)]"
-              />
-              <span>
-                Overwrite existing trades
-                <span className="block text-xs text-dim">
-                  Off by default: trades already imported (same ticket) are left as they are, only new ones are added. Turn on to overwrite them with this file&apos;s values.
-                </span>
-              </span>
-            </label>
+            <fieldset className="mt-5 space-y-2">
+              <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">On import</legend>
+              {([
+                ["append", "Add all rows", "Adds every row in the file, duplicates included."],
+                ["select", "Choose which to replace", "Tick rows above; each replaces any existing trade with the same ticket, others are untouched."],
+                ["wipe", "Wipe all, then import", "Deletes every existing trade first. Cannot be undone."],
+              ] as const).map(([val, title, desc]) => (
+                <label key={val} className="flex items-start gap-2.5 text-sm text-muted">
+                  <input
+                    type="radio"
+                    name="import-mode"
+                    checked={mode === val}
+                    onChange={() => { setMode(val); setConfirmWipe(false); }}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)]"
+                  />
+                  <span>
+                    {title}
+                    <span className={`block text-xs ${val === "wipe" ? "text-danger" : "text-dim"}`}>{desc}</span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+
+            {mode === "wipe" && confirmWipe && (
+              <p className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
+                This permanently deletes ALL your existing trades and replaces them with this file. Click the button again to confirm.
+              </p>
+            )}
 
             <div className="mt-4 flex items-center gap-3">
               <button
-                onClick={doImport}
-                disabled={importing || trades.length === 0 || missingRequired.length > 0}
-                className="rounded-lg bg-accent px-5 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+                onClick={() => {
+                  if (mode === "wipe" && !confirmWipe) { setConfirmWipe(true); return; }
+                  doImport();
+                }}
+                disabled={importing || trades.length === 0 || missingRequired.length > 0 || (mode === "select" && selected.size === 0)}
+                className={`rounded-lg px-5 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50 ${mode === "wipe" ? "bg-danger" : "bg-accent"}`}
               >
-                {importing ? "Importing..." : `Import ${trades.length} trades`}
+                {importing
+                  ? "Importing..."
+                  : mode === "wipe"
+                    ? confirmWipe
+                      ? `Confirm: wipe all and import ${trades.length}`
+                      : `Wipe all and import ${trades.length}`
+                    : mode === "select"
+                      ? `Import ${selected.size} selected`
+                      : `Add ${trades.length} trades`}
               </button>
               {missingRequired.length > 0 && (
                 <span className="text-xs text-dim">Map: {missingRequired.map((f) => f.label).join(", ")}</span>
