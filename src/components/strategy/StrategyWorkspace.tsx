@@ -1002,11 +1002,23 @@ function MoneyOrPct({
   on: (v: string) => void;
   accountSize: number;
 }) {
-  const pct = v.trim().endsWith("%") ? parseFloat(v.trim().slice(0, -1)) : NaN;
-  const preview =
-    !Number.isNaN(pct) && accountSize > 0
-      ? Math.round((pct / 100) * accountSize * 100) / 100
-      : null;
+  // Show the value's live relationship to the current account both ways: a
+  // percent shows the figure it works out to now, a figure shows what percent
+  // of the account it is. Either way the hint reflects the current account.
+  const t = v.trim();
+  const isPct = t.endsWith("%");
+  const pct = isPct ? parseFloat(t.slice(0, -1)) : NaN;
+  const figure = !isPct ? parseFloat(t) : NaN;
+  let hint = accountSize > 0 ? "Type a figure or % of account" : "\u00A0";
+  if (accountSize > 0) {
+    if (isPct && !Number.isNaN(pct)) {
+      const abs = Math.round((pct / 100) * accountSize * 100) / 100;
+      hint = `= ${abs.toLocaleString()} of ${accountSize.toLocaleString()} now`;
+    } else if (!isPct && !Number.isNaN(figure) && figure !== 0) {
+      const p = Math.round((figure / accountSize) * 10000) / 100;
+      hint = `= ${p}% of ${accountSize.toLocaleString()} now`;
+    }
+  }
   return (
     <label className="block">
       <span className="mb-1 block text-xs text-dim">{label}</span>
@@ -1018,13 +1030,7 @@ function MoneyOrPct({
         className="field"
         style={{ fontFamily: "var(--font-mono)" }}
       />
-      <span className="mt-0.5 block text-[11px] text-dim">
-        {preview != null
-          ? `= ${preview.toLocaleString()} of ${accountSize.toLocaleString()} now`
-          : accountSize > 0
-            ? "Type a figure or % of account"
-            : "\u00A0"}
-      </span>
+      <span className="mt-0.5 block text-[11px] text-dim">{hint}</span>
     </label>
   );
 }
@@ -1083,12 +1089,12 @@ function WindowPicker({
   return (
     <label className="block">
       <span className="mb-1 block text-xs text-dim">{label}</span>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
         <input
           type="time"
           value={start}
           onChange={(e) => emit(e.target.value, end, tz)}
-          className="field !w-auto"
+          className="field !w-auto !px-2 !py-1.5 !text-sm"
           aria-label="Window start"
         />
         <span className="text-xs text-dim">to</span>
@@ -1096,13 +1102,13 @@ function WindowPicker({
           type="time"
           value={end}
           onChange={(e) => emit(start, e.target.value, tz)}
-          className="field !w-auto"
+          className="field !w-auto !px-2 !py-1.5 !text-sm"
           aria-label="Window end"
         />
         <select
           value={tz}
           onChange={(e) => emit(start, end, e.target.value)}
-          className="field !w-auto min-w-0"
+          className="field !w-auto min-w-0 max-w-[9.5rem] !px-2 !py-1.5 !text-sm"
           aria-label="Timezone"
         >
           {/* Values stay IANA ids; labels drop the underscores (New_York). */}
