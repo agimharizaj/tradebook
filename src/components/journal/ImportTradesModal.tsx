@@ -142,11 +142,12 @@ export default function ImportTradesModal({
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   // How the import writes to the journal:
-  //  append - add every row, duplicates included (no matching at all)
-  //  select - import only the ticked rows; each replaces any existing trade
-  //           with the same ticket, others are left alone
-  //  wipe   - delete ALL existing trades first, then import the whole file
-  const [mode, setMode] = useState<"append" | "select" | "wipe">("append");
+  //  replace - default: every file row overwrites the matching trade (by
+  //            ticket) and new ones are added, so no duplicates
+  //  select  - import only the ticked rows; each replaces its ticket match,
+  //            the rest of the journal is left alone
+  //  wipe    - delete ALL existing trades first, then import the whole file
+  const [mode, setMode] = useState<"replace" | "select" | "wipe">("replace");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [confirmWipe, setConfirmWipe] = useState(false);
   const lastIdx = useRef<number | null>(null);
@@ -225,8 +226,8 @@ export default function ImportTradesModal({
     if (!u.user) { setResult("Not signed in."); setImporting(false); return; }
     const userId = u.user.id;
 
-    // Rows to insert depend on the mode; deletes happen first where needed.
-    let rows = trades;
+    // Rows to insert: the whole file, or just the ticked ones in select mode.
+    let rows = mode === "select" ? trades.filter((_, i) => selected.has(i)) : trades;
     let wiped = 0;
     let replaced = 0;
 
@@ -238,9 +239,10 @@ export default function ImportTradesModal({
       const { error } = await supabase.from("trades").delete().eq("user_id", userId);
       if (error) { setResult(`Import error: ${error.message}`); setImporting(false); return; }
       wiped = count ?? 0;
-    } else if (mode === "select") {
-      // Import only ticked rows; each replaces existing trades with its ticket.
-      rows = trades.filter((_, i) => selected.has(i));
+      rows = trades;
+    } else {
+      // replace / select: delete existing trades that share a ticket with the
+      // rows we are about to import, so those get overwritten (no duplicates).
       const extIds = Array.from(new Set(rows.map((t) => t.ext_id).filter((x): x is string => !!x)));
       for (let i = 0; i < extIds.length; i += 300) {
         const chunk = extIds.slice(i, i + 300);
@@ -253,7 +255,6 @@ export default function ImportTradesModal({
         if (error) { setResult(`Import error: ${error.message}`); setImporting(false); return; }
       }
     }
-    // mode === "append": no deletes, insert everything (duplicates allowed).
 
     const toInsert = rows.map((t) => ({ ...t, user_id: userId }));
     let inserted = 0;
@@ -388,8 +389,8 @@ export default function ImportTradesModal({
             <fieldset className="mt-5 space-y-2">
               <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">On import</legend>
               {([
-                ["append", "Add all rows", "Adds every row in the file, duplicates included."],
-                ["select", "Choose which to replace", "Tick rows above; each replaces any existing trade with the same ticket, others are untouched."],
+                ["replace", "Replace with this file", "Each row overwrites the matching trade (by ticket); new trades are added. No duplicates."],
+                ["select", "Replace selected rows only", "Tick rows above; only those import, each replacing its match. The rest of the journal is untouched."],
                 ["wipe", "Wipe all, then import", "Deletes every existing trade first. Cannot be undone."],
               ] as const).map(([val, title, desc]) => (
                 <label key={val} className="flex items-start gap-2.5 text-sm text-muted">
@@ -431,7 +432,7 @@ export default function ImportTradesModal({
                       : `Wipe all and import ${trades.length}`
                     : mode === "select"
                       ? `Import ${selected.size} selected`
-                      : `Add ${trades.length} trades`}
+                      : `Import ${trades.length} trades`}
               </button>
               {missingRequired.length > 0 && (
                 <span className="text-xs text-dim">Map: {missingRequired.map((f) => f.label).join(", ")}</span>

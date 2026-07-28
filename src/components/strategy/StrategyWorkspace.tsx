@@ -597,7 +597,7 @@ export default function StrategyWorkspace() {
             mode, Save while editing, so long plans never need a scroll to
             the header. */}
         {draft && mode === "edit" ? (
-          <div className="fixed bottom-40 right-3 z-40 flex items-center gap-2 md:bottom-8 md:right-8">
+          <div className="fixed bottom-40 right-3 z-40 flex flex-col items-end gap-2 md:bottom-8 md:right-8">
             <button
               onClick={() => {
                 dirtyEdit.current = false;
