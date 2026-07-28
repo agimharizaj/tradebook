@@ -596,19 +596,35 @@ export default function StrategyWorkspace() {
         {/* Floating mode control, matching the notes editor: Edit in view
             mode, Save while editing, so long plans never need a scroll to
             the header. */}
-        {draft && (
+        {draft && mode === "edit" ? (
+          <div className="fixed bottom-40 right-3 z-40 flex items-center gap-2 md:bottom-8 md:right-8">
+            <button
+              onClick={() => {
+                dirtyEdit.current = false;
+                if (draft.id) openStrategy(draft.id);
+                else setDraft(null);
+              }}
+              disabled={saving}
+              className="rounded-full border border-border2 bg-card/95 px-4 py-2.5 text-sm font-medium text-muted shadow-xl backdrop-blur transition hover:border-foreground hover:text-foreground disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="rounded-full bg-accent px-4 py-2.5 text-sm font-medium text-white shadow-xl backdrop-blur transition hover:opacity-90 disabled:opacity-60"
+            >
+              {saving ? "Saving..." : "Save"}
+            </button>
+          </div>
+        ) : draft ? (
           <button
-            onClick={() => (mode === "view" ? setMode("edit") : save())}
-            disabled={saving}
-            className={`fixed bottom-40 right-3 z-40 rounded-full px-4 py-2.5 text-sm font-medium shadow-xl backdrop-blur transition disabled:opacity-60 md:bottom-8 md:right-8 ${
-              mode === "edit"
-                ? "bg-accent text-white hover:opacity-90"
-                : "border border-border2 bg-card/95 text-foreground hover:border-accent"
-            }`}
+            onClick={() => setMode("edit")}
+            className="fixed bottom-40 right-3 z-40 rounded-full border border-border2 bg-card/95 px-4 py-2.5 text-sm font-medium text-foreground shadow-xl backdrop-blur transition hover:border-accent md:bottom-8 md:right-8"
           >
-            {mode === "edit" ? (saving ? "Saving..." : "Save") : "Edit"}
+            Edit
           </button>
-        )}
+        ) : null}
         {draft && (
           <button
             onClick={() => {
