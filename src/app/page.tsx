@@ -181,7 +181,7 @@ export default async function Home({
                 d: "Market headlines and the economic calendar next to your charts, archived as they arrive so the record deepens the longer you run it. Ask Sidekick what a print means for your pairs.",
               },
               {
-                t: "Sanctuary",
+                t: "Calm",
                 d: "Box breathing and psychology prompts for the moments the market gets loud. The cheapest risk control in the whole app.",
               },
             ].map((f) => (
