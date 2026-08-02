@@ -27,6 +27,7 @@ export default function MicButton({
         >
           <span className="mr-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-danger align-middle" aria-hidden="true" />
           {interim ? <em className="not-italic text-foreground">{interim}</em> : "Listening…"}
+          <span className="mt-1 block text-[10px] text-dim">Tap the mic to stop</span>
         </span>
       )}
       <button

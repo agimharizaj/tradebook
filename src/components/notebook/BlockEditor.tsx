@@ -794,6 +794,7 @@ export default function BlockEditor({
         >
           <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-danger align-middle" aria-hidden="true" />
           {speech.interim ? <em className="not-italic text-foreground">{speech.interim}</em> : "Listening…"}
+          <span className="mt-0.5 block text-[10px] text-dim">Tap Stop in the palette to finish</span>
         </div>
       )}
 
@@ -875,7 +876,7 @@ export default function BlockEditor({
                   <rect x="9" y="2" width="6" height="12" rx="3" />
                   <path d="M5 10a7 7 0 0 0 14 0M12 17v4" />
                 </svg>
-                {speech.listening ? "Listening…" : "Dictate"}
+                {speech.listening ? "Stop" : "Dictate"}
               </span>
             </button>
           )}
@@ -944,7 +945,7 @@ export default function BlockEditor({
                   <rect x="9" y="2" width="6" height="12" rx="3" />
                   <path d="M5 10a7 7 0 0 0 14 0M12 17v4" />
                 </svg>
-                {speech.listening ? "Listening…" : "Dictate"}
+                {speech.listening ? "Stop" : "Dictate"}
               </span>
             </button>
           )}
