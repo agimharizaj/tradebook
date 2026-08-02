@@ -5,12 +5,13 @@
 // trading-day panel runs against your real settings.
 import { useState } from "react";
 
+// Demo limits sized for a 100K account (3% daily loss cap, 5% target).
 const MAX_TRADES = 5;
-const MAX_LOSS = -300;
-const TARGET = 500;
+const MAX_LOSS = -3000;
+const TARGET = 5000;
 
 export default function GuardrailsDemo() {
-  const [pnl, setPnl] = useState(-120);
+  const [pnl, setPnl] = useState(-1200);
   const [count, setCount] = useState(3);
 
   const pct = Math.min(100, Math.max(0, ((pnl - MAX_LOSS) / (TARGET - MAX_LOSS)) * 100));
@@ -75,15 +76,15 @@ export default function GuardrailsDemo() {
             />
           </div>
           <div className="mt-1 flex justify-between font-mono text-[10px] text-dim">
-            <span>-$300 max loss</span>
+            <span>-$3,000 max loss</span>
             <span>0</span>
-            <span>+$500 target</span>
+            <span>+$5,000 target</span>
           </div>
           <input
             type="range"
-            min={-400}
-            max={600}
-            step={10}
+            min={-4000}
+            max={6000}
+            step={100}
             value={pnl}
             onChange={(e) => setPnl(Number(e.target.value))}
             aria-label="Drag the demo day's PnL"
