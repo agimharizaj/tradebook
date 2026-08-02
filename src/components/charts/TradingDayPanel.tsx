@@ -155,12 +155,17 @@ export default function TradingDayPanel({
   const routineTotal = settings.routine_items.length;
   const routineCount = routineDone.filter((x) => settings.routine_items.includes(x)).length;
 
-  // PnL position on the loss-cap..target bar (50% = zero when only one side set).
-  const barPct = useMemo(() => {
+  // PnL bar between loss cap and target: the fill grows from the zero point
+  // toward the current net, so a flat day shows an empty bar instead of a
+  // misleading green block.
+  const bar = useMemo(() => {
     const lo = lossCap != null ? -Math.abs(lossCap) : Math.min(net, 0) * 1.5 || -100;
     const hi = target != null ? Math.abs(target) : Math.max(net, 0) * 1.5 || 100;
     const span = hi - lo || 1;
-    return Math.min(100, Math.max(0, ((net - lo) / span) * 100));
+    const pos = (v: number) => Math.min(100, Math.max(0, ((v - lo) / span) * 100));
+    const zero = pos(0);
+    const now = pos(net);
+    return { left: Math.min(zero, now), width: Math.abs(now - zero), zero };
   }, [net, lossCap, target]);
 
   const body = (
@@ -239,12 +244,9 @@ export default function TradingDayPanel({
           </span>
         </div>
         {windows.length > 0 && (
-          <div className="flex items-center justify-between py-1">
-            <span className="text-sm text-muted">Trading window</span>
-            <span className="flex items-center gap-2">
-              <span className="font-mono text-[11px] text-muted">
-                {windows.map((w) => w.raw).join(" · ")}
-              </span>
+          <div className="py-1">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted">Trading window</span>
               <span
                 className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
                   windowOpen
@@ -254,7 +256,29 @@ export default function TradingDayPanel({
               >
                 {windowOpen ? "Open" : "Closed"}
               </span>
-            </span>
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {windows.map((w) => {
+                // Compact display: "07:00–09:00 London" instead of the raw
+                // IANA id, which wrapped ugly at panel width.
+                const times = w.raw.match(/^\S+/)?.[0]?.replace("-", "–") ?? w.raw;
+                const tzShort = (w.tz.split("/").pop() ?? w.tz).replace(/_/g, " ");
+                const openNow = inWindow(w, new Date());
+                return (
+                  <span
+                    key={w.raw}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-surface2 px-2 py-1 font-mono text-[11px] text-muted"
+                    title={w.raw}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${openNow ? "bg-success" : "bg-danger/60"}`}
+                      aria-hidden="true"
+                    />
+                    {times} {tzShort}
+                  </span>
+                );
+              })}
+            </div>
           </div>
         )}
         <div className="py-1">
@@ -268,14 +292,21 @@ export default function TradingDayPanel({
           </div>
           {(lossCap != null || target != null) && (
             <>
-              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface2">
+              <div className="relative mt-1.5 h-1.5 rounded-full bg-surface2">
                 <div
-                  className={`h-full rounded-full ${net < 0 ? "bg-danger" : "bg-success"}`}
-                  style={{ width: `${barPct}%` }}
+                  className={`absolute inset-y-0 rounded-full ${net < 0 ? "bg-danger" : "bg-success"}`}
+                  style={{ left: `${bar.left}%`, width: `${bar.width}%` }}
+                />
+                {/* zero marker */}
+                <div
+                  className="absolute inset-y-0 w-px bg-border2"
+                  style={{ left: `${bar.zero}%` }}
+                  aria-hidden="true"
                 />
               </div>
               <div className="mt-1 flex justify-between font-mono text-[10px] text-dim">
                 <span>{lossCap != null ? `-${moneySigned(Math.abs(lossCap), cur).replace("+", "")} max loss` : ""}</span>
+                <span>0</span>
                 <span>{target != null ? `${moneySigned(Math.abs(target), cur)} target` : ""}</span>
               </div>
             </>
