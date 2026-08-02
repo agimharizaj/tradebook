@@ -233,10 +233,14 @@ export default function JournalPanel({
     setRecap("");
     const end = ymd(new Date(new Date(anchorDay + "T00:00:00").getTime() + 6 * 86400000));
     const prompt =
-      `Write a recap of my trading week ${anchorDay} to ${end} using only the data snapshot. ` +
-      `Cover: the net result, what worked (plans, confluences), repeated mistakes and emotions, ` +
-      `guardrail violations and plan adherence - and end with exactly one specific focus for next week. ` +
-      `If I logged no trades that week, say so in one line. Plain text, no headers, under 180 words, direct.`;
+      `Weekly recap request - this is a data-only task, NOT a chart or setup check. ` +
+      `There is no screenshot and none is needed; never ask for one. ` +
+      `From the data snapshot alone, recap my trading week ${anchorDay} to ${end} ` +
+      `(trades whose date falls in that range). Cover: the net result, what worked ` +
+      `(plans, confluences), repeated mistakes and emotions, guardrail violations and ` +
+      `plan adherence - and end with exactly one specific focus for next week. ` +
+      `If I logged no trades in that range, say so in one line and stop. ` +
+      `Plain text, no headers, under 180 words, direct.`;
     try {
       const res = await fetch("/api/ai", {
         method: "POST",
