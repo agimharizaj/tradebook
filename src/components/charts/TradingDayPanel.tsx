@@ -32,7 +32,7 @@ type Trade = {
   pnl: number | null;
 };
 
-type NewsItem = { title: string; link: string; pubDate: string; source: string };
+type NewsItem = { title: string; link: string; pubDate: string; source: string; body: string };
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const todayYmd = () => {
@@ -63,6 +63,7 @@ export default function TradingDayPanel({
   const [accSize, setAccSize] = useState(0);
   const [lifetimeNet, setLifetimeNet] = useState<number | null>(null);
   const [news, setNews] = useState<NewsItem[] | null>(null);
+  const [openNews, setOpenNews] = useState<string | null>(null);
   const [, setTick] = useState(0); // re-render each minute for the window pill
   const notifiedRef = useRef(false);
   const day = todayYmd();
@@ -408,22 +409,39 @@ export default function TradingDayPanel({
           </div>
           <div className="mt-2 space-y-1">
             {news.length === 0 && <p className="py-1 text-xs text-dim">Nothing published yet today.</p>}
-            {news.map((n) => (
-              <a
-                key={n.link}
-                href={n.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block rounded-lg px-1.5 py-1.5 transition hover:bg-surface2"
-              >
-                <span className="line-clamp-2 text-xs leading-snug">{n.title}</span>
-                <span className="mt-0.5 block font-mono text-[10px] text-dim">
-                  {n.source}
-                  {!Number.isNaN(new Date(n.pubDate).getTime()) &&
-                    ` · ${new Date(n.pubDate).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`}
-                </span>
-              </a>
-            ))}
+            {news.map((n) => {
+              const expanded = openNews === n.link;
+              return (
+                <div key={n.link} className={`rounded-lg transition ${expanded ? "bg-surface2" : "hover:bg-surface2"}`}>
+                  <button
+                    onClick={() => setOpenNews(expanded ? null : n.link)}
+                    className="block w-full px-1.5 py-1.5 text-left"
+                    aria-expanded={expanded}
+                  >
+                    <span className={`text-xs leading-snug ${expanded ? "" : "line-clamp-2"}`}>{n.title}</span>
+                    <span className="mt-0.5 block font-mono text-[10px] text-dim">
+                      {n.source}
+                      {!Number.isNaN(new Date(n.pubDate).getTime()) &&
+                        ` · ${new Date(n.pubDate).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`}
+                    </span>
+                  </button>
+                  {expanded && (
+                    <div className="px-1.5 pb-2">
+                      {n.body ? (
+                        <p className="text-xs leading-relaxed text-muted">
+                          {n.body.length > 420 ? `${n.body.slice(0, 420).trimEnd()}…` : n.body}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-dim">No summary available for this one.</p>
+                      )}
+                      <Link href="/news" className="mt-1.5 inline-block text-[11px] text-accent2 hover:underline">
+                        Read in full on the News page
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

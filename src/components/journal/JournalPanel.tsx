@@ -308,7 +308,7 @@ export default function JournalPanel({
       <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={onClose} aria-hidden="true" />
       <aside
         aria-label={isDay ? "Day journal" : "Week journal"}
-        className="fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-border2 bg-card shadow-2xl md:w-[380px]"
+        className="fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-border2 bg-card pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-2xl md:w-[380px] md:pb-0 md:pt-0"
       >
         {/* header */}
         <div className="flex items-center gap-2 border-b border-border px-4 py-3">

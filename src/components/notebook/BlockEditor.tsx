@@ -785,6 +785,18 @@ export default function BlockEditor({
       {imgErr && <p className="text-xs text-danger">{imgErr}</p>}
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={uploadImage} />
 
+      {/* Live transcription while dictating: interim words appear here before
+          they commit to the note at the cursor. */}
+      {speech.listening && (
+        <div
+          aria-live="polite"
+          className="fixed bottom-24 left-1/2 z-50 w-max max-w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-border2 bg-card px-3.5 py-2 text-sm text-muted shadow-2xl md:bottom-6"
+        >
+          <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-danger align-middle" aria-hidden="true" />
+          {speech.interim ? <em className="not-italic text-foreground">{speech.interim}</em> : "Listening…"}
+        </div>
+      )}
+
       {showEmoji && (
         <div className="flex flex-wrap gap-1 rounded-xl border border-border2 bg-surface2/60 p-2">
           {EMOJIS.map((em) => (
