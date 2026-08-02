@@ -62,7 +62,7 @@ export default async function Home({
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div>
             <div className="mb-4 flex flex-wrap gap-1.5">
-              {["Playbooks", "Journal", "Guardrails", "Risk", "Charts", "AI sidekick"].map((tag) => (
+              {["Playbooks", "Journal", "Guardrails", "Risk", "Trading", "AI sidekick"].map((tag) => (
                 <span
                   key={tag}
                   className="rounded-full border border-border2 px-2.5 py-1 font-mono text-xs text-muted"
@@ -170,8 +170,8 @@ export default async function Home({
                 i: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 8v4M12 16h.01",
               },
               {
-                t: "Charts + analysis log",
-                d: "TradingView with your watchlist, the trading-day panel beside the candles, and a log of every read you take.",
+                t: "Trading terminal",
+                d: "TradingView with your watchlist, the trading-day panel beside the candles - routine, guardrails, today's news - and a log of every read you take.",
                 i: "M4 19V5M4 19h16M8 15l3-3 3 2 4-5",
               },
               {
@@ -254,7 +254,7 @@ export default async function Home({
             </h2>
             <p className="mt-4 max-w-md leading-relaxed text-muted">
               Set your max trades, max daily loss, profit target and trading
-              windows once. The chart page then watches the day with you:
+              windows once. The Trading page then watches the day with you:
               trades count up, the PnL bar tracks your caps, and rule breaks
               are named out loud - here and in the journal.
             </p>

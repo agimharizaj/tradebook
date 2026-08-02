@@ -5,7 +5,7 @@
 
 export type PairInfo = {
   label: string; // canonical app-wide identifier, e.g. "EUR/USD"
-  tv: string; // TradingView symbol for the Charts page
+  tv: string; // TradingView symbol for the Trading page
   cat: "FX majors" | "FX crosses" | "Metals" | "Crypto" | "Indices" | "Energy";
 };
 

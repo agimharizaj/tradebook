@@ -1,6 +1,6 @@
 "use client";
 
-// The trading-day panel on the Charts page: pre-market routine checklist,
+// The trading-day panel on the Trading page: pre-market routine checklist,
 // live guardrail readouts (trades today, trading window, net PnL vs limits)
 // and warnings, plus today's logged trades. Docked to the RIGHT of the chart
 // (outside #tv-chart-area so screen captures stay clean); on phones it opens

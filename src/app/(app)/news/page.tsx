@@ -37,10 +37,10 @@ export default function NewsPage() {
   // TradingView's calendar always lists upcoming events; the one filter it
   // supports from outside is importance, so that's the toggle we expose.
   const [highOnly, setHighOnly] = useState(false);
-  // Send widget symbol clicks to our own Charts page instead of tradingview.com.
+  // Send widget symbol clicks to our own Trading page instead of tradingview.com.
   const [origin, setOrigin] = useState("");
   useEffect(() => setOrigin(window.location.origin), []);
-  const largeChartUrl = origin ? `${origin}/charts` : undefined;
+  const largeChartUrl = origin ? `${origin}/trading` : undefined;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">

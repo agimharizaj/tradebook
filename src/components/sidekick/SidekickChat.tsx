@@ -139,7 +139,7 @@ export default function SidekickChat({
   const [slashIndex, setSlashIndex] = useState(0);
   const [strategyId, setStrategyId] = useState("");
 
-  // A chart snapped in from the Charts page: attach it to the composer once.
+  // A chart snapped in from the Trading page: attach it to the composer once.
   useEffect(() => {
     if (!pendingImage) return;
     let cancelled = false;

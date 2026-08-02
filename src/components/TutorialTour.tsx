@@ -39,7 +39,7 @@ const STEPS: Step[] = [
     body: "Stop distance in, lot size out, with live prices. Size the position before the trade exists.",
   },
   {
-    target: "nav-charts",
+    target: "nav-trading",
     title: "Trading",
     body: "Your session cockpit: TradingView with your watchlist, plus the trading-day panel - pre-market routine, live guardrails, today's news and trades beside the chart.",
   },

@@ -210,7 +210,7 @@ export default function SettingsWorkspace({ meta }: { meta: Meta }) {
           <>
             <Section
               title="Trading guardrails"
-              lead="Account-level limits. These drive the guardrail violations in your journal and the live warnings on the Charts page. Money limits take a figure (200) or a percent of account (5%)."
+              lead="Account-level limits. These drive the guardrail violations in your journal and the live warnings on the Trading page. Money limits take a figure (200) or a percent of account (5%)."
             >
               {migrationNote}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -243,7 +243,7 @@ export default function SettingsWorkspace({ meta }: { meta: Meta }) {
               </div>
               <div className="mt-4 flex items-center justify-between gap-4">
                 <ToggleRow
-                  label="Warn on Charts page"
+                  label="Warn on Trading page"
                   desc="Show live guardrail warnings while charting"
                   on={settings.warn_on_charts}
                   onToggle={() => persist({ warn_on_charts: !settings.warn_on_charts })}
@@ -313,7 +313,7 @@ export default function SettingsWorkspace({ meta }: { meta: Meta }) {
         {tab === "routine" && (
           <Section
             title="Pre-market routine"
-            lead="Your daily checklist. It appears on the Charts page and in each day's journal. Ticks reset every trading day."
+            lead="Your daily checklist. It appears on the Trading page and in each day's journal. Ticks reset every trading day."
           >
             {migrationNote}
             <div className="space-y-2">

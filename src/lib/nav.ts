@@ -2,7 +2,7 @@ export type NavItem = { href: string; label: string; short: string; icon: string
 
 export const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", short: "Home", icon: "M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" },
-  { href: "/charts", label: "Trading", short: "Trading", icon: "M4 19V5M4 19h16M8 15l3-3 3 2 4-5" },
+  { href: "/trading", label: "Trading", short: "Trading", icon: "M4 19V5M4 19h16M8 15l3-3 3 2 4-5" },
   { href: "/journal", label: "Journal", short: "Journal", icon: "M4 4h16v16H4zM4 9h16M9 4v16" },
   { href: "/strategy", label: "Strategy", short: "Strategy", icon: "M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" },
   { href: "/notebook", label: "Notebook", short: "Notes", icon: "M15.5 3.5a2.12 2.12 0 0 1 3 3L8 17l-4 1 1-4z" },

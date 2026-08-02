@@ -104,7 +104,7 @@ export default function SnapshotMenu({
 
   async function copyLink() {
     setOpen(false);
-    const link = `${window.location.origin}/charts?tvwidgetsymbol=${encodeURIComponent(tv)}`;
+    const link = `${window.location.origin}/trading?tvwidgetsymbol=${encodeURIComponent(tv)}`;
     try {
       await navigator.clipboard.writeText(link);
       flash("Chart link copied - it reopens this pair here.");

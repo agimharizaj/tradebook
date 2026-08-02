@@ -18,7 +18,7 @@ export default function SidekickDock() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [strategies, setStrategies] = useState<Strategy[] | null>(null);
-  // A chart captured by "Snap to Sidekick" on the Charts page, waiting to be
+  // A chart captured by "Snap to Sidekick" on the Trading page, waiting to be
   // attached once the chat mounts.
   const [pendingImage, setPendingImage] = useState<Blob | null>(null);
   // Draggable launcher: null = default corner position (Tailwind classes);
@@ -95,7 +95,7 @@ export default function SidekickDock() {
     }
   }
 
-  // "Snap to Sidekick" (Charts page) dispatches a chart blob; open the drawer
+  // "Snap to Sidekick" (Trading page) dispatches a chart blob; open the drawer
   // and hold the image until the chat mounts and consumes it.
   useEffect(() => {
     const onSnap = (e: Event) => {
