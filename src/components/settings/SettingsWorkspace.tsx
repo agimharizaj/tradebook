@@ -16,6 +16,7 @@ import {
 } from "@/lib/settings";
 import PairsManager from "@/components/PairsManager";
 import ThemeToggle from "@/components/ThemeToggle";
+import BackLink from "@/components/BackLink";
 
 type Meta = Record<string, unknown>;
 const str = (m: Meta, k: string) => (typeof m[k] === "string" ? (m[k] as string) : "");
@@ -169,7 +170,8 @@ export default function SettingsWorkspace({ meta }: { meta: Meta }) {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 md:px-8 md:py-10">
-      <h1 className="text-2xl">Settings</h1>
+      <BackLink fallback="/dashboard" />
+      <h1 className="mt-2 text-2xl">Settings</h1>
       <p className="mt-1 text-muted">Account-level trading configuration.</p>
 
       {msg && (
