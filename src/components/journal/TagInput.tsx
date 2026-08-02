@@ -88,7 +88,7 @@ export default function TagInput({
           className="min-w-20 flex-1 bg-transparent py-0.5 text-sm outline-none placeholder:text-dim"
         />
       </div>
-      {open && options.length > 0 && (
+      {open && (options.length > 0 || input.trim()) && (
         <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-44 overflow-y-auto rounded-lg border border-border2 bg-card py-1 shadow-2xl">
           {options.map((s) => (
             <button
@@ -100,6 +100,18 @@ export default function TagInput({
               {s}
             </button>
           ))}
+          {/* New tags are first-class: typed text becomes a tag on click or
+              Enter, and joins the suggestion catalog for every later trade. */}
+          {input.trim() && !suggestions.includes(input.trim()) && (
+            <button
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); add(input); }}
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-accent2 transition hover:bg-surface2"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+              Add &ldquo;{input.trim()}&rdquo;
+            </button>
+          )}
         </div>
       )}
     </div>

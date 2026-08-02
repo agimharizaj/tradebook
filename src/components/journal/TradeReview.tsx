@@ -104,6 +104,11 @@ export default function TradeReview({ tradeId }: { tradeId: string }) {
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [uploading, setUploading] = useState<Slot | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareToken, setShareToken] = useState<string | null>(null);
+  const [shareAvailable, setShareAvailable] = useState(true);
+  const [shareMsg, setShareMsg] = useState<string | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reviewRef = useRef(review);
@@ -315,6 +320,68 @@ export default function TradeReview({ tradeId }: { tradeId: string }) {
     });
   }
 
+  // --- share (migration 0017) ----------------------------------------------
+  async function openShare() {
+    setShareOpen(true);
+    setShareMsg(null);
+    const { data, error } = await supabase
+      .from("trade_shares")
+      .select("token")
+      .eq("trade_id", tradeId)
+      .maybeSingle();
+    if (error) setShareAvailable(false);
+    else {
+      setShareAvailable(true);
+      setShareToken((data as { token: string } | null)?.token ?? null);
+    }
+  }
+
+  async function copyToClipboard(text: string, okMsg: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setShareMsg(okMsg);
+    } catch {
+      setShareMsg("Clipboard blocked - copy the link manually.");
+    }
+  }
+
+  async function createPublicLink() {
+    setShareBusy(true);
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) {
+      setShareBusy(false);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("trade_shares")
+      .insert({ user_id: u.user.id, trade_id: tradeId })
+      .select("token")
+      .single();
+    setShareBusy(false);
+    if (error) {
+      setShareMsg(`Could not create the link: ${error.message}`);
+      return;
+    }
+    const token = (data as { token: string }).token;
+    setShareToken(token);
+    copyToClipboard(
+      `${window.location.origin}/share/trade/${token}`,
+      "Public link created and copied."
+    );
+  }
+
+  async function revokeShare() {
+    setShareBusy(true);
+    const { error } = await supabase.from("trade_shares").delete().eq("trade_id", tradeId);
+    setShareBusy(false);
+    if (error) {
+      setShareMsg(`Could not revoke: ${error.message}`);
+      return;
+    }
+    setShareToken(null);
+    setShareMsg("Link revoked - it now shows nothing.");
+  }
+
   const pos = dayIds.indexOf(tradeId);
   const prevId = pos > 0 ? dayIds[pos - 1] : null;
   const nextId = pos >= 0 && pos < dayIds.length - 1 ? dayIds[pos + 1] : null;
@@ -357,31 +424,27 @@ export default function TradeReview({ tradeId }: { tradeId: string }) {
     );
   }
 
-  const emoRow = (
+  // Native selects, like EdgeFlo. Emoji prefixes inside <option> are the one
+  // tolerated exception to the no-emoji-icons rule (options can't render SVG).
+  const emoSelect = (
     list: { label: string; e: string }[],
     current: string | null,
     key: "entry_emotion" | "exit_emotion"
   ) => (
-    <div className="flex flex-wrap gap-1.5">
-      {list.map((x) => {
-        const on = current === x.label;
-        return (
-          <button
-            key={x.label}
-            type="button"
-            onClick={() => update({ [key]: on ? null : x.label } as Partial<Review>)}
-            className={`rounded-lg border px-2.5 py-1.5 text-xs transition ${
-              on
-                ? "border-accent bg-accent-soft text-foreground"
-                : "border-border2 text-muted hover:border-accent hover:text-foreground"
-            }`}
-            aria-pressed={on}
-          >
-            <span aria-hidden="true">{x.e}</span> {x.label}
-          </button>
-        );
-      })}
-    </div>
+    <select
+      value={current ?? ""}
+      onChange={(e) => update({ [key]: e.target.value || null } as Partial<Review>)}
+      className="jfield"
+      disabled={!reviewsAvailable}
+      aria-label={key === "entry_emotion" ? "Entry emotion" : "Exit emotion"}
+    >
+      <option value="">Select…</option>
+      {list.map((x) => (
+        <option key={x.label} value={x.label}>
+          {x.e} {x.label}
+        </option>
+      ))}
+    </select>
   );
 
   return (
@@ -409,6 +472,16 @@ export default function TradeReview({ tradeId }: { tradeId: string }) {
           <span aria-live="polite" className="mr-1 font-mono text-[11px] text-dim">
             {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : ""}
           </span>
+          <button
+            onClick={openShare}
+            className="flex items-center gap-1.5 rounded-lg border border-border2 px-3 py-1.5 text-xs font-medium text-muted transition hover:border-accent hover:text-foreground"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+              <path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" />
+            </svg>
+            Share
+          </button>
           <button
             onClick={toggleFocus}
             className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
@@ -630,12 +703,12 @@ export default function TradeReview({ tradeId }: { tradeId: string }) {
               </FieldWrap>
             </div>
 
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <FieldWrap label="Entry emotion">
-                {emoRow(ENTRY_EMOTIONS, review.entry_emotion, "entry_emotion")}
+                {emoSelect(ENTRY_EMOTIONS, review.entry_emotion, "entry_emotion")}
               </FieldWrap>
               <FieldWrap label="Exit emotion">
-                {emoRow(EXIT_EMOTIONS, review.exit_emotion, "exit_emotion")}
+                {emoSelect(EXIT_EMOTIONS, review.exit_emotion, "exit_emotion")}
               </FieldWrap>
             </div>
 
@@ -673,6 +746,96 @@ export default function TradeReview({ tradeId }: { tradeId: string }) {
           onClose={() => setEditOpen(false)}
           onSaved={load}
         />
+      )}
+
+      {shareOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setShareOpen(false);
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl bg-card p-6 ring-1 ring-border2">
+            <div className="flex items-start justify-between">
+              <h3 className="text-base font-medium" style={{ fontFamily: "var(--font-display)" }}>
+                Share trade
+              </h3>
+              <button onClick={() => setShareOpen(false)} aria-label="Close" className="-m-1.5 rounded-md p-1.5 text-muted hover:text-foreground">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {!shareAvailable ? (
+              <p className="mt-3 rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-sm text-gold">
+                Sharing needs migration 0017 (trade_shares) applied first.
+              </p>
+            ) : (
+              <div className="mt-4 space-y-3">
+                <div className="rounded-xl border border-border p-3.5">
+                  <div className="text-sm font-medium">Private link</div>
+                  <p className="mt-0.5 text-xs text-dim">
+                    This page&apos;s URL - only works for you, signed in.
+                  </p>
+                  <button
+                    onClick={() => copyToClipboard(window.location.href, "Private link copied.")}
+                    className="mt-2.5 rounded-lg border border-border2 px-3 py-1.5 text-xs font-medium text-muted transition hover:border-accent hover:text-foreground"
+                  >
+                    Copy private link
+                  </button>
+                </div>
+
+                <div className="rounded-xl border border-border p-3.5">
+                  <div className="text-sm font-medium">Public link</div>
+                  <p className="mt-0.5 text-xs text-dim">
+                    Anyone with the link sees this trade and its review, read-only,
+                    nothing else. Revoke it any time.
+                  </p>
+                  {shareToken ? (
+                    <>
+                      <div className="mt-2.5 truncate rounded-lg bg-surface2 px-3 py-2 font-mono text-[11px] text-muted">
+                        {`${typeof window !== "undefined" ? window.location.origin : ""}/share/trade/${shareToken}`}
+                      </div>
+                      <div className="mt-2.5 flex gap-2">
+                        <button
+                          onClick={() =>
+                            copyToClipboard(
+                              `${window.location.origin}/share/trade/${shareToken}`,
+                              "Public link copied."
+                            )
+                          }
+                          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90"
+                        >
+                          Copy link
+                        </button>
+                        <button
+                          onClick={revokeShare}
+                          disabled={shareBusy}
+                          className="rounded-lg border border-danger/40 px-3 py-1.5 text-xs font-medium text-danger transition hover:bg-danger/10 disabled:opacity-50"
+                        >
+                          Revoke link
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <button
+                      onClick={createPublicLink}
+                      disabled={shareBusy}
+                      className="mt-2.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+                    >
+                      {shareBusy ? "Creating…" : "Create public link"}
+                    </button>
+                  )}
+                </div>
+
+                {shareMsg && (
+                  <p aria-live="polite" className="text-xs text-muted">
+                    {shareMsg}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {confirmDelete && (

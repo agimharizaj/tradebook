@@ -43,9 +43,11 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isPublic =
+    pathname === "/" || // landing page (redirects signed-in users itself)
     pathname.startsWith("/login") ||
     pathname.startsWith("/signup") ||
-    pathname.startsWith("/auth");
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/share"); // token-scoped public trade shares
 
   // Not signed in and trying to reach a protected page -> send to login.
   if (!user && !isPublic) {

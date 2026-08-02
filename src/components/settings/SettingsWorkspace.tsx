@@ -17,6 +17,7 @@ import {
 import PairsManager from "@/components/PairsManager";
 import ThemeToggle from "@/components/ThemeToggle";
 import BackLink from "@/components/BackLink";
+import { MoneyOrPct, WindowPicker } from "@/components/RiskFields";
 
 type Meta = Record<string, unknown>;
 const str = (m: Meta, k: string) => (typeof m[k] === "string" ? (m[k] as string) : "");
@@ -62,6 +63,12 @@ export default function SettingsWorkspace({ meta }: { meta: Meta }) {
   });
   const setG = (k: keyof typeof guard, v: string) => setGuard((f) => ({ ...f, [k]: v }));
   const [savingGuard, setSavingGuard] = useState(false);
+  // Live account size for the "= X of account now" hints, tracking the
+  // trading-profile field as it's typed.
+  const accountSizeNum = (() => {
+    const n = parseFloat(profile.account_size.replace(/,/g, ""));
+    return Number.isNaN(n) ? 0 : n;
+  })();
 
   const [newItem, setNewItem] = useState("");
 
@@ -208,24 +215,32 @@ export default function SettingsWorkspace({ meta }: { meta: Meta }) {
               {migrationNote}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Max trades / day">
-                  <input inputMode="numeric" value={guard.max_trades_per_day} onChange={(e) => setG("max_trades_per_day", e.target.value)} placeholder="5" className="field" />
+                  <input inputMode="numeric" value={guard.max_trades_per_day} onChange={(e) => setG("max_trades_per_day", e.target.value)} placeholder="5" className="field" style={{ fontFamily: "var(--font-mono)" }} />
                 </Field>
-                <Field label="Max daily loss">
-                  <input value={guard.max_daily_loss} onChange={(e) => setG("max_daily_loss", e.target.value)} placeholder="200 or 3%" className="field" />
-                </Field>
-                <Field label="Daily profit target">
-                  <input value={guard.max_daily_profit} onChange={(e) => setG("max_daily_profit", e.target.value)} placeholder="500 or 5%" className="field" />
-                </Field>
-                <Field label="Trading window 1">
-                  <input value={guard.trading_window} onChange={(e) => setG("trading_window", e.target.value)} placeholder="08:00-12:00 UTC" className="field" />
-                </Field>
-                <Field label="Trading window 2 (optional)">
-                  <input value={guard.trading_window_2} onChange={(e) => setG("trading_window_2", e.target.value)} placeholder="13:30-16:00 NY" className="field" />
-                </Field>
+                <div className="hidden sm:block" />
+                <MoneyOrPct
+                  label="Max daily loss"
+                  v={guard.max_daily_loss}
+                  on={(v) => setG("max_daily_loss", v)}
+                  accountSize={accountSizeNum}
+                />
+                <MoneyOrPct
+                  label="Daily profit target"
+                  v={guard.max_daily_profit}
+                  on={(v) => setG("max_daily_profit", v)}
+                  accountSize={accountSizeNum}
+                />
+                <WindowPicker
+                  label="Trading window"
+                  value={guard.trading_window}
+                  on={(v) => setG("trading_window", v)}
+                />
+                <WindowPicker
+                  label="Trading window 2 (optional)"
+                  value={guard.trading_window_2}
+                  on={(v) => setG("trading_window_2", v)}
+                />
               </div>
-              <p className="mt-2 text-xs text-dim">
-                Window timezones: UTC (default), London, NY, Tokyo, Sydney, or any IANA name.
-              </p>
               <div className="mt-4 flex items-center justify-between gap-4">
                 <ToggleRow
                   label="Warn on Charts page"
