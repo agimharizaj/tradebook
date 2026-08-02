@@ -6,6 +6,7 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 type TradeRow = {
+  id: string;
   pnl: number | null;
   r_multiple: number | null;
   pair: string | null;
@@ -15,6 +16,34 @@ type TradeRow = {
   emotion: string | null;
   notes: string | null;
   strategy_id: string | null;
+};
+
+type ReviewRow = {
+  trade_id: string;
+  plan_followed: boolean | null;
+  confluences: string[] | null;
+  management: string[] | null;
+  mistakes: string[] | null;
+  entry_emotion: string | null;
+  exit_emotion: string | null;
+  reflection: string | null;
+  strategy_name: string | null;
+};
+
+type DayReviewRow = {
+  day: string;
+  plan_followed: string | null;
+  note: string | null;
+  routine_done: string[] | null;
+};
+
+type SettingsRow = {
+  max_trades_per_day: number | null;
+  max_daily_loss: string | null;
+  max_daily_profit: string | null;
+  trading_window: string | null;
+  trading_window_2: string | null;
+  routine_items: unknown;
 };
 
 type StrategyRow = {
@@ -113,10 +142,22 @@ function nowContext(): string {
 }
 
 export async function buildAiContext(supabase: SupabaseClient, user: User): Promise<string> {
-  const [tradesRes, stratRes, entryRes, exitRes, tmrRes, notesRes, analysesRes, newsRes] = await Promise.all([
+  const [
+    tradesRes,
+    stratRes,
+    entryRes,
+    exitRes,
+    tmrRes,
+    notesRes,
+    analysesRes,
+    newsRes,
+    settingsRes,
+    dayRevRes,
+    tradeRevRes,
+  ] = await Promise.all([
     supabase
       .from("trades")
-      .select("pnl, r_multiple, pair, direction, traded_on, size_lots, emotion, notes, strategy_id")
+      .select("id, pnl, r_multiple, pair, direction, traded_on, size_lots, emotion, notes, strategy_id")
       .order("traded_on", { ascending: true }),
     supabase.from("strategies").select(
       "id, name, plan_type, is_active, max_trades_per_day, max_daily_loss, max_daily_profit, risk_per_trade_pct, trading_window, trading_window_2, strategy_date, pair"
@@ -139,6 +180,19 @@ export async function buildAiContext(supabase: SupabaseClient, user: User): Prom
       .select("title, source, published_at")
       .order("published_at", { ascending: false })
       .limit(15),
+    // Tables from migrations 0014-0016; error branches yield empty/null.
+    supabase.from("user_settings").select("*").maybeSingle(),
+    supabase
+      .from("day_reviews")
+      .select("day, plan_followed, note, routine_done")
+      .order("day", { ascending: false })
+      .limit(14),
+    supabase
+      .from("trade_reviews")
+      .select(
+        "trade_id, plan_followed, confluences, management, mistakes, entry_emotion, exit_emotion, reflection, strategy_name"
+      )
+      .limit(400),
   ]);
 
   const trades = (tradesRes.data as TradeRow[]) ?? [];
@@ -197,9 +251,22 @@ export async function buildAiContext(supabase: SupabaseClient, user: User): Prom
     .filter((x) => x.count > 0)
     .map((x) => `${x.d}: ${x.count} trades, win rate ${pctOf(x.wins, x.count)}, net ${n1(x.net)} ${cur}`);
 
-  // Risk-rule breach days, judged against the active strategy's limits
-  // (falls back to the first strategy that defines a limit).
+  // Account-level guardrails from Settings (migration 0016). When set, breach
+  // days are judged against these; otherwise fall back to strategy limits.
+  const gs = (settingsRes.error ? null : (settingsRes.data as SettingsRow | null)) ?? null;
+  const settingsLimits =
+    gs && (gs.max_trades_per_day != null || gs.max_daily_loss)
+      ? {
+          name: "Settings",
+          max_trades_per_day: gs.max_trades_per_day,
+          max_daily_loss: gs.max_daily_loss,
+        }
+      : null;
+
+  // Risk-rule breach days, judged against the account guardrails, or the
+  // active strategy's limits as a fallback.
   const limits =
+    settingsLimits ??
     strategies.find((s) => s.is_active && (s.max_trades_per_day != null || s.max_daily_loss != null)) ??
     strategies.find((s) => s.max_trades_per_day != null || s.max_daily_loss != null);
   const breachLines: string[] = [];
@@ -244,11 +311,28 @@ export async function buildAiContext(supabase: SupabaseClient, user: User): Prom
     ].join("\n");
   });
 
+  // Trade reviews (journal entries per trade, migration 0014).
+  const reviewRows = (tradeRevRes.error ? [] : ((tradeRevRes.data as ReviewRow[]) ?? []));
+  const reviewByTrade = new Map(reviewRows.map((r) => [r.trade_id, r]));
+
+  // Which mistakes and confluences recur, across all journaled trades.
+  const tally = (pick: (r: ReviewRow) => string[] | null) => {
+    const m = new Map<string, number>();
+    reviewRows.forEach((r) => (pick(r) ?? []).forEach((t) => m.set(t, (m.get(t) ?? 0) + 1)));
+    return Array.from(m.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map(([t, c]) => `${t} (${c})`);
+  };
+  const mistakeTally = tally((r) => r.mistakes);
+  const confluenceTally = tally((r) => r.confluences);
+
   const stratName = new Map(strategies.map((s) => [s.id, s.name]));
   const recent = [...trades]
     .slice(-50)
     .reverse()
     .map((t) => {
+      const rev = reviewByTrade.get(t.id);
       const bits = [
         t.traded_on.slice(0, 16).replace("T", " "),
         t.pair ?? "?",
@@ -259,9 +343,40 @@ export async function buildAiContext(supabase: SupabaseClient, user: User): Prom
         t.strategy_id ? stratName.get(t.strategy_id) : null,
         t.emotion ? `emotion: ${t.emotion}` : null,
         t.notes ? `note: ${t.notes.slice(0, 80)}` : null,
+        rev?.plan_followed != null ? `plan followed: ${rev.plan_followed ? "yes" : "no"}` : null,
+        rev?.entry_emotion || rev?.exit_emotion
+          ? `emotions ${rev.entry_emotion ?? "?"} -> ${rev.exit_emotion ?? "?"}`
+          : null,
+        rev?.confluences?.length ? `confluences: ${rev.confluences.join(", ")}` : null,
+        rev?.mistakes?.length ? `mistakes: ${rev.mistakes.join(", ")}` : null,
+        rev?.reflection ? `reflection: ${rev.reflection.slice(0, 120)}` : null,
       ].filter(Boolean);
       return `- ${bits.join(" | ")}`;
     });
+
+  // Day reviews: plan-followed verdicts, routine completion, day notes.
+  const dayRevLines = (dayRevRes.error ? [] : ((dayRevRes.data as DayReviewRow[]) ?? [])).map((d) => {
+    const bits = [
+      d.day,
+      d.plan_followed ? `plan followed: ${d.plan_followed}` : null,
+      d.routine_done?.length ? `routine done: ${d.routine_done.length} items` : null,
+      d.note ? `note: ${d.note.slice(0, 160)}` : null,
+    ].filter(Boolean);
+    return `- ${bits.join(" | ")}`;
+  });
+
+  // Account guardrails block.
+  const guardrailLines: string[] = [];
+  if (gs) {
+    if (gs.max_trades_per_day != null) guardrailLines.push(`Max trades/day: ${gs.max_trades_per_day}`);
+    if (fmtLimit(gs.max_daily_loss)) guardrailLines.push(`Max daily loss: ${fmtLimit(gs.max_daily_loss)}`);
+    if (fmtLimit(gs.max_daily_profit)) guardrailLines.push(`Daily profit target: ${fmtLimit(gs.max_daily_profit)}`);
+    if (gs.trading_window) guardrailLines.push(`Trading window: ${gs.trading_window}`);
+    if (gs.trading_window_2) guardrailLines.push(`Second window: ${gs.trading_window_2}`);
+    if (Array.isArray(gs.routine_items) && gs.routine_items.length) {
+      guardrailLines.push(`Pre-market routine: ${(gs.routine_items as string[]).join("; ")}`);
+    }
+  }
 
   const noteBlocks = (
     (notesRes.data as { title: string; content: string | null; updated_at: string }[]) ?? []
@@ -322,7 +437,23 @@ export async function buildAiContext(supabase: SupabaseClient, user: User): Prom
     `## Strategies (${strategies.length})`,
     stratBlocks.length ? stratBlocks.join("\n\n") : "(none created yet)",
     ``,
-    `## Most recent trades (up to 50, newest first)`,
+    `## Account guardrails (from Settings; violations in the journal are judged against these)`,
+    guardrailLines.length ? guardrailLines.join("\n") : "(none set)",
+    ``,
+    `## Recurring journal tags (across all trade reviews)`,
+    mistakeTally.length || confluenceTally.length
+      ? [
+          mistakeTally.length ? `Mistakes: ${mistakeTally.join(", ")}` : null,
+          confluenceTally.length ? `Confluences: ${confluenceTally.join(", ")}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : "(no trades journaled with tags yet)",
+    ``,
+    `## Day reviews (latest ${dayRevLines.length}: plan-followed verdict, routine, day notes)`,
+    dayRevLines.length ? dayRevLines.join("\n") : "(none)",
+    ``,
+    `## Most recent trades (up to 50, newest first; journaled trades include their review)`,
     recent.length ? recent.join("\n") : "(none)",
     ``,
     `## Chart analysis log (latest ${analysisLines.length})`,

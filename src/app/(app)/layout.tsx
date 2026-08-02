@@ -4,6 +4,7 @@ import Sidebar from "@/components/Sidebar";
 import MobileNav from "@/components/MobileNav";
 import LogoMark from "@/components/LogoMark";
 import SidekickDock from "@/components/sidekick/SidekickDock";
+import TutorialTour from "@/components/TutorialTour";
 
 export default async function AppLayout({
   children,
@@ -43,6 +44,7 @@ export default async function AppLayout({
         <main className="flex-1 overflow-y-auto bg-bg2">{children}</main>
         <MobileNav />
         <SidekickDock />
+        <TutorialTour />
       </div>
     </div>
   );

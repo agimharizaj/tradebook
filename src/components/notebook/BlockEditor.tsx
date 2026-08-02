@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useSpeech } from "@/lib/useSpeech";
 
 // "img" blocks hold a storage path in `text` (entry-models bucket) and are
 // created by "Send to Notebook" on a chart analysis, not from the palette.
@@ -374,6 +375,10 @@ export default function BlockEditor({
 
   const EMOJIS = ["✅","❌","⚠️","🔥","📈","📉","💰","🎯","🧠","😤","😌","🚀","🐂","🐻","💡","⭐","❗","⏰","📌","👀","💪","🤝"];
   const [showEmoji, setShowEmoji] = useState(false);
+
+  // Dictation: speech lands at the cursor of the focused block (or a new
+  // text block), same insertion path as the emoji strip.
+  const speech = useSpeech((t) => insertText(t + " "));
 
   function insertText(txt: string) {
     const id = lastFocus.current;
@@ -841,6 +846,27 @@ export default function BlockEditor({
           >
             + Analysis
           </button>
+          {speech.supported && (
+            <button
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={speech.toggle}
+              aria-pressed={speech.listening}
+              className={`rounded-md border px-2.5 py-1.5 text-xs transition ${
+                speech.listening
+                  ? "border-danger bg-danger/15 text-danger"
+                  : "border-border2 text-muted hover:border-accent hover:text-foreground"
+              }`}
+              title={speech.listening ? "Stop dictating" : "Dictate into the note"}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="9" y="2" width="6" height="12" rx="3" />
+                  <path d="M5 10a7 7 0 0 0 14 0M12 17v4" />
+                </svg>
+                {speech.listening ? "Listening…" : "Dictate"}
+              </span>
+            </button>
+          )}
           <button
             onClick={() => setShowEmoji((v) => !v)}
             aria-pressed={showEmoji}
@@ -889,6 +915,27 @@ export default function BlockEditor({
           >
             + Analysis
           </button>
+          {speech.supported && (
+            <button
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={speech.toggle}
+              aria-pressed={speech.listening}
+              className={`rounded-md border px-2.5 py-1.5 text-xs transition ${
+                speech.listening
+                  ? "border-danger bg-danger/15 text-danger"
+                  : "border-border2 text-muted hover:border-accent hover:text-foreground"
+              }`}
+              title={speech.listening ? "Stop dictating" : "Dictate into the note"}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="9" y="2" width="6" height="12" rx="3" />
+                  <path d="M5 10a7 7 0 0 0 14 0M12 17v4" />
+                </svg>
+                {speech.listening ? "Listening…" : "Dictate"}
+              </span>
+            </button>
+          )}
           <button
             onClick={() => setShowEmoji((v) => !v)}
             aria-pressed={showEmoji}

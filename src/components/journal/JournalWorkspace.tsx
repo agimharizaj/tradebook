@@ -1,39 +1,42 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { moneySigned, sym } from "@/lib/format";
-import { usePairs } from "@/lib/usePairs";
+import {
+  emptySettings,
+  fetchSettings,
+  isJournaled,
+  type ReviewLite,
+  type UserSettings,
+} from "@/lib/settings";
 import ImportTradesModal from "./ImportTradesModal";
+import TradeFormModal, { type TradeFormTrade } from "./TradeFormModal";
+import JournalPanel, {
+  fmtNet,
+  type DayReview,
+  type PanelScope,
+  type Unit,
+} from "./JournalPanel";
 
-type Trade = {
-  id: string;
-  traded_on: string;
-  pair: string | null;
-  direction: string | null;
-  entry_price: number | null;
-  stop_price: number | null;
-  exit_price: number | null;
-  size_lots: number | null;
-  pnl: number | null;
-  r_multiple: number | null;
-  emotion: string | null;
-  notes: string | null;
-  strategy_id: string | null;
-};
+type Trade = TradeFormTrade;
 type Strat = { id: string; name: string };
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-// First day of the following month, for half-open date range queries that
-// work whether traded_on is a date or a timestamp.
-const nextMonthStart = (y: number, m: number) => {
-  const d = new Date(y, m + 1, 1);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-01`;
-};
 // traded_on may be a date ("2026-07-25") or a timestamp; day key is the date part.
 const dayKey = (tradedOn: string) => tradedOn.slice(0, 10);
+const addDays = (day: string, n: number) => {
+  const d = new Date(day + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return ymd(d);
+};
+// Monday of the week containing the given day.
+const mondayOf = (day: string) => {
+  const d = new Date(day + "T00:00:00");
+  return addDays(day, -((d.getDay() + 6) % 7));
+};
 // Phone calendar cells are ~40px wide; "1.2k" fits where "1,234" cannot.
 function compactMoney(net: number) {
   const abs = Math.abs(net);
@@ -70,35 +73,115 @@ function computeStats(trades: Trade[]) {
     worst: withPnl.length ? Math.min(...withPnl.map((t) => t.pnl)) : 0,
     expectancy,
     avgR: rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : null,
+    rs,
   };
 }
 
+// R distribution buckets for the monthly histogram.
+const R_BUCKETS: { label: string; test: (r: number) => boolean; lose: boolean }[] = [
+  { label: "≤-2R", test: (r) => r <= -2, lose: true },
+  { label: "-2..-1", test: (r) => r > -2 && r <= -1, lose: true },
+  { label: "-1..0", test: (r) => r > -1 && r < 0, lose: true },
+  { label: "0..1R", test: (r) => r >= 0 && r < 1, lose: false },
+  { label: "1..2R", test: (r) => r >= 1 && r < 2, lose: false },
+  { label: "≥2R", test: (r) => r >= 2, lose: false },
+];
+
 export default function JournalWorkspace() {
   const supabase = createClient();
+  const router = useRouter();
   const now = new Date();
   const [cursor, setCursor] = useState({ y: now.getFullYear(), m: now.getMonth() });
   const [trades, setTrades] = useState<Trade[]>([]);
+  const [reviews, setReviews] = useState<Map<string, ReviewLite>>(new Map());
+  const [reviewsAvailable, setReviewsAvailable] = useState(true);
+  const [dayReviews, setDayReviews] = useState<Record<string, DayReview>>({});
+  const [dayReviewsAvailable, setDayReviewsAvailable] = useState(true);
+  const [settings, setSettings] = useState<UserSettings>(emptySettings());
   const [strategies, setStrategies] = useState<Strat[]>([]);
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [panel, setPanel] = useState<PanelScope | null>(null);
+  const [formDay, setFormDay] = useState<string | null>(null);
+  const [formTrade, setFormTrade] = useState<Trade | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [cur, setCur] = useState("USD");
   const [accSize, setAccSize] = useState<number | null>(null);
+  const [unit, setUnit] = useState<Unit>("money");
+
+  // The 6x7 Monday-first grid; fetches cover the whole grid so weeks crossing
+  // month boundaries are complete.
+  const weeks = useMemo(() => {
+    const first = new Date(cursor.y, cursor.m, 1);
+    const offset = (first.getDay() + 6) % 7;
+    const gridStart = new Date(cursor.y, cursor.m, 1 - offset);
+    const w: Date[][] = [];
+    for (let r = 0; r < 6; r++) {
+      const row: Date[] = [];
+      for (let c = 0; c < 7; c++) {
+        const d = new Date(gridStart);
+        d.setDate(gridStart.getDate() + r * 7 + c);
+        row.push(d);
+      }
+      w.push(row);
+    }
+    return w;
+  }, [cursor]);
+  const gridStartStr = ymd(weeks[0][0]);
+  const gridEndStr = addDays(ymd(weeks[5][6]), 1); // exclusive
 
   const load = useCallback(async () => {
     setLoading(true);
-    const start = `${cursor.y}-${pad(cursor.m + 1)}-01`;
     const { data, error } = await supabase
       .from("trades")
       .select("*")
-      .gte("traded_on", start)
-      .lt("traded_on", nextMonthStart(cursor.y, cursor.m))
+      .gte("traded_on", gridStartStr)
+      .lt("traded_on", gridEndStr)
       .order("traded_on", { ascending: true });
     setLoadError(error ? `Could not load trades: ${error.message}` : null);
-    setTrades((data as Trade[]) ?? []);
+    const list = (data as Trade[]) ?? [];
+    setTrades(list);
+
+    // Trade reviews for the journaled indicator + emotions (migration 0014).
+    if (list.length) {
+      const { data: revs, error: revErr } = await supabase
+        .from("trade_reviews")
+        .select(
+          "trade_id, plan_followed, entry_emotion, exit_emotion, reflection, htf_path, mtf_path, ltf_path, confluences, management, mistakes"
+        )
+        .in("trade_id", list.map((t) => t.id));
+      if (revErr) {
+        setReviewsAvailable(false);
+      } else {
+        setReviewsAvailable(true);
+        setReviews(new Map(((revs as ReviewLite[]) ?? []).map((r) => [r.trade_id, r])));
+      }
+    } else {
+      setReviews(new Map());
+    }
+
+    // Day reviews: plan-followed, day note, routine ticks (migration 0015).
+    const { data: days, error: dayErr } = await supabase
+      .from("day_reviews")
+      .select("day, plan_followed, note, routine_done")
+      .gte("day", gridStartStr)
+      .lt("day", gridEndStr);
+    if (dayErr) {
+      setDayReviewsAvailable(false);
+    } else {
+      setDayReviewsAvailable(true);
+      const map: Record<string, DayReview> = {};
+      (days as ({ day: string } & DayReview)[] | null)?.forEach((d) => {
+        map[d.day] = {
+          plan_followed: d.plan_followed,
+          note: d.note,
+          routine_done: d.routine_done ?? [],
+        };
+      });
+      setDayReviews(map);
+    }
     setLoading(false);
-  }, [supabase, cursor]);
+  }, [supabase, gridStartStr, gridEndStr]);
 
   useEffect(() => {
     load();
@@ -116,24 +199,16 @@ export default function JournalWorkspace() {
       const s = parseFloat(m.account_size);
       if (!Number.isNaN(s) && s > 0) setAccSize(s);
     });
-  }, [supabase]);
+    fetchSettings(supabase).then(({ settings: s }) => setSettings(s));
+    const savedUnit = localStorage.getItem("tb_journal_unit");
+    if (savedUnit === "money" || savedUnit === "pct" || savedUnit === "r") setUnit(savedUnit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const weeks = useMemo(() => {
-    const first = new Date(cursor.y, cursor.m, 1);
-    const offset = (first.getDay() + 6) % 7; // Monday-first
-    const gridStart = new Date(cursor.y, cursor.m, 1 - offset);
-    const w: Date[][] = [];
-    for (let r = 0; r < 6; r++) {
-      const row: Date[] = [];
-      for (let c = 0; c < 7; c++) {
-        const d = new Date(gridStart);
-        d.setDate(gridStart.getDate() + r * 7 + c);
-        row.push(d);
-      }
-      w.push(row);
-    }
-    return w;
-  }, [cursor]);
+  function pickUnit(u: Unit) {
+    setUnit(u);
+    localStorage.setItem("tb_journal_unit", u);
+  }
 
   const byDay = useMemo(() => {
     const map: Record<string, Trade[]> = {};
@@ -143,8 +218,21 @@ export default function JournalWorkspace() {
     return map;
   }, [trades]);
 
-  const stats = useMemo(() => computeStats(trades), [trades]);
-  const dayTrades = selectedDay ? byDay[selectedDay] ?? [] : [];
+  // Monthly stats only count the visible month, not the grid overflow days.
+  const monthTrades = useMemo(
+    () => trades.filter((t) => {
+      const d = dayKey(t.traded_on);
+      return +d.slice(0, 4) === cursor.y && +d.slice(5, 7) === cursor.m + 1;
+    }),
+    [trades, cursor]
+  );
+  const stats = useMemo(() => computeStats(monthTrades), [monthTrades]);
+
+  const rHist = useMemo(() => {
+    const counts = R_BUCKETS.map((b) => stats.rs.filter((r) => b.test(r)).length);
+    const max = Math.max(1, ...counts);
+    return { counts, max };
+  }, [stats.rs]);
 
   function shift(delta: number) {
     setCursor((c) => {
@@ -153,16 +241,77 @@ export default function JournalWorkspace() {
     });
   }
 
-  async function deleteTrade(id: string) {
-    const { error } = await supabase.from("trades").delete().eq("id", id);
-    if (error) setLoadError(`Could not delete trade: ${error.message}`);
-    load();
-  }
-
   const todayStr = ymd(now);
 
+  // --- panel helpers -------------------------------------------------------
+  function jumpTo(day: string) {
+    // Keep the calendar month in sync when panel arrows leave the grid.
+    if (day < gridStartStr || day >= gridEndStr) {
+      setCursor({ y: +day.slice(0, 4), m: +day.slice(5, 7) - 1 });
+    }
+  }
+
+  function panelShift(delta: -1 | 1) {
+    setPanel((p) => {
+      if (!p) return p;
+      if (p.kind === "day") {
+        const next = addDays(p.day, delta);
+        jumpTo(next);
+        return { kind: "day", day: next };
+      }
+      const next = addDays(p.start, delta * 7);
+      jumpTo(next);
+      return { kind: "week", start: next };
+    });
+  }
+
+  function panelToday() {
+    setCursor({ y: now.getFullYear(), m: now.getMonth() });
+    setPanel((p) =>
+      p?.kind === "week" ? { kind: "week", start: mondayOf(todayStr) } : { kind: "day", day: todayStr }
+    );
+  }
+
+  function panelSwitchScope() {
+    setPanel((p) => {
+      if (!p) return p;
+      if (p.kind === "day") return { kind: "week", start: mondayOf(p.day) };
+      const day = todayStr >= p.start && todayStr <= addDays(p.start, 6) ? todayStr : p.start;
+      return { kind: "day", day };
+    });
+  }
+
+  const panelTrades = useMemo(() => {
+    if (!panel) return [];
+    if (panel.kind === "day") return byDay[panel.day] ?? [];
+    const end = addDays(panel.start, 7);
+    return trades.filter((t) => {
+      const d = dayKey(t.traded_on);
+      return d >= panel.start && d < end;
+    });
+  }, [panel, byDay, trades]);
+
+  async function saveDayReview(day: string, patch: Partial<DayReview>) {
+    const prev = dayReviews[day] ?? { plan_followed: null, note: null, routine_done: [] };
+    const next = { ...prev, ...patch };
+    setDayReviews((m) => ({ ...m, [day]: next }));
+    if (!dayReviewsAvailable) return;
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    const { error } = await supabase
+      .from("day_reviews")
+      .upsert({ user_id: u.user.id, day, ...patch }, { onConflict: "user_id,day" });
+    if (error) setLoadError(`Could not save day review: ${error.message}`);
+  }
+
+  // -------------------------------------------------------------------------
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
+    <div
+      className={`mx-auto max-w-6xl px-4 py-6 transition-[margin] duration-200 md:px-8 md:py-8 ${
+        panel ? "md:mr-[390px] md:max-w-none" : ""
+      }`}
+    >
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl">Journal</h1>
@@ -170,7 +319,27 @@ export default function JournalWorkspace() {
             Review your trades, emotions, and patterns to build consistency.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div
+            className="flex items-center gap-0.5 rounded-lg border border-border2 bg-card p-0.5"
+            role="group"
+            aria-label="PnL display unit"
+          >
+            {([["money", sym(cur).trim() || "$"], ["pct", "%"], ["r", "R"]] as [Unit, string][]).map(
+              ([u, label]) => (
+                <button
+                  key={u}
+                  onClick={() => pickUnit(u)}
+                  title={u === "pct" && !accSize ? "Set your account size in Settings first" : undefined}
+                  className={`rounded-md px-2.5 py-1.5 font-mono text-xs font-medium transition ${
+                    unit === u ? "bg-accent text-white" : "text-muted hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            )}
+          </div>
           <button
             onClick={() => setShowImport(true)}
             className="rounded-lg border border-border2 px-4 py-2 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground"
@@ -178,7 +347,7 @@ export default function JournalWorkspace() {
             Import trades
           </button>
           <button
-            onClick={() => setSelectedDay(todayStr)}
+            onClick={() => { setFormTrade(null); setFormDay(panel?.kind === "day" ? panel.day : todayStr); }}
             className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
           >
             + Add trade
@@ -220,10 +389,14 @@ export default function JournalWorkspace() {
             const net = dayTradesCell.reduce((s, t) => s + (t.pnl ?? 0), 0);
             const has = dayTradesCell.length > 0;
             const win = net > 0;
+            const journaledCount = reviewsAvailable
+              ? dayTradesCell.filter((t) => isJournaled(reviews.get(t.id))).length
+              : 0;
+            const selected = panel?.kind === "day" && panel.day === key;
             return (
               <button
                 key={key}
-                onClick={() => setSelectedDay(key)}
+                onClick={() => setPanel({ kind: "day", day: key })}
                 className={`flex h-12 flex-col overflow-hidden rounded-md border p-1 text-left transition hover:border-accent md:h-24 md:rounded-lg md:p-2 ${
                   has
                     ? win
@@ -232,11 +405,33 @@ export default function JournalWorkspace() {
                         ? "border-danger/40 bg-danger/10"
                         : "border-border"
                     : "border-border"
-                } ${inMonth ? "" : "opacity-40"} ${key === todayStr ? "ring-1 ring-accent" : ""}`}
+                } ${inMonth ? "" : "opacity-40"} ${key === todayStr ? "ring-1 ring-accent" : ""} ${
+                  selected ? "ring-2 ring-accent2" : ""
+                }`}
               >
                 <span className="text-xs text-dim">{d.getDate()}</span>
                 {has && (
                   <span className="mt-auto block min-w-0">
+                    {reviewsAvailable && (
+                      <span className="mb-0.5 hidden items-center gap-[3px] md:flex" aria-hidden="true">
+                        {dayTradesCell.length <= 6 ? (
+                          dayTradesCell.map((t) => (
+                            <span
+                              key={t.id}
+                              className={`h-[5px] w-[5px] rounded-full ${
+                                isJournaled(reviews.get(t.id))
+                                  ? "bg-accent2"
+                                  : "border border-dim"
+                              }`}
+                            />
+                          ))
+                        ) : (
+                          <span className="font-mono text-[9px] text-accent2">
+                            {journaledCount}/{dayTradesCell.length} journaled
+                          </span>
+                        )}
+                      </span>
+                    )}
                     <span className="hidden text-[11px] text-muted md:block">
                       {dayTradesCell.length} {dayTradesCell.length === 1 ? "trade" : "trades"}
                     </span>
@@ -245,9 +440,11 @@ export default function JournalWorkspace() {
                       style={{ fontFamily: "var(--font-mono)" }}
                     >
                       <span className="md:hidden">
-                        {`${net > 0 ? "+" : net < 0 ? "-" : ""}${sym(cur)}${compactMoney(net)}`}
+                        {unit === "money"
+                          ? `${net > 0 ? "+" : net < 0 ? "-" : ""}${sym(cur)}${compactMoney(net)}`
+                          : fmtNet(dayTradesCell, unit, cur, accSize)}
                       </span>
-                      <span className="hidden md:inline">{moneySigned(net, cur)}</span>
+                      <span className="hidden md:inline">{fmtNet(dayTradesCell, unit, cur, accSize)}</span>
                     </span>
                   </span>
                 )}
@@ -265,51 +462,93 @@ export default function JournalWorkspace() {
           {loading ? (
             <p className="text-sm text-muted">Loading...</p>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <Metric label="Net PnL" value={moneySigned(stats.net, cur)} tone={stats.net >= 0 ? "up" : "down"} />
-              <Metric
-                label="Account growth"
-                value={accSize ? `${stats.net >= 0 ? "+" : ""}${((stats.net / accSize) * 100).toFixed(2)}%` : "—"}
-                tone={stats.net >= 0 ? "up" : "down"}
-              />
-              <Metric label="Win rate" value={`${stats.winRate.toFixed(1)}%`} />
-              <Metric label="Total trades" value={String(stats.total)} />
-              <Metric
-                label="Expectancy / trade"
-                value={moneySigned(stats.expectancy, cur)}
-                tone={stats.expectancy >= 0 ? "up" : "down"}
-              />
-              <Metric label="Avg R" value={stats.avgR == null ? "—" : `${stats.avgR.toFixed(2)}R`} />
-              <Metric label="Avg win" value={moneySigned(stats.avgWin, cur)} tone="up" />
-              <Metric label="Avg loss" value={moneySigned(stats.avgLoss, cur)} tone="down" />
-              <Metric label="Best trade" value={moneySigned(stats.best, cur)} tone="up" />
-              <Metric label="Worst trade" value={moneySigned(stats.worst, cur)} tone="down" />
-            </div>
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <Metric label="Net PnL" value={moneySigned(stats.net, cur)} tone={stats.net >= 0 ? "up" : "down"} />
+                <Metric
+                  label="Account growth"
+                  value={accSize ? `${stats.net >= 0 ? "+" : ""}${((stats.net / accSize) * 100).toFixed(2)}%` : "—"}
+                  tone={stats.net >= 0 ? "up" : "down"}
+                />
+                <Metric label="Win rate" value={`${stats.winRate.toFixed(1)}%`} />
+                <Metric label="Total trades" value={String(stats.total)} />
+                <Metric
+                  label="Expectancy / trade"
+                  value={moneySigned(stats.expectancy, cur)}
+                  tone={stats.expectancy >= 0 ? "up" : "down"}
+                />
+                <Metric label="Avg R" value={stats.avgR == null ? "—" : `${stats.avgR.toFixed(2)}R`} />
+                <Metric label="Avg win" value={moneySigned(stats.avgWin, cur)} tone="up" />
+                <Metric label="Avg loss" value={moneySigned(stats.avgLoss, cur)} tone="down" />
+                <Metric label="Best trade" value={moneySigned(stats.best, cur)} tone="up" />
+                <Metric label="Worst trade" value={moneySigned(stats.worst, cur)} tone="down" />
+              </div>
+              {stats.rs.length > 0 && (
+                <div className="mt-5">
+                  <div className="mb-2 text-xs text-dim">R distribution ({stats.rs.length} trades with R)</div>
+                  <div className="flex h-24 items-end gap-2">
+                    {R_BUCKETS.map((b, i) => (
+                      <div key={b.label} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+                        <span className="font-mono text-[10px] text-dim">
+                          {rHist.counts[i] || ""}
+                        </span>
+                        <div
+                          className={`w-full max-w-9 rounded-t ${b.lose ? "bg-danger/60" : "bg-accent"}`}
+                          style={{ height: `${(rHist.counts[i] / rHist.max) * 72}px` }}
+                        />
+                        <span className="font-mono text-[9px] text-dim">{b.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 
         <div className="rounded-2xl bg-card p-5 ring-1 ring-border">
-          <h2 className="mb-4 text-sm font-medium uppercase tracking-wide text-muted">
+          <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-muted">
             Weekly breakdown
           </h2>
+          <p className="mb-3 text-xs text-dim">Click a week to open it in the panel.</p>
           <div className="space-y-2">
             {weeks.map((week, i) => {
-              const wt = week.filter((d) => d.getMonth() === cursor.m).flatMap((d) => byDay[ymd(d)] ?? []);
+              const start = ymd(week[0]);
+              const end = addDays(start, 7);
+              const wt = trades.filter((t) => {
+                const d = dayKey(t.traded_on);
+                return d >= start && d < end;
+              });
               if (wt.length === 0) return null;
-              const net = wt.reduce((s, t) => s + (t.pnl ?? 0), 0);
+              const daysTraded = new Set(wt.map((t) => dayKey(t.traded_on))).size;
+              const isCurrent = todayStr >= start && todayStr < end;
+              const selected = panel?.kind === "week" && panel.start === start;
+              const netStr = fmtNet(wt, unit, cur, accSize);
+              const netVal = wt.reduce((s, t) => s + (t.pnl ?? 0), 0);
               return (
-                <div key={i} className="flex items-center justify-between rounded-lg bg-surface2 px-3 py-2">
-                  <span className="text-sm text-muted">Week {i + 1}</span>
-                  <div className="text-right">
-                    <span className="mr-3 text-xs text-dim">{wt.length} trades</span>
+                <button
+                  key={i}
+                  onClick={() => setPanel({ kind: "week", start })}
+                  className={`flex w-full items-center justify-between rounded-lg bg-surface2 px-3 py-2.5 text-left transition hover:ring-1 hover:ring-accent ${
+                    selected ? "ring-1 ring-accent2" : isCurrent ? "ring-1 ring-accent/50" : ""
+                  }`}
+                >
+                  <span className="text-sm text-muted">
+                    Week {i + 1}
+                    {isCurrent && <span className="ml-1.5 text-xs text-accent2">· current</span>}
+                  </span>
+                  <span className="text-right">
+                    <span className="mr-3 text-xs text-dim">
+                      {daysTraded} {daysTraded === 1 ? "day" : "days"} · {wt.length} trades
+                    </span>
                     <span
-                      className={`text-sm font-medium ${net > 0 ? "text-success" : net < 0 ? "text-danger" : "text-muted"}`}
+                      className={`text-sm font-medium ${netVal > 0 ? "text-success" : netVal < 0 ? "text-danger" : "text-muted"}`}
                       style={{ fontFamily: "var(--font-mono)" }}
                     >
-                      {moneySigned(net, cur)}
+                      {netStr}
                     </span>
-                  </div>
-                </div>
+                  </span>
+                </button>
               );
             })}
             {trades.length === 0 && !loading && (
@@ -319,15 +558,41 @@ export default function JournalWorkspace() {
         </div>
       </div>
 
-      {selectedDay && (
-        <DayModal
-          day={selectedDay}
-          trades={dayTrades}
-          strategies={strategies}
+      {panel && (
+        <JournalPanel
+          scope={panel}
+          trades={panelTrades}
+          reviews={reviews}
+          dayReviews={dayReviews}
+          settings={settings}
+          dayReviewsAvailable={dayReviewsAvailable}
+          reviewsAvailable={reviewsAvailable}
           cur={cur}
-          onClose={() => setSelectedDay(null)}
+          accSize={accSize}
+          unit={unit}
+          todayStr={todayStr}
+          onClose={() => setPanel(null)}
+          onShift={panelShift}
+          onToday={panelToday}
+          onSwitchScope={panelSwitchScope}
+          onAddTrade={(day) => { setFormTrade(null); setFormDay(day); }}
+          onOpenTrade={(id) => router.push(`/journal/trade/${id}`)}
+          onEditTrade={(t) => {
+            const full = trades.find((x) => x.id === t.id) ?? null;
+            setFormTrade(full);
+            setFormDay(full ? dayKey(full.traded_on) : null);
+          }}
+          onSaveDay={saveDayReview}
+        />
+      )}
+
+      {formDay && (
+        <TradeFormModal
+          day={formDay}
+          trade={formTrade}
+          strategies={strategies}
+          onClose={() => { setFormDay(null); setFormTrade(null); }}
           onSaved={load}
-          onDelete={deleteTrade}
         />
       )}
 
@@ -349,243 +614,5 @@ function Metric({ label, value, tone }: { label: string; value: string; tone?: "
         {value}
       </div>
     </div>
-  );
-}
-
-function DayModal({
-  day,
-  trades,
-  strategies,
-  cur,
-  onClose,
-  onSaved,
-  onDelete,
-}: {
-  day: string;
-  trades: Trade[];
-  strategies: Strat[];
-  cur: string;
-  onClose: () => void;
-  onSaved: () => void;
-  onDelete: (id: string) => void;
-}) {
-  const supabase = createClient();
-  const watchlist = usePairs();
-  const [adding, setAdding] = useState(trades.length === 0);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  const [pair, setPair] = useState("");
-  const [direction, setDirection] = useState("long");
-  const [pnl, setPnl] = useState("");
-  const [r, setR] = useState("");
-  const [entry, setEntry] = useState("");
-  const [stop, setStop] = useState("");
-  const [exit, setExit] = useState("");
-  const [size, setSize] = useState("");
-  const [emotion, setEmotion] = useState("");
-  const [notes, setNotes] = useState("");
-  const [strategyId, setStrategyId] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const num = (v: string) => (v.trim() === "" ? null : Number(v));
-
-  function resetForm() {
-    setPair(""); setDirection("long"); setPnl(""); setR(""); setEntry(""); setStop("");
-    setExit(""); setSize(""); setEmotion(""); setNotes(""); setStrategyId("");
-    setEditingId(null);
-    setErr(null);
-  }
-
-  function startEdit(t: Trade) {
-    setPair(t.pair ?? "");
-    setDirection(t.direction ?? "long");
-    setPnl(t.pnl != null ? String(t.pnl) : "");
-    setR(t.r_multiple != null ? String(t.r_multiple) : "");
-    setEntry(t.entry_price != null ? String(t.entry_price) : "");
-    setStop(t.stop_price != null ? String(t.stop_price) : "");
-    setExit(t.exit_price != null ? String(t.exit_price) : "");
-    setSize(t.size_lots != null ? String(t.size_lots) : "");
-    setEmotion(t.emotion ?? "");
-    setNotes(t.notes ?? "");
-    setStrategyId(t.strategy_id ?? "");
-    setEditingId(t.id);
-    setErr(null);
-    setAdding(true);
-  }
-
-  function cancelForm() {
-    resetForm();
-    setAdding(false);
-  }
-
-  async function save() {
-    setSaving(true);
-    setErr(null);
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) {
-      setErr("Not signed in.");
-      setSaving(false);
-      return;
-    }
-    const payload = {
-      pair: pair || null,
-      direction,
-      entry_price: num(entry),
-      stop_price: num(stop),
-      exit_price: num(exit),
-      size_lots: num(size),
-      pnl: num(pnl),
-      r_multiple: num(r),
-      emotion: emotion || null,
-      notes: notes || null,
-      strategy_id: strategyId || null,
-    };
-    // Editing an existing trade updates in place; otherwise insert a new one
-    // (traded_on stays fixed to this day and is only set on insert).
-    const { error } = editingId
-      ? await supabase.from("trades").update(payload).eq("id", editingId)
-      : await supabase.from("trades").insert({ user_id: u.user.id, traded_on: day, ...payload });
-    setSaving(false);
-    if (error) {
-      setErr(error.message);
-      return;
-    }
-    cancelForm();
-    onSaved();
-  }
-
-  const heading = new Date(day + "T00:00:00").toLocaleDateString(undefined, {
-    weekday: "long", day: "numeric", month: "long", year: "numeric",
-  });
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4">
-      <div className="max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-card p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] ring-1 ring-border2 sm:rounded-2xl sm:pb-6">
-        <div className="mb-4 flex items-start justify-between">
-          <h2 className="text-lg" style={{ fontFamily: "var(--font-display)" }}>{heading}</h2>
-          <button onClick={onClose} className="-m-2 rounded-md p-2 text-muted hover:text-foreground" aria-label="Close">✕</button>
-        </div>
-
-        {trades.length > 0 && (
-          <div className="mb-4 space-y-2">
-            {trades.map((t) => (
-              <div key={t.id} className={`flex items-center justify-between rounded-lg bg-surface2 px-3 py-2 ${editingId === t.id ? "ring-1 ring-accent" : ""}`}>
-                <div className="text-sm">
-                  <span className="font-medium">{t.pair ?? "Trade"}</span>{" "}
-                  <span className="text-dim">{t.direction}</span>
-                  {t.notes && <div className="text-xs text-muted">{t.notes}</div>}
-                </div>
-                <div className="flex items-center gap-2">
-                  {t.pnl != null && (
-                    <span
-                      className={`mr-1 text-sm font-medium ${t.pnl > 0 ? "text-success" : t.pnl < 0 ? "text-danger" : "text-muted"}`}
-                      style={{ fontFamily: "var(--font-mono)" }}
-                    >
-                      {moneySigned(t.pnl, cur)}
-                    </span>
-                  )}
-                  <button
-                    onClick={() => startEdit(t)}
-                    className="rounded-md p-2 text-muted transition hover:bg-accent/15 hover:text-accent2"
-                    aria-label="Edit trade"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
-                  </button>
-                  {confirmingId === t.id ? (
-                    <span className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => { setConfirmingId(null); onDelete(t.id); }}
-                        className="rounded-md bg-danger/15 px-2.5 py-1.5 text-xs font-medium text-danger transition hover:bg-danger/25"
-                      >
-                        Delete
-                      </button>
-                      <button
-                        onClick={() => setConfirmingId(null)}
-                        className="rounded-md border border-border2 px-2.5 py-1.5 text-xs text-muted transition hover:text-foreground"
-                      >
-                        Cancel
-                      </button>
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => setConfirmingId(t.id)}
-                      className="rounded-md p-2 text-muted transition hover:bg-danger/15 hover:text-danger"
-                      aria-label="Delete trade"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {adding ? (
-          <div className="space-y-3">
-            <div className="text-xs font-medium uppercase tracking-wide text-dim">
-              {editingId ? "Edit trade" : "New trade"}
-            </div>
-            {err && <p className="text-sm text-danger">{err}</p>}
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Pair">
-                <input value={pair} onChange={(e) => setPair(e.target.value)} placeholder="EUR/USD" list="journal-pairs" className="jfield" />
-                <datalist id="journal-pairs">
-                  {watchlist.map((p) => (<option key={p} value={p} />))}
-                </datalist>
-                <span className="mt-0.5 block text-[11px]">
-                  <Link href="/profile/pairs" className="text-accent2 hover:underline">Edit pairs</Link>
-                </span>
-              </Field>
-              <Field label="Direction">
-                <select value={direction} onChange={(e) => setDirection(e.target.value)} className="jfield">
-                  <option value="long">Long</option>
-                  <option value="short">Short</option>
-                </select>
-              </Field>
-              <Field label="PnL ($)"><input value={pnl} onChange={(e) => setPnl(e.target.value)} className="jfield" /></Field>
-              <Field label="R multiple"><input value={r} onChange={(e) => setR(e.target.value)} className="jfield" /></Field>
-              <Field label="Entry"><input inputMode="decimal" value={entry} onChange={(e) => setEntry(e.target.value)} className="jfield" /></Field>
-              <Field label="Stop"><input inputMode="decimal" value={stop} onChange={(e) => setStop(e.target.value)} className="jfield" /></Field>
-              <Field label="Exit"><input inputMode="decimal" value={exit} onChange={(e) => setExit(e.target.value)} className="jfield" /></Field>
-              <Field label="Size (lots)"><input inputMode="decimal" value={size} onChange={(e) => setSize(e.target.value)} className="jfield" /></Field>
-              <Field label="Emotion"><input value={emotion} onChange={(e) => setEmotion(e.target.value)} placeholder="Calm, FOMO..." className="jfield" /></Field>
-              <Field label="Strategy">
-                <select value={strategyId} onChange={(e) => setStrategyId(e.target.value)} className="jfield">
-                  <option value="">None</option>
-                  {strategies.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-            <Field label="Notes">
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="jfield resize-y" />
-            </Field>
-            <div className="flex justify-end gap-2 pt-1">
-              <button onClick={cancelForm} className="rounded-lg border border-border2 px-4 py-2 text-sm text-muted hover:text-foreground">Cancel</button>
-              <button onClick={save} disabled={saving} className="rounded-lg bg-accent px-5 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50">
-                {saving ? "Saving..." : editingId ? "Save changes" : "Save trade"}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button onClick={() => { resetForm(); setAdding(true); }} className="w-full rounded-lg border border-dashed border-border2 py-2.5 text-sm text-muted transition hover:border-accent hover:text-accent2">
-            {trades.length ? "+ Add another trade" : "+ Add trade"}
-          </button>
-        )}
-      </div>
-
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs text-dim">{label}</span>
-      {children}
-    </label>
   );
 }

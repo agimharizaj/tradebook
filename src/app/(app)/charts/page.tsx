@@ -9,6 +9,7 @@ import RiskWidget from "@/components/charts/RiskWidget";
 import { PAIR_CATALOG, tvSymbolFor } from "@/lib/pairs";
 import SnapToNote from "@/components/charts/SnapToNote";
 import SnapToSidekick from "@/components/charts/SnapToSidekick";
+import TradingDayPanel from "@/components/charts/TradingDayPanel";
 import { captureChartArea } from "@/lib/captureChart";
 import { usePairs } from "@/lib/usePairs";
 
@@ -70,6 +71,7 @@ export default function ChartsPage() {
   const [showLog, setShowLog] = useState(false);
   const [showRisk, setShowRisk] = useState(false);
   const [showInd, setShowInd] = useState(false);
+  const [showDaySheet, setShowDaySheet] = useState(false);
   const [studies, setStudies] = useState<string[]>([]);
   const [tf, setTf] = useState("60");
   const current = pairs.find((p) => p.tv === tv)?.label ?? tv;
@@ -127,7 +129,7 @@ export default function ChartsPage() {
           ))}
         </select>
         <Link
-          href="/profile/pairs"
+          href="/settings?tab=pairs"
           className="shrink-0 whitespace-nowrap text-xs text-dim transition hover:text-accent2"
           title="Add or remove pairs"
         >
@@ -168,6 +170,12 @@ export default function ChartsPage() {
         >
           Analysis log
         </button>
+        <button
+          onClick={() => setShowDaySheet(true)}
+          className="shrink-0 whitespace-nowrap rounded-lg border border-border2 px-3 py-2 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground md:hidden"
+        >
+          Day
+        </button>
         {canSnap && <SnapToNote symbol={current} />}
         {canSnap && <SnapToSidekick />}
         {canSnap && (
@@ -204,10 +212,15 @@ export default function ChartsPage() {
         </div>
       )}
 
-      {/* id used by AnalysisPanel to crop self-tab screen captures to the chart */}
-      <div id="tv-chart-area" className="relative flex-1">
-        <TradingViewChart symbol={tv} studies={studies} interval={tf} />
-        {showRisk && <RiskWidget pairLabel={current} onClose={() => setShowRisk(false)} />}
+      {/* The trading-day panel sits OUTSIDE #tv-chart-area so screen captures
+          crop to the chart alone. */}
+      <div className="flex min-h-0 flex-1">
+        {/* id used by AnalysisPanel to crop self-tab screen captures to the chart */}
+        <div id="tv-chart-area" className="relative min-w-0 flex-1">
+          <TradingViewChart symbol={tv} studies={studies} interval={tf} />
+          {showRisk && <RiskWidget pairLabel={current} onClose={() => setShowRisk(false)} />}
+        </div>
+        <TradingDayPanel mobileOpen={showDaySheet} onMobileClose={() => setShowDaySheet(false)} />
       </div>
 
       {showLog && (

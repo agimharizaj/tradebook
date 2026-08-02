@@ -492,7 +492,7 @@ export default function NotebookWorkspace() {
                       <option value={note.pair}>{note.pair}</option>
                     )}
                   </select>
-                  <Link href="/profile/pairs" className="text-[11px] text-accent2 hover:underline">Edit</Link>
+                  <Link href="/settings?tab=pairs" className="text-[11px] text-accent2 hover:underline">Edit</Link>
                 </>
               ) : (
                 note.pair && (

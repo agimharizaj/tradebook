@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV, PROFILE } from "@/lib/nav";
+import { NAV, PROFILE, SETTINGS } from "@/lib/nav";
 
-const ITEMS = [...NAV, PROFILE];
+const ITEMS = [...NAV, SETTINGS, PROFILE];
 
 export default function MobileNav() {
   const pathname = usePathname();
@@ -19,6 +19,7 @@ export default function MobileNav() {
             <Link
               key={item.href}
               href={item.href}
+              data-tour={item.href === "/settings" ? "settings" : `nav${item.href.replace("/", "-")}`}
               className={`flex w-[72px] shrink-0 flex-col items-center gap-1 py-2.5 text-[11px] transition ${
                 active ? "text-accent2" : "text-muted"
               }`}

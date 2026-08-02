@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type Grid = { headers: string[]; rows: string[][] };
@@ -278,8 +278,26 @@ export default function ImportTradesModal({
 
   const missingRequired = FIELDS.filter((f) => f.required && (mapping[f.key] ?? -1) < 0);
 
+  // Escape closes, matching the backdrop-click rule: never mid-import, and
+  // not once a file is loaded (to protect the mapping work).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !importing && !grid) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [importing, grid, onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
+      onMouseDown={(e) => {
+        // Click outside closes - but never mid-import, and never silently
+        // after a file is loaded (that state took effort to set up).
+        if (e.target !== e.currentTarget || importing) return;
+        if (!grid) onClose();
+      }}
+    >
       <div className="max-h-[85dvh] w-full max-w-2xl overflow-y-auto rounded-t-2xl bg-card p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] ring-1 ring-border2 sm:rounded-2xl sm:pb-6">
         <div className="mb-4 flex items-start justify-between">
           <div>

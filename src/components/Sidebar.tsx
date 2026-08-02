@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import LogoMark from "@/components/LogoMark";
 import ThemeToggle from "@/components/ThemeToggle";
-import { NAV, PROFILE } from "@/lib/nav";
+import { NAV, PROFILE, SETTINGS } from "@/lib/nav";
 
 function Icon({ d }: { d: string }) {
   return (
@@ -130,7 +130,13 @@ export default function Sidebar({ email, name }: { email: string; name?: string 
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-2">
         {NAV.map((item) => (
-          <Link key={item.href} href={item.href} title={collapsed ? item.label : undefined} className={itemClass(pathname.startsWith(item.href))}>
+          <Link
+            key={item.href}
+            href={item.href}
+            title={collapsed ? item.label : undefined}
+            data-tour={`nav${item.href.replace("/", "-")}`}
+            className={itemClass(pathname.startsWith(item.href))}
+          >
             <Icon d={item.icon} />
             {!collapsed && item.label}
           </Link>
@@ -138,6 +144,15 @@ export default function Sidebar({ email, name }: { email: string; name?: string 
       </nav>
 
       <div className="border-t border-border p-2">
+        <Link
+          href={SETTINGS.href}
+          title={collapsed ? "Settings" : undefined}
+          data-tour="settings"
+          className={itemClass(pathname.startsWith(SETTINGS.href))}
+        >
+          <Icon d={SETTINGS.icon} />
+          {!collapsed && SETTINGS.label}
+        </Link>
         <Link href={PROFILE.href} title={collapsed ? "Profile" : undefined} className={itemClass(pathname.startsWith(PROFILE.href))}>
           <Icon d={PROFILE.icon} />
           {!collapsed && <span className="truncate">{displayLabel}</span>}

@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Tradebook — Journaling & Settings concept (EdgeFlo parity)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#161A23; --canvas:#1C212C; --card:#222834; --input:#2B3240;
+  --border:rgba(255,255,255,.08); --border2:rgba(255,255,255,.15);
+  --text:#E7E9EF; --muted:#9AA0B0; --dim:#939AAD;
+  --violet:#6A58F0; --violet2:#AB9DFF; --teal:#22D39A; --red:#FF6274; --gold:#F3C57C;
+  --r:12px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+.mono{font-family:'JetBrains Mono',monospace}
+h1,h2,h3,.disp{font-family:'Space Grotesk',sans-serif;letter-spacing:-.02em}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1280px;margin:0 auto;padding:0 26px}
+
+/* page header + jump nav */
+header{padding:44px 0 8px}
+header h1{font-size:32px;font-weight:600}
+header p{color:var(--muted);max-width:860px;margin-top:10px;font-size:15px}
+.jump{position:sticky;top:0;z-index:60;background:rgba(22,26,35,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);margin-top:22px}
+.jump .wrap{display:flex;gap:8px;padding:12px 26px;flex-wrap:wrap}
+.jchip{font-family:'Space Grotesk';font-size:13px;padding:7px 14px;border-radius:100px;border:1px solid var(--border);color:var(--muted);cursor:pointer;background:var(--card)}
+.jchip:hover{color:var(--text);border-color:var(--border2)}
+
+section{padding:52px 0 12px}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--violet2);margin-bottom:8px}
+section>.wrap>h2{font-size:26px;font-weight:600;margin-bottom:6px}
+.lead{color:var(--muted);font-size:14.5px;max-width:840px;margin-bottom:22px}
+.note{border-left:3px solid var(--gold);background:#f3c57c12;padding:10px 14px;border-radius:0 8px 8px 0;color:var(--muted);font-size:13.5px;margin:14px 0;max-width:860px}
+.note b{color:var(--gold);font-weight:600}
+
+/* app frame */
+.frame{background:var(--canvas);border:1px solid var(--border2);border-radius:16px;overflow:hidden;box-shadow:0 24px 60px #00000055}
+.framebar{display:flex;align-items:center;gap:7px;padding:11px 15px;border-bottom:1px solid var(--border);background:var(--bg)}
+.fdot{width:10px;height:10px;border-radius:50%;background:#3a4150}
+.ftitle{margin-left:8px;font-size:12px;color:var(--dim)}
+.appbody{display:flex;min-height:540px}
+
+/* mini sidebar */
+.mside{width:60px;background:var(--bg);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;flex-shrink:0}
+.mlogo{width:32px;height:32px;border-radius:8px;background:linear-gradient(150deg,#8b7bff,var(--violet));margin-bottom:10px;position:relative}
+.mlogo:before{content:"";position:absolute;left:50%;top:6px;bottom:6px;width:2px;background:#fff;transform:translateX(-50%);border-radius:2px}
+.micon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--dim);cursor:pointer}
+.micon:hover{background:var(--input);color:var(--text)}
+.micon.on{background:#6a58f026;color:var(--violet2)}
+.micon svg{width:21px;height:21px}
+.mspacer{flex:1}
+
+.main{flex:1;padding:20px 22px;overflow:hidden;min-width:0}
+.pgtitle{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:10px;flex-wrap:wrap}
+.pgtitle h3{font-size:19px;font-weight:600}
+.pgtitle .sub{font-size:12.5px;color:var(--dim);margin-left:10px;font-weight:400}
+
+/* buttons & controls */
+.btn{font-family:'Space Grotesk';font-size:13px;font-weight:500;padding:8px 14px;border-radius:9px;border:1px solid var(--border2);background:transparent;color:var(--text);cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:7px}
+.btn:hover{background:#ffffff0d}
+.btn.primary{background:var(--violet);border-color:transparent;color:#fff;box-shadow:0 6px 18px #6a58f044}
+.btn.primary:hover{filter:brightness(1.1)}
+.btn.sm{padding:5px 10px;font-size:12px;border-radius:7px}
+.btn svg{width:15px;height:15px}
+.seg{display:inline-flex;background:var(--card);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px}
+.seg button{font-family:'JetBrains Mono';font-size:12px;padding:5px 11px;border:none;background:transparent;color:var(--dim);border-radius:6px;cursor:pointer}
+.seg button.on{background:var(--violet);color:#fff}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;padding:3px 10px;border-radius:100px;border:1px solid var(--border)}
+.pill.red{color:var(--red);border-color:#ff627440;background:#ff627414}
+.pill.teal{color:var(--teal);border-color:#22d39a40;background:#22d39a14}
+.pill.gold{color:var(--gold);border-color:#f3c57c40;background:#f3c57c14}
+.pill.violet{color:var(--violet2);border-color:#6a58f055;background:#6a58f01c}
+
+/* journal layout */
+.jgrid{display:grid;grid-template-columns:1fr 340px;gap:16px}
+.cal{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px}
+.calhead{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.calhead h4{font-family:'Space Grotesk';font-size:15px}
+.navbtn{width:26px;height:26px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.navbtn:hover{background:var(--input);color:var(--text)}
+.navbtn svg{width:14px;height:14px}
+.dow{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.day{background:var(--canvas);border:1px solid var(--border);border-radius:9px;min-height:66px;padding:6px 7px;position:relative;font-size:11px;cursor:pointer;transition:.12s}
+.day:hover{border-color:var(--border2)}
+.day .n{position:absolute;top:5px;right:7px;color:var(--dim);font-family:'JetBrains Mono';font-size:10.5px}
+.day.pos{background:#22d39a10;border-color:#22d39a2e}
+.day.neg{background:#ff627410;border-color:#ff62742e}
+.day.today{outline:2px solid var(--violet);outline-offset:-1px}
+.day.sel{outline:2px solid var(--violet2);outline-offset:-1px}
+.day .t{margin-top:14px;color:var(--muted);font-size:10px}
+.day .p{font-family:'JetBrains Mono';font-size:11px;font-weight:500}
+.day .p.up{color:var(--teal)} .day .p.dn{color:var(--red)}
+.jdots{display:flex;gap:3px;margin-top:4px}
+.jdot{width:6px;height:6px;border-radius:50%;background:var(--violet2)}
+.jdot.off{background:transparent;border:1.2px solid var(--dim)}
+.todaypill{position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:var(--violet);color:#fff;font-size:9px;font-family:'Space Grotesk';padding:1px 8px;border-radius:100px;white-space:nowrap}
+
+/* summary cards */
+.sumrow{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.sumcard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px}
+.sumcard h4{font-family:'Space Grotesk';font-size:14.5px;margin-bottom:12px}
+.kvrow{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px}
+.kvrow:last-child{border:none}
+.kvrow .k{color:var(--dim)} .kvrow .v{font-family:'JetBrains Mono'}
+.hist{display:flex;align-items:flex-end;gap:10px;height:110px;padding:8px 4px 0}
+.hbar{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%;justify-content:flex-end}
+.hbar i{display:block;width:100%;max-width:38px;border-radius:5px 5px 0 0;background:var(--violet)}
+.hbar.lose i{background:#ff627488}
+.hbar span{font-family:'JetBrains Mono';font-size:9.5px;color:var(--dim)}
+.weeks{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.wk{background:var(--canvas);border:1px solid var(--border);border-radius:10px;padding:11px;cursor:pointer;transition:.12s}
+.wk:hover{border-color:var(--violet2)}
+.wk.cur{border-color:var(--violet);box-shadow:0 0 0 1px #6a58f044}
+.wk .wl{font-size:11px;color:var(--dim)}
+.wk .wd{font-size:10px;color:var(--violet2);background:#6a58f01c;display:inline-block;padding:1px 7px;border-radius:100px;margin:5px 0}
+.wk .wp{font-family:'JetBrains Mono';font-size:13px;font-weight:500}
+.wk .wp.up{color:var(--teal)} .wk .wp.dn{color:var(--red)}
+
+/* day panel */
+.dpanel{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:0;box-shadow:-18px 0 40px #00000033}
+.dpnav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.dpnav .dt{font-family:'Space Grotesk';font-size:13.5px}
+.dpnav .dt span{color:var(--dim);font-size:11.5px;margin-left:6px}
+.bigpnl{font-family:'JetBrains Mono';font-size:27px;font-weight:600;letter-spacing:-.02em}
+.bigpnl.dn{color:var(--red)} .bigpnl.up{color:var(--teal)}
+.lbl{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.07em;margin-top:1px}
+.statgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:13px 0}
+.sg{background:var(--canvas);border:1px solid var(--border);border-radius:9px;padding:8px 10px}
+.sg .v{font-family:'JetBrains Mono';font-size:14.5px;font-weight:500}
+.sg .v.up{color:var(--teal)} .sg .v.dn{color:var(--red)}
+.drow{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-top:1px solid var(--border);font-size:12.5px}
+.drow .k{color:var(--muted)}
+.drow .chev{color:var(--dim);font-size:10px;margin-left:6px}
+.expand{background:var(--canvas);border:1px solid var(--border);border-radius:9px;padding:9px 11px;margin:2px 0 9px;font-size:12px;color:var(--muted)}
+.viol{display:flex;gap:8px;align-items:center;padding:4px 0;color:var(--red)}
+.viol svg{width:13px;height:13px;flex-shrink:0}
+.rchk{display:flex;gap:9px;align-items:center;padding:4px 0;cursor:pointer}
+.cbx{width:16px;height:16px;border-radius:5px;border:1.5px solid var(--border2);flex-shrink:0;position:relative}
+.cbx.done{background:var(--teal);border-color:var(--teal)}
+.cbx.done:after{content:"";position:absolute;left:5px;top:1.5px;width:4px;height:8px;border:solid #06120d;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.notebox{display:flex;align-items:center;gap:9px;background:var(--input);border:1px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--dim);font-size:12.5px;margin:10px 0 12px}
+.notebox svg{width:15px;height:15px;flex-shrink:0}
+.notebox .mic{margin-left:auto;color:var(--violet2);cursor:pointer}
+.tfilter{display:flex;gap:6px;align-items:center;margin:8px 0}
+.tfb{font-size:11.5px;padding:4px 11px;border-radius:100px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'Space Grotesk'}
+.tfb.on{background:var(--violet);border-color:transparent;color:#fff}
+.tsearch{margin-left:auto;background:var(--input);border:1px solid var(--border);border-radius:8px;padding:4px 9px;font-size:11.5px;color:var(--dim);display:flex;gap:6px;align-items:center}
+.trow{display:flex;align-items:center;gap:9px;padding:8px 6px;border-radius:8px;font-size:12px;cursor:pointer}
+.trow:hover{background:var(--input)}
+.flags{display:flex;flex-shrink:0}
+.flag{width:19px;height:19px;border-radius:50%;border:1.5px solid var(--card);display:flex;align-items:center;justify-content:center;font-size:11px;background:var(--input);overflow:hidden}
+.flag+.flag{margin-left:-7px}
+.trow .pr{font-family:'Space Grotesk';font-weight:500;font-size:12.5px}
+.trow .tm{color:var(--dim);font-family:'JetBrains Mono';font-size:11px}
+.trow .dir{font-size:11px;font-weight:500}
+.dir.buy{color:var(--teal)} .dir.sell{color:var(--red)}
+.trow .emo{font-size:13px}
+.trow .pnl{margin-left:auto;font-family:'JetBrains Mono';font-size:12px;font-weight:500}
+.pnl.up{color:var(--teal)} .pnl.dn{color:var(--red)}
+.trow .jind{width:7px;height:7px;border-radius:50%;background:var(--violet2);flex-shrink:0}
+.trow .jind.off{background:transparent;border:1.3px solid var(--dim)}
+
+/* trade journal page */
+.tjhead{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.tjhead .bk{color:var(--dim);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px}
+.tjhead h3{font-size:17px;display:flex;align-items:center;gap:9px}
+.tjhead .rt{margin-left:auto;display:flex;gap:8px}
+.tjgrid{display:grid;grid-template-columns:330px 1fr;gap:16px}
+.tjgrid.focus{grid-template-columns:1fr}
+.tjgrid.focus .tdcol{display:none}
+.chartup{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.cslot{border:1.5px dashed var(--border2);border-radius:10px;min-height:110px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:var(--dim);font-size:11.5px;cursor:pointer;background:var(--canvas)}
+.cslot:hover{border-color:var(--violet2);color:var(--violet2)}
+.cslot svg{width:20px;height:20px}
+.cslot .tf{font-family:'JetBrains Mono';font-size:10.5px;color:var(--violet2);background:#6a58f01c;padding:1px 8px;border-radius:100px}
+.cslot.filled{border-style:solid;padding:0;overflow:hidden;position:relative}
+.fakechart{width:100%;height:100%;min-height:110px;background:linear-gradient(160deg,#232a38,#1a1f2a);position:relative}
+.fakechart:after{content:"";position:absolute;inset:0;background:
+ repeating-linear-gradient(90deg,transparent 0 24px,rgba(255,255,255,.03) 24px 25px)}
+.ffield{margin-bottom:14px}
+.ffield>label{display:block;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.fake-input,.fake-select,.fake-ta{width:100%;background:var(--input);border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:13px;color:var(--text)}
+.fake-select{display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.fake-select .car{color:var(--dim);font-size:10px}
+.fake-ta{min-height:92px;color:var(--dim);position:relative}
+.tags{display:flex;flex-wrap:wrap;gap:6px;background:var(--input);border:1px solid var(--border);border-radius:9px;padding:8px 10px;min-height:40px}
+.tag{display:inline-flex;align-items:center;gap:6px;background:#6a58f022;border:1px solid #6a58f04d;color:var(--violet2);font-size:12px;padding:3px 9px;border-radius:7px}
+.tag i{font-style:normal;cursor:pointer;color:var(--dim);font-size:11px}
+.tag.red{background:#ff627418;border-color:#ff627440;color:var(--red)}
+.tags .ph{color:var(--dim);font-size:12px;padding:3px 2px}
+.frow2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.kv{display:flex;justify-content:space-between;padding:7px 0;font-size:12.5px;border-bottom:1px solid var(--border)}
+.kv:last-child{border:none}
+.kv .k{color:var(--dim)} .kv .v{font-family:'JetBrains Mono'}
+.micbtn{position:absolute;right:10px;bottom:10px;width:28px;height:28px;border-radius:8px;background:var(--card);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;color:var(--violet2);cursor:pointer}
+.micbtn svg{width:15px;height:15px}
+.recbar{display:flex;align-items:center;gap:10px;background:#6a58f014;border:1px solid #6a58f04d;border-radius:9px;padding:8px 12px;margin-top:8px;font-size:12px;color:var(--violet2)}
+.wave{flex:1;height:16px;background:repeating-linear-gradient(90deg,var(--violet2) 0 2px,transparent 2px 5px);opacity:.6;border-radius:2px;mask-image:linear-gradient(180deg,transparent 0 40%,#000 40% 60%,transparent 60%)}
+.emoline{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.emobtn{font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--border);background:var(--canvas);color:var(--muted);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.emobtn.on{border-color:var(--violet);background:#6a58f01c;color:var(--text)}
+
+/* settings */
+.stgrid{display:grid;grid-template-columns:200px 1fr;gap:18px}
+.stnav{display:flex;flex-direction:column;gap:3px}
+.stlink{padding:9px 13px;border-radius:9px;font-size:13.5px;color:var(--muted);cursor:pointer;display:flex;gap:10px;align-items:center}
+.stlink svg{width:16px;height:16px}
+.stlink:hover{background:var(--input);color:var(--text)}
+.stlink.on{background:#6a58f022;color:var(--violet2)}
+.stpanel{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:20px}
+.stpanel h4{font-family:'Space Grotesk';font-size:15px;margin-bottom:4px}
+.stpanel .d{color:var(--dim);font-size:12.5px;margin-bottom:16px}
+.ritem{display:flex;align-items:center;gap:10px;background:var(--canvas);border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:8px;font-size:13px}
+.ritem .grip{color:var(--dim);cursor:grab;font-family:'JetBrains Mono';letter-spacing:2px}
+.ritem .x{margin-left:auto;color:var(--dim);cursor:pointer}
+.addline{display:flex;gap:9px;align-items:center;color:var(--violet2);font-size:13px;cursor:pointer;padding:6px 2px}
+.tog{width:34px;height:19px;border-radius:100px;background:var(--input);border:1px solid var(--border2);position:relative;cursor:pointer;flex-shrink:0}
+.tog:after{content:"";position:absolute;top:2px;left:2.5px;width:13px;height:13px;border-radius:50%;background:var(--dim);transition:.15s}
+.tog.on{background:var(--violet);border-color:transparent}
+.tog.on:after{left:16px;background:#fff}
+.strow{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);font-size:13.5px}
+.strow:last-child{border:none}
+.strow .k b{display:block;font-weight:500}
+.strow .k span{font-size:12px;color:var(--dim)}
+
+/* charts page */
+.chgrid{display:flex;gap:0;min-height:430px}
+.chpanel{width:290px;flex-shrink:0;background:var(--card);border-right:1px solid var(--border);padding:14px;display:flex;flex-direction:column;gap:0;transition:.2s}
+.chmain{flex:1;background:#12151d;position:relative;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px}
+.gbar{height:7px;border-radius:100px;background:var(--input);position:relative;margin:7px 0 3px;overflow:hidden}
+.gbar i{position:absolute;left:0;top:0;bottom:0;width:23%;background:var(--red);border-radius:100px}
+.gscale{display:flex;justify-content:space-between;font-family:'JetBrains Mono';font-size:9.5px;color:var(--dim)}
+.dots5{display:flex;gap:4px}
+.d5{width:10px;height:10px;border-radius:50%;background:var(--input);border:1px solid var(--border2)}
+.d5.used{background:var(--red);border-color:transparent}
+.warn{display:flex;gap:8px;align-items:flex-start;font-size:12px;border-radius:9px;padding:8px 11px;margin-top:8px}
+.warn.gold{background:#f3c57c14;color:var(--gold);border:1px solid #f3c57c33}
+.warn.red{background:#ff627414;color:var(--red);border:1px solid #ff627433}
+.warn svg{width:14px;height:14px;flex-shrink:0;margin-top:2px}
+.chcollapse{position:absolute;top:12px;left:12px;z-index:5}
+
+/* tutorial */
+.tutwrap{position:relative;overflow:hidden}
+.tutov{position:absolute;inset:0;background:rgba(10,12,17,.72);z-index:10}
+.spot{position:absolute;z-index:11;border-radius:12px;box-shadow:0 0 0 3px var(--violet), 0 0 0 9999px rgba(10,12,17,.72)}
+.tutcard{position:absolute;z-index:12;width:290px;background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:16px;box-shadow:0 20px 50px #00000088}
+.tutcard .step{font-size:11px;color:var(--violet2);font-family:'JetBrains Mono';margin-bottom:6px}
+.tutcard h5{font-family:'Space Grotesk';font-size:15px;margin-bottom:6px}
+.tutcard p{font-size:12.5px;color:var(--muted);margin-bottom:14px}
+.tutcard .row{display:flex;justify-content:space-between;align-items:center}
+.tutdots{display:flex;gap:4px}
+.tutdots i{width:6px;height:6px;border-radius:50%;background:var(--input)}
+.tutdots i.on{background:var(--violet2)}
+
+/* modal */
+.modalbg{background:rgba(10,12,17,.6);border-radius:12px;padding:34px;display:flex;align-items:center;justify-content:center}
+.modal{width:430px;background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:20px;box-shadow:0 24px 60px #00000077}
+.modal h4{font-family:'Space Grotesk';font-size:15.5px;margin-bottom:14px}
+
+/* build notes */
+.bn{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:14px}
+.bn h4{font-family:'Space Grotesk';font-size:15px;margin-bottom:10px;color:var(--violet2)}
+.bn p, .bn li{font-size:13.5px;color:var(--muted)}
+.bn ul{padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.bn code{font-family:'JetBrains Mono';font-size:12px;background:var(--input);padding:1px 6px;border-radius:5px;color:var(--text)}
+footer{padding:40px 0 60px;color:var(--dim);font-size:12.5px}
+@media(max-width:980px){.jgrid,.tjgrid,.stgrid,.sumrow{grid-template-columns:1fr}.appbody{flex-direction:column}.mside{flex-direction:row;width:100%;height:52px;padding:0 14px}.chgrid{flex-direction:column}.chpanel{width:100%}}
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <div class="eyebrow">Concept for review — nothing committed yet</div>
+  <h1>Journaling, Settings & Tutorial <span style="color:var(--violet2)">— EdgeFlo parity</span></h1>
+  <p>Every screen below is a static mock in the approved terminal brand. Decisions locked in from your answers: guardrails live globally in Settings, voice uses the browser Web Speech API, tutorial is an overlay coach-marks tour, and the day/journal panel slides in from the <b style="color:var(--text)">right</b>. Review each section, tell me what to change, then I implement and commit for you to push.</p>
+</header>
+
+<div class="jump"><div class="wrap">
+  <a class="jchip" href="#journal">1 · Journal page</a>
+  <a class="jchip" href="#daypanel">2 · Day / Week panel</a>
+  <a class="jchip" href="#tradejournal">3 · Trade journal</a>
+  <a class="jchip" href="#settings">4 · Settings</a>
+  <a class="jchip" href="#charts">5 · Charts routine panel</a>
+  <a class="jchip" href="#tutorial">6 · Tutorial</a>
+  <a class="jchip" href="#addtrade">7 · Add trade</a>
+  <a class="jchip" href="#notes">8 · Build notes</a>
+  <a class="jchip" href="#gaps">9 · Gap analysis</a>
+</div></div>
+
+<!-- ================= 1. JOURNAL ================= -->
+<section id="journal"><div class="wrap">
+  <div class="eyebrow">Section 1</div>
+  <h2>Journal page — calendar, journaled dots, monthly summary, weekly breakdown</h2>
+  <p class="lead">The calendar keeps your current layout but each day now shows one dot per trade: <b style="color:var(--violet2)">filled = journaled</b>, hollow = not yet. New top-right: a $ / % / R display toggle (spotted in your screenshots, applies to every PnL on the page). Monthly Summary is upgraded to EdgeFlo's stat block plus an R-distribution histogram. Weekly Breakdown becomes clickable cards that open the same right-hand panel in week mode.</p>
+
+  <div class="frame">
+    <div class="framebar"><div class="fdot"></div><div class="fdot"></div><div class="fdot"></div><span class="ftitle">tradebook — /journal</span></div>
+    <div class="appbody">
+      <div class="mside">
+        <div class="mlogo"></div>
+        <div class="micon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></div>
+        <div class="micon on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 9h18"/></svg></div>
+        <div class="micon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14"/><path d="M4 19a2 2 0 0 0 2 2h14"/><path d="M9 9h6M9 13h4"/></svg></div>
+        <div class="mspacer"></div>
+        <div class="micon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+        <div class="micon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg></div>
+      </div>
+      <div class="main">
+        <div class="pgtitle">
+          <h3>Journal <span class="sub">Review your trades, emotions and patterns.</span></h3>
+          <div style="display:flex;gap:10px;align-items:center">
+            <div class="seg"><button class="on">$</button><button>%</button><button>R</button></div>
+            <button class="btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add trade</button>
+          </div>
+        </div>
+
+        <div class="jgrid">
+          <div>
+            <div class="cal">
+              <div class="calhead">
+                <button class="navbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+                <button class="navbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+                <h4>August 2026</h4>
+              </div>
+              <div class="dow"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+              <div class="days">
+                <div class="day"><span class="n">27</span></div>
+                <div class="day pos"><span class="n">28</span><div class="t">6 trades</div><div class="p up">+$1,240.50</div><div class="jdots"><span class="jdot"></span><span class="jdot"></span><span class="jdot"></span><span class="jdot"></span><span class="jdot off"></span><span class="jdot off"></span></div></div>
+                <div class="day neg"><span class="n">29</span><div class="t">2 trades</div><div class="p dn">-$392.20</div><div class="jdots"><span class="jdot"></span><span class="jdot"></span></div></div>
+                <div class="day pos"><span class="n">30</span><div class="t">4 trades</div><div class="p up">+$845.00</div><div class="jdots"><span class="jdot"></span><span class="jdot off"></span><span class="jdot off"></span><span class="jdot off"></span></div></div>
+                <div class="day neg sel"><span class="n">31</span><div class="t">4 trades</div><div class="p dn">-$390.00</div><div class="jdots"><span class="jdot"></span><span class="jdot off"></span><span class="jdot off"></span><span class="jdot off"></span></div></div>
+                <div class="day"><span class="n">1</span></div>
+                <div class="day today"><span class="todaypill">Today</span><span class="n">2</span></div>
+                <div class="day"><span class="n">3</span></div>
+                <div class="day"><span class="n">4</span></div>
+                <div class="day"><span class="n">5</span></div>
+                <div class="day"><span class="n">6</span></div>
+                <div class="day"><span class="n">7</span></div>
+                <div class="day"><span class="n">8</span></div>
+                <div class="day"><span class="n">9</span></div>
+              </div>
+            </div>
+
+            <div class="sumrow">
+              <div class="sumcard">
+                <h4>Monthly Summary</h4>
+                <div class="kvrow"><span class="k">Expectancy</span><span class="v">0.12R</span></div>
+                <div class="kvrow"><span class="k">Win rate</span><span class="v">54.2%</span></div>
+                <div class="kvrow"><span class="k">Avg win</span><span class="v" style="color:var(--teal)">+$412.80</span></div>
+                <div class="kvrow"><span class="k">Avg loss</span><span class="v" style="color:var(--red)">-$203.15</span></div>
+                <div class="kvrow"><span class="k">Best trade</span><span class="v" style="color:var(--teal)">+$1,120.00</span></div>
+                <div class="kvrow"><span class="k">Worst trade</span><span class="v" style="color:var(--red)">-$690.40</span></div>
+                <div class="kvrow"><span class="k">Total trades</span><span class="v">16 <span style="color:var(--dim)">· 9W/7L</span></span></div>
+                <div class="hist">
+                  <div class="hbar lose"><i style="height:22%"></i><span>&le;-2R</span></div>
+                  <div class="hbar lose"><i style="height:48%"></i><span>-1R to 0</span></div>
+                  <div class="hbar"><i style="height:64%"></i><span>0 to 1R</span></div>
+                  <div class="hbar"><i style="height:88%"></i><span>1R to 2R</span></div>
+                  <div class="hbar"><i style="height:34%"></i><span>&ge;2R</span></div>
+                </div>
+              </div>
+              <div class="sumcard">
+                <h4>Weekly Breakdown <span style="font-size:11px;color:var(--dim);font-weight:400;margin-left:6px">click a week to open it in the panel</span></h4>
+                <div class="weeks">
+                  <div class="wk"><div class="wl">Week 1</div><div class="wd">3 days</div><div class="wp up">+$1,693.30</div></div>
+                  <div class="wk"><div class="wl">Week 2</div><div class="wd">2 days</div><div class="wp dn">-$412.20</div></div>
+                  <div class="wk cur"><div class="wl" style="color:var(--violet2)">Current</div><div class="wd">1 day</div><div class="wp dn">-$390.00</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ============ DAY PANEL (right drawer) ============ -->
+          <div class="dpanel" id="daypanel">
+            <div class="dpnav">
+              <button class="navbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+              <div class="dt" id="ptitle">Fri, July 31 <span>· yesterday</span></div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <button class="navbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+                <button class="btn sm">Today</button>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div><div class="bigpnl dn">-$390.00</div><div class="lbl">Net PnL</div></div>
+              <button class="btn sm" id="pmode">Week view</button>
+            </div>
+            <div class="statgrid">
+              <div class="sg"><div class="v">25%</div><div class="lbl">Win rate</div></div>
+              <div class="sg"><div class="v dn">-0.4R</div><div class="lbl">Avg R</div></div>
+              <div class="sg"><div class="v">4</div><div class="lbl">Trades</div></div>
+              <div class="sg"><div class="v up">1</div><div class="lbl">Wins</div></div>
+              <div class="sg"><div class="v dn">3</div><div class="lbl">Losses</div></div>
+              <div class="sg"><div class="v">1/4</div><div class="lbl">Journaled</div></div>
+            </div>
+
+            <div class="drow"><span class="k">Plan followed</span>
+              <div class="seg"><button>Yes</button><button class="on" style="background:var(--gold);color:#161A23">Partial</button><button>No</button></div>
+            </div>
+
+            <div class="drow" style="cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+              <span class="k">Guardrail violations</span><span class="pill red">2 <span class="chev">▾</span></span>
+            </div>
+            <div class="expand">
+              <div class="viol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>Traded outside allowed window ×1</div>
+              <div class="viol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>Exceeded max daily loss ×1</div>
+            </div>
+
+            <div class="drow" style="cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+              <span class="k">Pre-market routine</span><span class="pill gold">2/3 <span class="chev">▾</span></span>
+            </div>
+            <div class="expand" style="display:none">
+              <div class="rchk"><span class="cbx done"></span>Meditate 15 mins</div>
+              <div class="rchk"><span class="cbx done"></span>Review your trading plan</div>
+              <div class="rchk"><span class="cbx"></span>Review charts</div>
+            </div>
+
+            <div class="notebox">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              Add a day note…
+              <span class="mic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg></span>
+            </div>
+
+            <div style="font-family:'Space Grotesk';font-size:13px">Trades <span style="font-size:10.5px;color:var(--dim);font-weight:400">tap a trade to journal it</span></div>
+            <div class="tfilter">
+              <button class="tfb on">All</button><button class="tfb">Wins</button><button class="tfb">Losses</button>
+              <div class="tsearch"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>Search</div>
+            </div>
+            <div class="trow"><span class="jind"></span><span class="flags"><span class="flag">🇪🇺</span><span class="flag">🇺🇸</span></span><span class="pr">EURUSD</span><span class="tm">13:01</span><span class="dir buy">↑ Buy</span><span class="emo" title="Revenge → Relieved">😡→😌</span><span class="pnl dn">-$210.00</span></div>
+            <div class="trow"><span class="jind off"></span><span class="flags"><span class="flag">🇬🇧</span><span class="flag">🇯🇵</span></span><span class="pr">GBPJPY</span><span class="tm">13:14</span><span class="dir buy">↑ Buy</span><span class="emo">—</span><span class="pnl dn">-$200.00</span></div>
+            <div class="trow"><span class="jind off"></span><span class="flags"><span class="flag" style="background:#2b3240;font-size:9px;font-family:'JetBrains Mono'">XAU</span><span class="flag">🇺🇸</span></span><span class="pr">XAUUSD</span><span class="tm">14:02</span><span class="dir sell">↓ Sell</span><span class="emo">—</span><span class="pnl up">+$420.00</span></div>
+            <div class="trow"><span class="jind off"></span><span class="flags"><span class="flag">🇪🇺</span><span class="flag">🇺🇸</span></span><span class="pr">EURUSD</span><span class="tm">15:18</span><span class="dir buy">↑ Buy</span><span class="emo">—</span><span class="pnl dn">-$400.00</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note"><b>Calendar dots:</b> one dot per trade, filled violet when its journal entry is complete (has at least a reflection note or one chart image), hollow otherwise. Days with 7+ trades collapse to "4/7" text to avoid clutter.</div>
+</div></section>
+
+<!-- ================= 2. DAY / WEEK PANEL ================= -->
+<section id="daypanel2"><div class="wrap">
+  <div class="eyebrow">Section 2</div>
+  <h2>Day panel vs Week panel — same drawer, two scopes</h2>
+  <p class="lead">Clicking a calendar day opens the drawer for that day. Clicking a Weekly Breakdown card opens the identical drawer scoped to the week: same stats aggregated Mon–Sun, arrows step week by week, the title reads "Week 2 · Aug 3–9", and the trades list shows every trade that week grouped by day. "Plan followed" and the routine section show per-day chips instead of one selector. Everything else is unchanged, so it's one component (<span class="mono" style="font-size:12px">JournalPanel</span>) with a <span class="mono" style="font-size:12px">scope: day | week</span> prop.</p>
+  <div class="note"><b>Behaviour notes:</b> the drawer is viewport-pinned on desktop (calendar stays visible), full-screen sheet on mobile with the back gesture closing it (same history-entry trick as the Sidekick dock). Left/right arrows animate the content, "Today" jumps back. Net PnL, win rate and stats respect the $ / % / R toggle.</div>
+</div></section>
+
+<!-- ================= 3. TRADE JOURNAL ================= -->
+<section id="tradejournal"><div class="wrap">
+  <div class="eyebrow">Section 3</div>
+  <h2>Trade journal — Regular and Focus mode</h2>
+  <p class="lead">Opening a trade from the panel (or "Save &amp; Journal" from Add trade) lands here. Regular mode shows trade facts on the left, charts + reflection on the right. Focus mode hides the facts and keeps only charts + reflection for fast end-of-day reviews, with Previous / Next Trade to walk the whole day. Try the toggle below — it works.</p>
+
+  <div class="frame">
+    <div class="framebar"><div class="fdot"></div><div class="fdot"></div><div class="fdot"></div><span class="ftitle">tradebook — /journal/trade/8f2…</span></div>
+    <div class="appbody"><div class="main">
+      <div class="tjhead">
+        <span class="bk"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>Journal</span>
+        <h3><span class="flags"><span class="flag">🇪🇺</span><span class="flag">🇺🇸</span></span>EURUSD <span style="color:var(--dim);font-weight:400;font-size:13px">· Trade 1 of 4 · Fri, Jul 31</span></h3>
+        <div class="rt">
+          <button class="btn sm" id="modetgl">Focus mode</button>
+          <button class="btn sm">‹ Previous</button>
+          <button class="btn sm">Next trade ›</button>
+        </div>
+      </div>
+
+      <div class="tjgrid" id="tjgrid">
+        <div class="tdcol">
+          <div class="sumcard">
+            <div class="bigpnl dn" style="font-size:23px">-$210.00</div><div class="lbl" style="margin-bottom:12px">Net PnL</div>
+            <div class="kv"><span class="k">Instrument</span><span class="v">EURUSD</span></div>
+            <div class="kv"><span class="k">Direction</span><span class="v" style="color:var(--teal)">Buy</span></div>
+            <div class="kv"><span class="k">Lot size</span><span class="v">0.50</span></div>
+            <div class="kv"><span class="k">Date</span><span class="v">Fri, Jul 31</span></div>
+            <div class="kv"><span class="k">Session</span><span class="v">London</span></div>
+            <div class="kv"><span class="k">Duration</span><span class="v">5m</span></div>
+            <div class="kv"><span class="k">Entry</span><span class="v">1.18423</span></div>
+            <div class="kv"><span class="k">Stop loss</span><span class="v">1.18380</span></div>
+            <div class="kv"><span class="k">Risk</span><span class="v">1R ($200)</span></div>
+            <div class="kv"><span class="k">Return</span><span class="v" style="color:var(--red)">-1.05R</span></div>
+            <div class="kv"><span class="k">Commission + swap</span><span class="v">-$3.50</span></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="sumcard" style="margin-bottom:16px">
+            <h4>Charts <span style="font-size:11px;color:var(--dim);font-weight:400;margin-left:6px">add screenshots to review context + execution</span></h4>
+            <div class="chartup">
+              <div class="cslot filled"><div class="fakechart"></div><span class="tf" style="position:absolute;top:8px;left:8px">HTF</span></div>
+              <div class="cslot"><span class="tf">MTF</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Upload or paste</div>
+              <div class="cslot"><span class="tf">LTF</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Upload or paste</div>
+            </div>
+
+            <h4>Review &amp; Reflection</h4>
+            <div class="frow2" style="margin-bottom:14px">
+              <div class="ffield" style="margin:0">
+                <label>Plan</label>
+                <div class="rchk" style="padding:8px 0 0"><span class="cbx done"></span>I followed my trade plan</div>
+              </div>
+              <div class="ffield" style="margin:0">
+                <label>Which plan did you intend to follow?</label>
+                <div class="fake-select">A+ Setup Checklist<span class="car">▾</span></div>
+              </div>
+            </div>
+
+            <div class="frow2">
+              <div class="ffield">
+                <label>Entry confluences</label>
+                <div class="tags"><span class="tag">LQ sweep <i>×</i></span><span class="tag">LTF POI mitigation <i>×</i></span><span class="tag">MS <i>×</i></span><span class="ph">+ add…</span></div>
+              </div>
+              <div class="ffield">
+                <label>Trade management</label>
+                <div class="tags"><span class="tag">Partial at 1R <i>×</i></span><span class="ph">+ add…</span></div>
+              </div>
+            </div>
+
+            <div class="ffield">
+              <label>Mistakes</label>
+              <div class="tags"><span class="tag red">Impatience <i>×</i></span><span class="tag red">Entered too late <i>×</i></span><span class="ph">+ add…</span></div>
+            </div>
+
+            <div class="frow2">
+              <div class="ffield">
+                <label>Entry emotion</label>
+                <div class="fake-select">😡 Revenge<span class="car">▾</span></div>
+                <div class="emoline"><span class="emobtn">😌 Calm</span><span class="emobtn">😨 FOMO</span><span class="emobtn on">😡 Revenge</span><span class="emobtn">😑 Boredom</span><span class="emobtn">😎 Overconfident</span><span class="emobtn">😰 Fear</span><span class="emobtn">🤑 Greed</span></div>
+              </div>
+              <div class="ffield">
+                <label>Exit emotion</label>
+                <div class="fake-select">😌 Relieved<span class="car">▾</span></div>
+                <div class="emoline"><span class="emobtn">😊 Satisfied</span><span class="emobtn">😞 Regretful</span><span class="emobtn">😤 Frustrated</span><span class="emobtn on">😌 Relieved</span><span class="emobtn">😔 Disappointed</span><span class="emobtn">🏆 Proud</span></div>
+              </div>
+            </div>
+
+            <div class="ffield" style="margin-bottom:0">
+              <label>Notes &amp; reflection</label>
+              <div class="fake-ta">What went well? What will you do differently next time?
+                <span class="micbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg></span>
+              </div>
+              <div class="recbar"><span style="width:8px;height:8px;border-radius:50%;background:var(--red);animation:blink 1s infinite"></span>Listening… speech lands in the box as you talk<div class="wave"></div><span class="mono" style="font-size:11px">0:14</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="note"><b>Tag fields:</b> confluence / management / mistake tags autocomplete from everything you've used before (per-user catalogs), Enter creates a new one — exactly like the Notebook pair-tag picker. <b>Emotions</b> are the fixed EdgeFlo sets shown above, stored as text so we can extend later. <b>Voice:</b> the mic uses the browser's Web Speech API — live transcription straight into the field; works in the trade reflection, the day note, and Notebook notes.</div>
+</div></section>
+
+<!-- ================= 4. SETTINGS ================= -->
+<section id="settings"><div class="wrap">
+  <div class="eyebrow">Section 4</div>
+  <h2>Settings — new sidebar entry, tabbed</h2>
+  <p class="lead">A gear icon joins the sidebar footer above Profile. Profile keeps identity (name, password); Settings takes everything behavioural. Trading pairs moves here from Profile (old route redirects). Tabs below are clickable.</p>
+
+  <div class="frame">
+    <div class="framebar"><div class="fdot"></div><div class="fdot"></div><div class="fdot"></div><span class="ftitle">tradebook — /settings</span></div>
+    <div class="appbody"><div class="main">
+      <div class="pgtitle"><h3>Settings</h3></div>
+      <div class="stgrid">
+        <div class="stnav" id="stnav">
+          <div class="stlink on" data-t="st-trading"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 7v6h-6"/></svg>Trading</div>
+          <div class="stlink" data-t="st-routine"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>Pre-market routine</div>
+          <div class="stlink" data-t="st-pairs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.9 5.7 3.9 9S14.5 18.4 12 21c-2.5-2.6-3.9-5.7-3.9-9S9.5 5.6 12 3z"/></svg>Trading pairs</div>
+          <div class="stlink" data-t="st-appear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>Appearance</div>
+          <div class="stlink" data-t="st-tutorial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></svg>Tutorial &amp; help</div>
+        </div>
+
+        <div>
+          <div class="stpanel stp" id="st-trading">
+            <h4>Trading guardrails</h4>
+            <div class="d">Account-level limits. These drive the violations in your journal and the live bar on Charts. Figures accept a number ("200") or a percent of account ("5%") — same convention as strategy risk controls.</div>
+            <div class="frow2">
+              <div class="ffield"><label>Account size</label><div class="fake-input mono">10,000</div></div>
+              <div class="ffield"><label>Max trades / day</label><div class="fake-input mono">5</div></div>
+              <div class="ffield"><label>Max daily loss</label><div class="fake-input mono">3%</div></div>
+              <div class="ffield"><label>Daily profit target</label><div class="fake-input mono">500</div></div>
+              <div class="ffield"><label>Trading window 1</label><div class="fake-input mono">08:00–12:00 UTC</div></div>
+              <div class="ffield"><label>Trading window 2 (optional)</label><div class="fake-input mono">13:30–16:00 UTC</div></div>
+            </div>
+            <div class="strow"><div class="k"><b>Warn on Charts page</b><span>Show live guardrail warnings while charting</span></div><div class="tog on"></div></div>
+          </div>
+
+          <div class="stpanel stp" id="st-routine" style="display:none">
+            <h4>Pre-market routine</h4>
+            <div class="d">Your daily checklist. It appears on the Charts page panel and in each day's journal. Items reset every trading day; add, remove or reorder freely.</div>
+            <div class="ritem"><span class="grip">⋮⋮</span>Meditate 15 mins<span class="x">×</span></div>
+            <div class="ritem"><span class="grip">⋮⋮</span>Review your trading plan<span class="x">×</span></div>
+            <div class="ritem"><span class="grip">⋮⋮</span>Review charts<span class="x">×</span></div>
+            <div class="addline">+ Add routine item</div>
+            <div class="strow" style="margin-top:8px"><div class="k"><b>Browser notification</b><span>Remind me if the routine isn't done by session open</span></div><div class="tog on"></div></div>
+            <div class="strow"><div class="k"><b>Remind at</b><span>Local time</span></div><div class="fake-input mono" style="width:110px">07:45</div></div>
+          </div>
+
+          <div class="stpanel stp" id="st-pairs" style="display:none">
+            <h4>Trading pairs</h4>
+            <div class="d">Moved here from Profile — same watchlist UI, drives every pair dropdown. /profile/pairs redirects here.</div>
+            <div class="tags"><span class="tag">EURUSD <i>×</i></span><span class="tag">GBPJPY <i>×</i></span><span class="tag">XAUUSD <i>×</i></span><span class="tag">BTCUSD <i>×</i></span><span class="ph">+ add from catalog…</span></div>
+          </div>
+
+          <div class="stpanel stp" id="st-appear" style="display:none">
+            <h4>Appearance</h4>
+            <div class="d">Theme selection, previously only a toggle.</div>
+            <div class="strow"><div class="k"><b>Theme</b><span>Terminal dark is the default</span></div><div class="seg"><button class="on">Dark</button><button>Light</button><button>System</button></div>
+            </div>
+          </div>
+
+          <div class="stpanel stp" id="st-tutorial" style="display:none">
+            <h4>Tutorial &amp; help</h4>
+            <div class="d">Replay the first-login tour any time.</div>
+            <button class="btn primary sm">Replay the tour</button>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</div></section>
+
+<!-- ================= 5. CHARTS ================= -->
+<section id="charts"><div class="wrap">
+  <div class="eyebrow">Section 5</div>
+  <h2>Charts — trading day panel, open by default</h2>
+  <p class="lead">A collapsible panel on the <b style="color:var(--text)">right</b> of the TradingView embed (open by default, state remembered). It holds the pre-market routine checkboxes, live guardrail readouts and warnings. Checks reset each trading day, not on collapse — collapsing shouldn't wipe your progress mid-morning; the daily reset covers the "fresh each session" intent. If the routine isn't complete by your reminder time, a browser notification fires (permission asked once).</p>
+
+  <div class="frame">
+    <div class="framebar"><div class="fdot"></div><div class="fdot"></div><div class="fdot"></div><span class="ftitle">tradebook — /charts</span></div>
+    <div class="chgrid">
+      <div class="chmain">TradingView chart (unchanged)</div>
+      <div class="chpanel" style="border-right:none;border-left:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <span style="font-family:'Space Grotesk';font-size:13.5px">Trading day</span>
+          <button class="navbtn" title="Collapse"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        </div>
+
+        <div class="drow" style="border-top:none"><span class="k">Pre-market routine</span><span class="pill violet">2/3</span></div>
+        <div class="expand" style="margin-top:0">
+          <div class="rchk"><span class="cbx done"></span>Meditate 15 mins</div>
+          <div class="rchk"><span class="cbx done"></span>Review your trading plan</div>
+          <div class="rchk"><span class="cbx"></span>Review charts</div>
+        </div>
+
+        <div class="drow"><span class="k">Trades today</span>
+          <div style="display:flex;gap:8px;align-items:center"><div class="dots5"><span class="d5 used"></span><span class="d5 used"></span><span class="d5 used"></span><span class="d5 used"></span><span class="d5"></span></div><span class="mono" style="font-size:11px">4/5</span></div>
+        </div>
+        <div class="drow"><span class="k">Trading window</span><span style="display:flex;gap:7px;align-items:center"><span class="mono" style="font-size:11.5px">08:00–12:00</span><span class="pill red">Closed</span></span></div>
+
+        <div class="drow" style="flex-direction:column;align-items:stretch;gap:2px">
+          <div style="display:flex;justify-content:space-between"><span class="k">Today's net PnL</span><span class="mono" style="color:var(--red);font-weight:600;font-size:13px">-$390.00</span></div>
+          <div class="gbar"><i></i></div>
+          <div class="gscale"><span>-$300 max loss</span><span>0</span><span>+$500 target</span></div>
+        </div>
+
+        <div class="warn gold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>Trade placed outside your allowed hours.</div>
+        <div class="warn red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>Max daily loss hit. Stop trading for today.</div>
+      </div>
+    </div>
+  </div>
+  <div class="note"><b>Where the numbers come from:</b> trades today / net PnL from the trades table for the current day; window + limits from Settings → Trading. Violations are computed, stored per-day, and surface again in the journal day panel. I diverged from your note in one place: checks reset daily rather than on panel close — closing the panel to look at a chart shouldn't uncheck your routine. Say the word if you want close-resets instead.</div>
+</div></section>
+
+<!-- ================= 6. TUTORIAL ================= -->
+<section id="tutorial"><div class="wrap">
+  <div class="eyebrow">Section 6</div>
+  <h2>First-login tutorial — coach-marks tour</h2>
+  <p class="lead">On first login (flag in user metadata) a spotlight tour walks through 7 stops: Dashboard, Strategy, Journal, Risk, Charts + routine panel, Sidekick, Settings. Skippable at any step, replayable from Settings → Tutorial.</p>
+
+  <div class="frame tutwrap">
+    <div class="framebar"><div class="fdot"></div><div class="fdot"></div><div class="fdot"></div><span class="ftitle">tradebook — first login</span></div>
+    <div class="appbody">
+      <div class="mside">
+        <div class="mlogo"></div>
+        <div class="micon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></div>
+        <div class="micon on" id="tuttarget"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 9h18"/></svg></div>
+        <div class="micon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14"/><path d="M4 19a2 2 0 0 0 2 2h14"/><path d="M9 9h6M9 13h4"/></svg></div>
+      </div>
+      <div class="main" style="filter:blur(1px);opacity:.55">
+        <div class="pgtitle"><h3>Dashboard</h3></div>
+        <div class="sumrow" style="margin-top:4px"><div class="sumcard" style="height:130px"></div><div class="sumcard" style="height:130px"></div></div>
+      </div>
+    </div>
+    <div class="tutov"></div>
+    <div class="spot" style="left:11px;top:150px;width:38px;height:38px"></div>
+    <div class="tutcard" style="left:74px;top:120px">
+      <div class="step">STEP 3 OF 7</div>
+      <h5>Your Journal</h5>
+      <p>Every trade lands on this calendar. Click a day to see stats, guardrails and your routine — then journal each trade with charts, tags and emotions.</p>
+      <div class="row">
+        <div class="tutdots"><i></i><i></i><i class="on"></i><i></i><i></i><i></i><i></i></div>
+        <div style="display:flex;gap:8px"><button class="btn sm">Skip tour</button><button class="btn sm primary">Next</button></div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= 7. ADD TRADE ================= -->
+<section id="addtrade"><div class="wrap">
+  <div class="eyebrow">Section 7</div>
+  <h2>Add trade — journal it immediately, and the click-outside fix</h2>
+  <p class="lead">The manual add form gains a second primary action: <b style="color:var(--text)">Save &amp; Journal</b>, which saves the trade and jumps straight into its trade journal page. Both the single-add and MT5 import modals get the missing click-outside-to-close behaviour (plus Escape), with a confirm if you've typed anything so a stray click can't eat your input.</p>
+
+  <div class="frame"><div class="modalbg">
+    <div class="modal">
+      <h4>Add trade — Fri, Jul 31</h4>
+      <div class="frow2">
+        <div class="ffield"><label>Pair</label><div class="fake-select">EURUSD<span class="car">▾</span></div></div>
+        <div class="ffield"><label>Direction</label><div class="seg"><button class="on">Buy</button><button>Sell</button></div></div>
+        <div class="ffield"><label>Result ($)</label><div class="fake-input mono">-210.00</div></div>
+        <div class="ffield"><label>Risk ($)</label><div class="fake-input mono">200</div></div>
+        <div class="ffield"><label>Time</label><div class="fake-input mono">13:01</div></div>
+        <div class="ffield"><label>Strategy</label><div class="fake-select">A+ Setup Checklist<span class="car">▾</span></div></div>
+      </div>
+      <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:6px">
+        <button class="btn sm">Cancel</button>
+        <button class="btn sm">Save</button>
+        <button class="btn sm primary">Save &amp; Journal →</button>
+      </div>
+    </div>
+  </div></div>
+</div></section>
+
+<!-- ================= 8. BUILD NOTES ================= -->
+<section id="notes"><div class="wrap">
+  <div class="eyebrow">Section 8</div>
+  <h2>Build notes — what changes under the hood</h2>
+
+  <div class="bn"><h4>Database (new migrations, RLS on everything)</h4>
+    <ul>
+      <li><code>0014_trade_reviews.sql</code> — one row per trade: <code>plan_followed</code>, <code>strategy_id</code>, <code>confluences text[]</code>, <code>management text[]</code>, <code>mistakes text[]</code>, <code>entry_emotion</code>, <code>exit_emotion</code>, <code>reflection</code>, <code>htf_path / mtf_path / ltf_path</code> (entry-models bucket). A trade counts as "journaled" when a review row has a reflection or any chart.</li>
+      <li><code>0015_day_reviews.sql</code> — one row per day: <code>plan_followed (yes/partial/no)</code>, <code>day_note</code>, <code>routine_done text[]</code>, computed <code>violations jsonb</code>.</li>
+      <li><code>0016_user_settings.sql</code> — single-row settings: account size, max trades/day, max daily loss, profit target, windows 1+2, routine items <code>jsonb</code>, reminder time, theme, tutorial-done flag. (Simpler than auth metadata and queryable by the AI context.)</li>
+      <li>Tag catalogs are derived (distinct values from trade_reviews), no extra table.</li>
+    </ul></div>
+
+  <div class="bn"><h4>Also picked up from your screenshots (not in your written list)</h4>
+    <ul>
+      <li>$ / % / R display toggle on the journal header.</li>
+      <li>Expectancy + R-distribution histogram in Monthly Summary; best/worst trade rows.</li>
+      <li>"Today" pill on the calendar and in the day panel title.</li>
+      <li>Emotion shown on each trade row (entry→exit) once journaled.</li>
+      <li>Live guardrail warnings on Charts (outside-window and max-loss banners).</li>
+      <li>Session (London/NY/Tokyo/Sydney) and duration derived on the trade journal page from trade time.</li>
+    </ul></div>
+
+  <div class="bn"><h4>Deliberately left out (say so if you want them)</h4>
+    <ul>
+      <li><b>Share Trade public links</b> — Tradebook is single-user and not being sold; a public share URL adds an auth-bypass surface for no benefit.</li>
+      <li><b>Emotion popup right after placing a trade</b> — EdgeFlo shows it because trades are placed in-app; yours arrive via MT5 import or manual add. The "Save &amp; Journal" flow covers the same intent.</li>
+      <li><b>Split-order breakdown</b> — MT5 import stores one row per trade today; splitting is a bigger import change, deferred.</li>
+      <li><b>"Auto" journaling badge</b> — no broker sync yet (roadmap: MetaApi later).</li>
+    </ul></div>
+
+  <div class="bn"><h4>Sidekick</h4>
+    <p>The AI context (<code>ai-context.ts</code>) gains trade reviews, day reviews, settings guardrails and violation history — so you can ask "what mistakes do I repeat on losing days?" and it answers from tags and emotions.</p></div>
+
+  <div class="bn"><h4>Flags &amp; emoji ruling needed</h4>
+    <p>Your icon rule bans emoji as UI icons. I'm treating <b>pair flags and emotion labels as data, not icons</b> (they match EdgeFlo and render natively on your Mac/iPhone). Non-FX instruments get a monospace badge (XAU, BTC). If you'd rather keep the rule absolute I'll swap flags for SVG roundels — costs a small sprite set.</p></div>
+
+  <div class="bn"><h4>Suggested build order (each ships independently)</h4>
+    <ul>
+      <li>1 — Settings page + guardrails + routine editor (everything else reads from it)</li>
+      <li>2 — Journal day/week panel + calendar dots + $/%/R toggle + upgraded summaries</li>
+      <li>3 — Trade journal page (regular + focus) + voice transcription + Save &amp; Journal + modal close fix</li>
+      <li>4 — Charts trading-day panel + notifications</li>
+      <li>5 — Tutorial tour + Sidekick context update</li>
+    </ul></div>
+</div></section>
+
+<!-- ================= 9. GAP ANALYSIS ================= -->
+<section id="gaps"><div class="wrap">
+  <div class="eyebrow">Section 9</div>
+  <h2>Gap analysis — everything else EdgeFlo has that Tradebook doesn't</h2>
+  <p class="lead">Full sweep of the screenshots against the current app. Three buckets: covered by this concept, missing and worth adding, and gaps that only make sense with broker sync (already on your "later" roadmap).</p>
+
+  <div class="bn"><h4>Covered by this concept</h4>
+    <ul>
+      <li>Day/week panel, trade journal (regular + focus), tags, emotions, voice reflection, journaled dots, monthly summary with expectancy + R histogram, weekly breakdown cards, guardrails + violations, pre-market routine + notifications, settings, tutorial, $/%/R toggle, Save &amp; Journal, modal close fix, session/duration on trade pages.</li>
+    </ul></div>
+
+  <div class="bn"><h4>Missing from Tradebook — recommend adding (not in your list)</h4>
+    <ul>
+      <li><b>Account balance &amp; equity tracking.</b> EdgeFlo's header shows Balance / Open PnL / Equity everywhere. Tradebook has no concept of a running balance. With account size now in Settings we can derive <code>balance = account size + cumulative net PnL</code> and show it on the Dashboard and Charts panel. Cheap, high value: your % guardrails become exact instead of static.</li>
+      <li><b>Persistent watchlist panel on Charts.</b> EdgeFlo has a right-hand instrument list with flags for one-click symbol switching. Tradebook only has a dropdown. Your watchlist already exists (<code>usePairs()</code>) so this is a rendering job, and it pairs well with the new trading-day panel.</li>
+      <li><b>Plan dropdown groups Active / Deleted plans.</b> EdgeFlo keeps journals pointing at deleted strategies. Today a hard-deleted Tradebook strategy would orphan its reviews. Fix: trade_reviews stores <code>strategy_id</code> plus a <code>strategy_name</code> snapshot, and the picker shows a Deleted section when relevant.</li>
+      <li><b>Chart snapshot → journal.</b> EdgeFlo's camera menu (download / copy image). The TradingView embed exposes a screenshot hook; a "Snap to journal" button could drop the current chart straight into a trade's HTF/MTF/LTF slot or into Sidekick. Nice-to-have, small.</li>
+      <li><b>Close time on manual trades.</b> Duration needs it; MT5 import has it, the manual add form doesn't. Add an optional close-time field.</li>
+      <li><b>"This month" reset + fullscreen toggle</b> on the calendar header. Trivial.</li>
+    </ul></div>
+
+  <div class="bn"><h4>Only sensible with broker sync — stays on the "later" roadmap (MetaApi)</h4>
+    <ul>
+      <li>Live open-positions table under the chart (Exit All, per-position edit/close/delete, live PnL).</li>
+      <li>Placing/closing trades from the chart, and the emotion popup at entry time.</li>
+      <li>Real margin health, live equity, split/partial fills, the "Auto" journaled badge.</li>
+    </ul></div>
+
+  <div class="bn"><h4>Present in EdgeFlo, deliberately skipped</h4>
+    <ul>
+      <li>Share Trade public links and Tweet image — single-user app, no audience, adds an auth-bypass surface.</li>
+    </ul></div>
+</div></section>
+
+<footer class="wrap">Tradebook · journaling &amp; settings concept · August 2026 · built for review before implementation — nothing has been committed.</footer>
+
+<script>
+// focus / regular mode toggle
+const tgl=document.getElementById('modetgl'),grid=document.getElementById('tjgrid');
+tgl.addEventListener('click',()=>{const f=grid.classList.toggle('focus');tgl.textContent=f?'Regular mode':'Focus mode';});
+// settings tabs
+document.querySelectorAll('#stnav .stlink').forEach(l=>l.addEventListener('click',()=>{
+  document.querySelectorAll('#stnav .stlink').forEach(x=>x.classList.remove('on'));l.classList.add('on');
+  document.querySelectorAll('.stp').forEach(p=>p.style.display='none');
+  document.getElementById(l.dataset.t).style.display='block';
+}));
+// day panel: day <-> week scope demo
+const pmode=document.getElementById('pmode'),ptitle=document.getElementById('ptitle');
+let wk=false;
+pmode.addEventListener('click',()=>{wk=!wk;pmode.textContent=wk?'Day view':'Week view';
+  ptitle.innerHTML=wk?'Week 5 · Jul 27–Aug 2 <span>· current</span>':'Fri, July 31 <span>· yesterday</span>';});
+// trades filter demo
+document.querySelectorAll('.tfb').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.tfb').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  const mode=b.textContent;document.querySelectorAll('#daypanel .trow').forEach(r=>{
+    const up=r.querySelector('.pnl').classList.contains('up');
+    r.style.display=(mode==='All'||(mode==='Wins'&&up)||(mode==='Losses'&&!up))?'flex':'none';});
+}));
+</script>
+<style>@keyframes blink{50%{opacity:.2}}</style>
+</body>
+</html>

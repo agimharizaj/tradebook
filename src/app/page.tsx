@@ -7,6 +7,8 @@ import RiskDemo from "@/components/landing/RiskDemo";
 import EntryChecklist from "@/components/landing/EntryChecklist";
 import JournalDemo from "@/components/landing/JournalDemo";
 import SidekickDemo from "@/components/landing/SidekickDemo";
+import GuardrailsDemo from "@/components/landing/GuardrailsDemo";
+import Reveal from "@/components/landing/Reveal";
 
 // Public landing page. Signed-in visitors skip straight to their dashboard.
 export default async function Home({
@@ -60,7 +62,7 @@ export default async function Home({
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div>
             <div className="mb-4 flex flex-wrap gap-1.5">
-              {["Playbooks", "Journal", "Risk", "Charts", "AI sidekick"].map((tag) => (
+              {["Playbooks", "Journal", "Guardrails", "Risk", "Charts", "AI sidekick"].map((tag) => (
                 <span
                   key={tag}
                   className="rounded-full border border-border2 px-2.5 py-1 font-mono text-xs text-muted"
@@ -143,8 +145,8 @@ export default async function Home({
             Everything between the idea and the fill.
           </h2>
           <p className="mt-2 max-w-xl text-muted">
-            Nine tools that usually live in nine tabs, wired together in one
-            place and aware of each other.
+            Twelve tools that usually live in twelve tabs, wired together in
+            one place and aware of each other.
           </p>
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {[
@@ -154,7 +156,15 @@ export default async function Home({
               },
               {
                 t: "Trade journal",
-                d: "A calendar that keeps score: daily PnL, weekly and monthly breakdowns, true expectancy, and broker-history import so the record is complete even when you'd rather it wasn't.",
+                d: "A calendar that keeps score: daily PnL, weekly and monthly breakdowns, true expectancy, an R-distribution histogram, and broker-history import so the record is complete even when you'd rather it wasn't.",
+              },
+              {
+                t: "Trade reviews",
+                d: "Journal every trade like a post-mortem: HTF/MTF/LTF screenshots, confluence and mistake tags, entry and exit emotions, and a reflection you can dictate instead of type.",
+              },
+              {
+                t: "Guardrails + routine",
+                d: "Max trades, max daily loss, profit target, trading windows. Violations are called out on the chart and in the journal, and a pre-market checklist keeps the session honest.",
               },
               {
                 t: "Risk engine",
@@ -162,11 +172,11 @@ export default async function Home({
               },
               {
                 t: "Charts + analysis log",
-                d: "TradingView charts with your watchlist and a screenshot log of every read you take, so you can check your past self's work.",
+                d: "TradingView charts with your watchlist, the trading-day panel beside the candles, and a screenshot log of every read you take.",
               },
               {
                 t: "Notebook",
-                d: "Block-based notes with images, timestamps and to-dos. Chart snaps file themselves into the right note.",
+                d: "Block-based notes with images, timestamps, to-dos and dictation. Chart snaps file themselves into the right note.",
               },
               {
                 t: "Dashboard analytics",
@@ -181,111 +191,148 @@ export default async function Home({
                 d: "Market headlines and the economic calendar next to your charts, archived as they arrive so the record deepens the longer you run it. Ask Sidekick what a print means for your pairs.",
               },
               {
+                t: "Sessions",
+                d: "Live Sydney, Tokyo, London and New York clocks with open/closed status and a cross-market time converter. Know whose money is awake.",
+              },
+              {
                 t: "Calm",
                 d: "Box breathing and psychology prompts for the moments the market gets loud. The cheapest risk control in the whole app.",
               },
-            ].map((f) => (
-              <div key={f.t} className="rounded-2xl bg-card p-6 ring-1 ring-border transition hover:ring-accent">
-                <h3 className="font-medium" style={{ fontFamily: "var(--font-display)" }}>
-                  {f.t}
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted">{f.d}</p>
-              </div>
+            ].map((f, i) => (
+              <Reveal key={f.t} delay={(i % 3) * 90}>
+                <div className="h-full rounded-2xl bg-card p-6 ring-1 ring-border transition hover:-translate-y-0.5 hover:ring-accent">
+                  <h3 className="font-medium" style={{ fontFamily: "var(--font-display)" }}>
+                    {f.t}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted">{f.d}</p>
+                </div>
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Risk engine demo */}
+      {/* Guardrails demo */}
       <section className="mx-auto max-w-6xl px-5 py-16 md:px-8 md:py-20">
         <div className="grid items-center gap-10 lg:grid-cols-2">
-          <div>
+          <Reveal>
             <h2 className="text-2xl md:text-3xl" style={{ fontFamily: "var(--font-display)" }}>
-              The sizing engine, live on this page.
+              Limits that argue back.
             </h2>
             <p className="mt-4 max-w-md leading-relaxed text-muted">
-              This is the actual sizing math from the app, running in your
-              browser right now. Account size and risk in, lot size out, floored
-              to 0.01 steps so a position never risks more than you stated.
+              Set your max trades, max daily loss, profit target and trading
+              windows once. The chart page then watches the day with you:
+              trades count up, the PnL bar tracks your caps, and rule breaks
+              are named out loud - here and in the journal.
             </p>
             <p className="mt-3 max-w-md leading-relaxed text-muted">
-              Inside Tradebook the prices are live, the pairs come from your own
-              watchlist, and there are two more modes: solve for the stop, or
-              audit the risk of a size you already have on.
+              Try it: drag the demo day into trouble and watch it push back.
             </p>
+          </Reveal>
+          <Reveal lazy delay={90}>
+            <GuardrailsDemo />
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Risk engine demo */}
+      <section className="border-t border-border bg-bg2">
+        <div className="mx-auto max-w-6xl px-5 py-16 md:px-8 md:py-20">
+          <div className="grid items-center gap-10 lg:grid-cols-2">
+            <Reveal>
+              <h2 className="text-2xl md:text-3xl" style={{ fontFamily: "var(--font-display)" }}>
+                The sizing engine, live on this page.
+              </h2>
+              <p className="mt-4 max-w-md leading-relaxed text-muted">
+                This is the actual sizing math from the app, running in your
+                browser right now. Account size and risk in, lot size out, floored
+                to 0.01 steps so a position never risks more than you stated.
+              </p>
+              <p className="mt-3 max-w-md leading-relaxed text-muted">
+                Inside Tradebook the prices are live, the pairs come from your own
+                watchlist, and there are two more modes: solve for the stop, or
+                audit the risk of a size you already have on.
+              </p>
+            </Reveal>
+            <Reveal lazy delay={90}>
+              <RiskDemo />
+            </Reveal>
           </div>
-          <RiskDemo />
         </div>
       </section>
 
       {/* Journal calendar demo */}
-      <section className="border-t border-border bg-bg2">
-        <div className="mx-auto max-w-6xl px-5 py-16 md:px-8 md:py-20">
-          <div className="grid items-center gap-10 lg:grid-cols-2">
+      <section className="mx-auto max-w-6xl px-5 py-16 md:px-8 md:py-20">
+        <div className="grid items-center gap-10 lg:grid-cols-2">
+          <Reveal lazy>
             <JournalDemo />
-            <div>
-              <h2 className="text-2xl md:text-3xl" style={{ fontFamily: "var(--font-display)" }}>
-                A month of trading at a glance.
-              </h2>
-              <p className="mt-4 max-w-md leading-relaxed text-muted">
-                The journal is a calendar, exactly like this one. Green days,
-                red days, tap any of them for the trades behind the number.
-                Weekly and monthly summaries, true expectancy and average R
-                sit underneath.
-              </p>
-              <p className="mt-3 max-w-md leading-relaxed text-muted">
-                Log trades in seconds or import your broker history, commission
-                and swap included, so the score is the real one.
-              </p>
-            </div>
-          </div>
+          </Reveal>
+          <Reveal delay={90}>
+            <h2 className="text-2xl md:text-3xl" style={{ fontFamily: "var(--font-display)" }}>
+              A month of trading at a glance.
+            </h2>
+            <p className="mt-4 max-w-md leading-relaxed text-muted">
+              The journal is a calendar, exactly like this one. Green days,
+              red days, tap any of them and a panel opens with the day&apos;s
+              stats, guardrail violations, your routine and every trade -
+              each one a dot that fills in as you journal it.
+            </p>
+            <p className="mt-3 max-w-md leading-relaxed text-muted">
+              Log trades in seconds or import your broker history, commission
+              and swap included, so the score is the real one.
+            </p>
+          </Reveal>
         </div>
       </section>
 
       {/* Sidekick demo */}
-      <section className="mx-auto max-w-6xl px-5 py-16 md:px-8 md:py-20">
-        <div className="grid items-center gap-10 lg:grid-cols-2">
-          <div>
-            <h2 className="text-2xl md:text-3xl" style={{ fontFamily: "var(--font-display)" }}>
-              An analyst who has actually read your journal.
-            </h2>
-            <p className="mt-4 max-w-md leading-relaxed text-muted">
-              Sidekick sits on every page. It knows your trades, your written
-              rules, your notes and what&apos;s on screen, so you can ask it to
-              read a chart, explain the news, or say plainly where the money
-              leaks.
-            </p>
-            <p className="mt-3 max-w-md leading-relaxed text-muted">
-              Attach a chart screenshot and it checks the setup against your
-              own entry criteria, rule by rule. Opinions with reasoning, never
-              certainty; the trade stays yours.
-            </p>
+      <section className="border-t border-border bg-bg2">
+        <div className="mx-auto max-w-6xl px-5 py-16 md:px-8 md:py-20">
+          <div className="grid items-center gap-10 lg:grid-cols-2">
+            <Reveal>
+              <h2 className="text-2xl md:text-3xl" style={{ fontFamily: "var(--font-display)" }}>
+                An analyst who has actually read your journal.
+              </h2>
+              <p className="mt-4 max-w-md leading-relaxed text-muted">
+                Sidekick sits on every page. It knows your trades, your written
+                rules, your notes and what&apos;s on screen, so you can ask it to
+                read a chart, explain the news, or say plainly where the money
+                leaks.
+              </p>
+              <p className="mt-3 max-w-md leading-relaxed text-muted">
+                Attach a chart screenshot and it checks the setup against your
+                own entry criteria, rule by rule. Opinions with reasoning, never
+                certainty; the trade stays yours.
+              </p>
+            </Reveal>
+            <Reveal lazy delay={90}>
+              <SidekickDemo />
+            </Reveal>
           </div>
-          <SidekickDemo />
         </div>
       </section>
 
       {/* Checklist strip */}
-      <section className="border-t border-border bg-bg2">
-        <div className="mx-auto max-w-6xl px-5 py-16 md:px-8 md:py-20">
-          <div className="grid items-center gap-10 lg:grid-cols-2">
+      <section className="mx-auto max-w-6xl px-5 py-16 md:px-8 md:py-20">
+        <div className="grid items-center gap-10 lg:grid-cols-2">
+          <Reveal lazy>
             <EntryChecklist />
-            <div>
-              <h2 className="text-2xl md:text-3xl" style={{ fontFamily: "var(--font-display)" }}>
-                Your rules, in writing, next to the chart.
-              </h2>
-              <p className="mt-4 max-w-md leading-relaxed text-muted">
-                Every strategy is a checklist you tick before entry. Try the one
-                on the left: criteria strike through as they're met, exactly as
-                they do in the app. Risk controls cap the damage on bad days, and
-                the journal records what you actually did, not what you remember
-                doing.
-              </p>
-              <p className="mt-3 max-w-md leading-relaxed text-muted">
-                There is even a breathing page for the moments the market gets loud.
-              </p>
-            </div>
-          </div>
+          </Reveal>
+          <Reveal delay={90}>
+            <h2 className="text-2xl md:text-3xl" style={{ fontFamily: "var(--font-display)" }}>
+              Your rules, in writing, next to the chart.
+            </h2>
+            <p className="mt-4 max-w-md leading-relaxed text-muted">
+              Every strategy is a checklist you tick before entry. Try the one
+              on the left: criteria strike through as they're met, exactly as
+              they do in the app. Risk controls cap the damage on bad days, and
+              the journal records what you actually did, not what you remember
+              doing.
+            </p>
+            <p className="mt-3 max-w-md leading-relaxed text-muted">
+              There is even a breathing page for the moments the market gets loud.
+            </p>
+          </Reveal>
         </div>
       </section>
 

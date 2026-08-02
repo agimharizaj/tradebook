@@ -167,7 +167,8 @@ Formatting: plain text only. Short paragraphs. Use a hyphen list only for three 
 // resolves to the right slice of the data snapshot.
 const PAGE_NOTES: [string, string][] = [
   ["/dashboard", "the Dashboard: lifetime stats from their logged trades (net PnL, win rate, profit factor, equity curve, max drawdown, day-of-week breakdown)"],
-  ["/journal", "the Journal: a monthly calendar of their trades with daily PnL, weekly and monthly summaries, expectancy and average R"],
+  ["/journal/trade", "a single trade's journal page: the trade's facts plus their review (plan followed, confluence/management/mistake tags, entry and exit emotions, chart screenshots, reflection)"],
+  ["/journal", "the Journal: a monthly calendar of their trades with daily PnL, weekly and monthly summaries, expectancy and average R, plus a day/week panel with guardrail violations, pre-market routine and per-trade journaling"],
   ["/charts", "the Charts page: a live TradingView chart of a pair from their watchlist, with a log of their saved chart analyses"],
   ["/risk", "the Risk calculator: position sizing (account size and risk in, lot size out) with live prices"],
   ["/news", "the News page: market headlines and the economic calendar (recent headlines are in the snapshot below)"],
@@ -175,7 +176,8 @@ const PAGE_NOTES: [string, string][] = [
   ["/notebook", "the Notebook: their free-form trading notes (recent notes are in the snapshot below)"],
   ["/strategy", "the Strategy page: their playbooks with charting process, entry/exit criteria, management rules and risk controls (all in the snapshot below)"],
   ["/sanctuary", "the Sanctuary: a box-breathing and trading-psychology page"],
-  ["/profile", "their Profile settings (display name, password, trading pairs watchlist)"],
+  ["/profile", "their Profile settings (personal details, password)"],
+  ["/settings", "their Settings: trading guardrails (max trades/day, max daily loss, profit target, trading windows), trading profile, pre-market routine, pairs watchlist, appearance"],
 ];
 
 export async function POST(request: Request) {

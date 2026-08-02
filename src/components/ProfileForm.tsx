@@ -5,8 +5,6 @@ import { createClient } from "@/lib/supabase/client";
 import DeleteAccount from "@/components/DeleteAccount";
 import Link from "next/link";
 import Combobox from "@/components/Combobox";
-import { withCommas } from "@/lib/format";
-import ThemeToggle from "@/components/ThemeToggle";
 
 type Meta = Record<string, unknown>;
 const str = (m: Meta, k: string) => (typeof m[k] === "string" ? (m[k] as string) : "");
@@ -54,6 +52,9 @@ export default function ProfileForm({
 }) {
   const supabase = createClient();
 
+  // Trading profile (broker, account size, risk...) moved to /settings.
+  // Only personal details are edited here; everything else in metadata is
+  // preserved untouched on save.
   const [form, setForm] = useState({
     first_name: str(meta, "first_name"),
     last_name: str(meta, "last_name"),
@@ -64,13 +65,6 @@ export default function ProfileForm({
     phone:
       str(meta, "phone") ||
       (DIAL[str(meta, "country")] ? `${DIAL[str(meta, "country")]} ` : ""),
-    broker: str(meta, "broker"),
-    account_currency: str(meta, "account_currency") || "USD",
-    account_size: withCommas(str(meta, "account_size")),
-    default_risk_pct: str(meta, "default_risk_pct"),
-    experience: str(meta, "experience"),
-    trading_style: str(meta, "trading_style"),
-    markets: str(meta, "markets"),
   });
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -118,16 +112,15 @@ export default function ProfileForm({
   async function saveDetails() {
     setSavingDetails(true);
     setMsg(null);
-    // Exclude pairs: it is managed on /profile/pairs and resending the
-    // page-load snapshot here could overwrite newer changes.
+    // Exclude pairs: it is managed in Settings and resending the page-load
+    // snapshot here could overwrite newer changes. Trading-profile keys pass
+    // through metaRest untouched (they are edited in Settings now).
     const { pairs: _pairs, ...metaRest } = meta;
     void _pairs;
     const { error } = await supabase.auth.updateUser({
       data: {
         ...metaRest,
         ...form,
-        // Store raw digits: parseFloat("10,000") reads as 10 downstream.
-        account_size: form.account_size.replace(/,/g, ""),
         display_name: fullName || str(meta, "display_name"),
       },
     });
@@ -199,13 +192,6 @@ export default function ProfileForm({
           </div>
         </div>
 
-        <Section title="Appearance">
-          <div className="w-fit rounded-lg border border-border2">
-            <ThemeToggle />
-          </div>
-          <p className="mt-2 text-xs text-dim">Tap to cycle System, Light, and Dark.</p>
-        </Section>
-
         <Section title="Personal details">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="First name"><input value={form.first_name} onChange={(e) => set("first_name", e.target.value)} className="field" /></Field>
@@ -261,46 +247,6 @@ export default function ProfileForm({
               )}
             </Field>
           </div>
-        </Section>
-
-        <Section title="Trading profile">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Broker / prop firm"><input value={form.broker} onChange={(e) => set("broker", e.target.value)} placeholder="FTMO" className="field" /></Field>
-            <Field label="Account currency">
-              <input
-                list="ccy-list"
-                value={form.account_currency}
-                onChange={(e) => set("account_currency", e.target.value.toUpperCase())}
-                className="field"
-              />
-              <datalist id="ccy-list">
-                {["USD","EUR","GBP","JPY","AUD","CAD","CHF","NZD","SGD","HKD","SEK","NOK","DKK","PLN","ZAR","AED"].map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
-            </Field>
-            <Field label="Account size"><input inputMode="decimal" value={form.account_size} onChange={(e) => set("account_size", withCommas(e.target.value))} placeholder="10,000" className="field" /></Field>
-            <Field label="Default risk % / trade"><input inputMode="decimal" value={form.default_risk_pct} onChange={(e) => set("default_risk_pct", e.target.value)} placeholder="1" className="field" /></Field>
-            <Field label="Experience">
-              <select value={form.experience} onChange={(e) => set("experience", e.target.value)} className="field">
-                <option value="">Select...</option>
-                <option>Beginner</option>
-                <option>Intermediate</option>
-                <option>Advanced</option>
-                <option>Professional</option>
-              </select>
-            </Field>
-            <Field label="Trading style">
-              <select value={form.trading_style} onChange={(e) => set("trading_style", e.target.value)} className="field">
-                <option value="">Select...</option>
-                <option>Scalper</option>
-                <option>Day trader</option>
-                <option>Swing trader</option>
-                <option>Position trader</option>
-              </select>
-            </Field>
-            <Field label="Markets traded"><input value={form.markets} onChange={(e) => set("markets", e.target.value)} placeholder="FX, indices, gold" className="field" /></Field>
-          </div>
           <div className="mt-4 flex items-center gap-3">
             <button
               onClick={saveDetails}
@@ -320,16 +266,16 @@ export default function ProfileForm({
         <div className="rounded-2xl bg-card p-6 ring-1 ring-border">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <div className="text-xs font-medium uppercase tracking-wide text-muted">Trading pairs</div>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted">Settings</div>
               <p className="mt-1 text-sm text-muted">
-                The watchlist behind every pair dropdown in the app.
+                Trading profile, guardrails, pre-market routine, pairs and appearance moved to Settings.
               </p>
             </div>
             <Link
-              href="/profile/pairs"
+              href="/settings"
               className="shrink-0 rounded-lg border border-border2 px-4 py-2 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground"
             >
-              Manage pairs
+              Open Settings
             </Link>
           </div>
         </div>

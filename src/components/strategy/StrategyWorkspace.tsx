@@ -772,7 +772,7 @@ export default function StrategyWorkspace() {
                       <option value={draft.pair}>{draft.pair}</option>
                     )}
                   </select>
-                  <Link href="/profile/pairs" className="shrink-0 text-[11px] text-accent2 hover:underline">Edit</Link>
+                  <Link href="/settings?tab=pairs" className="shrink-0 text-[11px] text-accent2 hover:underline">Edit</Link>
                 </div>
               </Section>
             </div>
