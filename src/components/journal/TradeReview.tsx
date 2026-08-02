@@ -16,7 +16,17 @@ import MicButton from "@/components/MicButton";
 import TagInput from "./TagInput";
 import TradeFormModal, { type TradeFormTrade } from "./TradeFormModal";
 
-type Trade = TradeFormTrade & { commission: number | null };
+type Trade = TradeFormTrade & { commission: number | null; opened_at: string | null };
+
+function fmtDuration(mins: number): string {
+  if (mins < 1) return "<1m";
+  const d = Math.floor(mins / 1440);
+  const h = Math.floor((mins % 1440) / 60);
+  const m = Math.round(mins % 60);
+  return [d ? `${d}d` : null, h ? `${h}h` : null, m || (!d && !h) ? `${m}m` : null]
+    .filter(Boolean)
+    .join(" ");
+}
 
 type Review = {
   plan_followed: boolean | null;
@@ -405,6 +415,15 @@ export default function TradeReview({ tradeId }: { tradeId: string }) {
     return Number.isNaN(at.getTime()) ? null : sessionsAt(at);
   }, [trade, timeStr]);
 
+  // Duration needs both ends: opened_at (migration 0018) and a real close time.
+  const duration = useMemo(() => {
+    if (!trade?.opened_at || !timeStr) return null;
+    const a = new Date(trade.opened_at).getTime();
+    const b = new Date(trade.traded_on).getTime();
+    if (Number.isNaN(a) || Number.isNaN(b) || b <= a) return null;
+    return fmtDuration((b - a) / 60000);
+  }, [trade, timeStr]);
+
   // Strategy dropdown: active plans, plus the snapshot name if that strategy
   // was deleted since (EdgeFlo's "Deleted Plans" group).
   const strategyDeleted =
@@ -537,7 +556,11 @@ export default function TradeReview({ tradeId }: { tradeId: string }) {
             />
             <KV k="Lot size" v={trade.size_lots != null ? String(trade.size_lots) : "—"} />
             <KV k="Date" v={heading} />
-            {timeStr && <KV k="Time" v={timeStr} />}
+            {trade.opened_at && trade.opened_at.length > 10 && (
+              <KV k="Opened" v={trade.opened_at.slice(11, 16) + " UTC"} />
+            )}
+            {timeStr && <KV k={trade.opened_at ? "Closed" : "Time"} v={timeStr} />}
+            {duration && <KV k="Duration" v={duration} />}
             {session && <KV k="Session" v={session} />}
             <KV k="Entry" v={trade.entry_price != null ? String(trade.entry_price) : "—"} />
             <KV k="Stop" v={trade.stop_price != null ? String(trade.stop_price) : "—"} />
@@ -657,13 +680,17 @@ export default function TradeReview({ tradeId }: { tradeId: string }) {
                   disabled={!reviewsAvailable}
                 >
                   <option value="">None</option>
-                  {strategies.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
+                  <optgroup label="Active plans">
+                    {strategies.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </optgroup>
                   {strategyDeleted && (
-                    <option value={review.strategy_id!}>
-                      {review.strategy_name ?? "Deleted plan"} (deleted)
-                    </option>
+                    <optgroup label="Deleted plans">
+                      <option value={review.strategy_id!}>
+                        {review.strategy_name ?? "Deleted plan"}
+                      </option>
+                    </optgroup>
                   )}
                 </select>
               </FieldWrap>

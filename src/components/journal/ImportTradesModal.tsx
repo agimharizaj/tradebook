@@ -4,12 +4,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type Grid = { headers: string[]; rows: string[][] };
-type FieldKey = "symbol" | "direction" | "date" | "lots" | "pnl" | "commissions" | "swap" | "entry" | "stop" | "exit" | "ticket";
+type FieldKey = "symbol" | "direction" | "date" | "opened" | "lots" | "pnl" | "commissions" | "swap" | "entry" | "stop" | "exit" | "ticket";
 
 const FIELDS: { key: FieldKey; label: string; required?: boolean; keys: RegExp; pick: "first" | "last" }[] = [
   { key: "symbol", label: "Symbol", required: true, keys: /symbol|instrument/i, pick: "first" },
   { key: "direction", label: "Direction / type", keys: /type|direction|side/i, pick: "first" },
   { key: "date", label: "Close date", required: true, keys: /close.*time|close.*date|time|date/i, pick: "last" },
+  // MT5 reports carry two "Time" columns: the FIRST is the open. Powers
+  // durations (migration 0018); optional everywhere else.
+  { key: "opened", label: "Open time", keys: /open.*time|open.*date|^\s*time\s*$/i, pick: "first" },
   { key: "lots", label: "Lots / volume", keys: /volume|lots|size|qty/i, pick: "first" },
   { key: "pnl", label: "Gross profit", required: true, keys: /profit|pnl|p.?\/.?l|net/i, pick: "last" },
   { key: "commissions", label: "Commissions", keys: /commission|comm|fee/i, pick: "first" },
@@ -108,11 +111,18 @@ function autoMap(headers: string[]): Record<FieldKey, number> {
   }
   // FTMO/MT5 CSV conventions the generic patterns cannot see:
   const lower = headers.map((h) => h.trim().toLowerCase());
-  // 1) The close datetime column is titled just "Close".
+  // 1) The close datetime column is titled just "Close" (and "Open" for the
+  //    open time).
   if (map.date < 0) {
     const i = lower.indexOf("close");
     if (i >= 0) map.date = i;
   }
+  if (map.opened < 0) {
+    const i = lower.indexOf("open");
+    if (i >= 0) map.opened = i;
+  }
+  // A single "Time" column is the close, not the open.
+  if (map.opened >= 0 && map.opened === map.date) map.opened = -1;
   // 2) Two bare "Price" columns: the first (after Symbol) is the entry,
   //    the second (after Close) is the exit.
   const prices = lower
@@ -184,8 +194,12 @@ export default function ImportTradesModal({
         const profit = num(col(r, "pnl"));
         const commissions = num(col(r, "commissions")) ?? 0;
         const swap = num(col(r, "swap")) ?? 0;
+        // Open time must precede the close to count; broker rows sometimes
+        // repeat the close in both columns.
+        const opened = parseDate(col(r, "opened") ?? "");
         return {
           traded_on: date,
+          opened_at: opened && opened < date ? opened : null,
           pair: normalizeSymbol(col(r, "symbol") ?? ""),
           direction: dir.includes("buy") ? "long" : dir.includes("sell") ? "short" : dir.includes("long") ? "long" : dir.includes("short") ? "short" : null,
           size_lots: num(col(r, "lots")),
@@ -259,8 +273,14 @@ export default function ImportTradesModal({
     const toInsert = rows.map((t) => ({ ...t, user_id: userId }));
     let inserted = 0;
     for (let i = 0; i < toInsert.length; i += 500) {
-      const chunk = toInsert.slice(i, i + 500);
-      const { error } = await supabase.from("trades").insert(chunk);
+      let chunk: Record<string, unknown>[] = toInsert.slice(i, i + 500);
+      let { error } = await supabase.from("trades").insert(chunk);
+      // opened_at ships code-first (migration 0018): retry without it when
+      // the column doesn't exist yet.
+      if (error && /opened_at/.test(error.message)) {
+        chunk = chunk.map(({ opened_at: _o, ...rest }) => rest);
+        ({ error } = await supabase.from("trades").insert(chunk));
+      }
       if (error) { setResult(`Import error: ${error.message}`); setImporting(false); return; }
       inserted += chunk.length;
     }

@@ -15,6 +15,7 @@ import { ENTRY_EMOTIONS } from "@/lib/settings";
 export type TradeFormTrade = {
   id: string;
   traded_on: string;
+  opened_at?: string | null;
   pair: string | null;
   direction: string | null;
   entry_price: number | null;
@@ -65,6 +66,10 @@ export default function TradeFormModal({
         trade && trade.traded_on.length > 10 && !/T00:00(:00)?/.test(trade.traded_on.slice(10, 19))
           ? trade.traded_on.slice(11, 16)
           : "",
+      openTime:
+        trade?.opened_at && trade.opened_at.length > 10
+          ? trade.opened_at.slice(11, 16)
+          : "",
     }),
     [trade]
   );
@@ -109,7 +114,8 @@ export default function TradeFormModal({
     }
     // Times are entered and shown in UTC (same convention as MT5 history).
     const tradedOn = f.time ? `${day}T${f.time}:00Z` : day;
-    const payload = {
+    const openedAt = f.openTime ? `${day}T${f.openTime}:00Z` : null;
+    const payload: Record<string, unknown> = {
       pair: f.pair || null,
       direction: f.direction,
       entry_price: num(f.entry),
@@ -122,21 +128,32 @@ export default function TradeFormModal({
       notes: f.notes || null,
       strategy_id: f.strategyId || null,
       ...(editing ? (f.time !== initial.time ? { traded_on: tradedOn } : {}) : {}),
+      ...(f.openTime !== initial.openTime || !editing ? { opened_at: openedAt } : {}),
     };
+    // opened_at ships code-first (migration 0018): retry without it when the
+    // column doesn't exist yet.
+    const stripOpened = ({ opened_at: _o, ...rest }: Record<string, unknown>) => rest;
     let id = trade?.id ?? null;
     if (editing && id) {
-      const { error } = await supabase.from("trades").update(payload).eq("id", id);
+      let { error } = await supabase.from("trades").update(payload).eq("id", id);
+      if (error && /opened_at/.test(error.message)) {
+        ({ error } = await supabase.from("trades").update(stripOpened(payload)).eq("id", id));
+      }
       if (error) {
         setErr(error.message);
         setSaving(false);
         return;
       }
     } else {
-      const { data, error } = await supabase
-        .from("trades")
-        .insert({ user_id: u.user.id, traded_on: tradedOn, ...payload })
-        .select("id")
-        .single();
+      const row = { user_id: u.user.id, traded_on: tradedOn, ...payload };
+      let { data, error } = await supabase.from("trades").insert(row).select("id").single();
+      if (error && /opened_at/.test(error.message)) {
+        ({ data, error } = await supabase
+          .from("trades")
+          .insert(stripOpened(row))
+          .select("id")
+          .single());
+      }
       if (error) {
         setErr(error.message);
         setSaving(false);
@@ -198,7 +215,8 @@ export default function TradeFormModal({
           <Field label="Stop"><input inputMode="decimal" value={f.stop} onChange={(e) => set("stop", e.target.value)} className="jfield" /></Field>
           <Field label="Exit"><input inputMode="decimal" value={f.exit} onChange={(e) => set("exit", e.target.value)} className="jfield" /></Field>
           <Field label="Size (lots)"><input inputMode="decimal" value={f.size} onChange={(e) => set("size", e.target.value)} className="jfield" /></Field>
-          <Field label="Time (UTC, optional)"><input type="time" value={f.time} onChange={(e) => set("time", e.target.value)} className="jfield" /></Field>
+          <Field label="Open time (UTC, optional)"><input type="time" value={f.openTime} onChange={(e) => set("openTime", e.target.value)} className="jfield" /></Field>
+          <Field label="Close time (UTC, optional)"><input type="time" value={f.time} onChange={(e) => set("time", e.target.value)} className="jfield" /></Field>
           <Field label="Emotion">
             <input value={f.emotion} onChange={(e) => set("emotion", e.target.value)} placeholder="Calm, FOMO..." list="journal-emotions" className="jfield" />
             <datalist id="journal-emotions">

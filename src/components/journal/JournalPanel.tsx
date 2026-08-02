@@ -218,6 +218,50 @@ export default function JournalPanel({
     []
   );
 
+  // --- weekly AI recap (week scope): streams from /api/ai, which already
+  // has the full data snapshot server-side --------------------------------
+  const [recap, setRecap] = useState("");
+  const [recapBusy, setRecapBusy] = useState(false);
+  useEffect(() => {
+    setRecap("");
+    setRecapBusy(false);
+  }, [anchorDay, isDay]);
+
+  async function generateRecap() {
+    if (isDay || recapBusy) return;
+    setRecapBusy(true);
+    setRecap("");
+    const end = ymd(new Date(new Date(anchorDay + "T00:00:00").getTime() + 6 * 86400000));
+    const prompt =
+      `Write a recap of my trading week ${anchorDay} to ${end} using only the data snapshot. ` +
+      `Cover: the net result, what worked (plans, confluences), repeated mistakes and emotions, ` +
+      `guardrail violations and plan adherence - and end with exactly one specific focus for next week. ` +
+      `If I logged no trades that week, say so in one line. Plain text, no headers, under 180 words, direct.`;
+    try {
+      const res = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "user", content: prompt }], page: "/journal" }),
+      });
+      if (!res.ok || !res.body) {
+        const j = await res.json().catch(() => null);
+        setRecap((j as { error?: string } | null)?.error ?? "Recap unavailable right now.");
+        setRecapBusy(false);
+        return;
+      }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        setRecap((r) => r + dec.decode(value, { stream: true }));
+      }
+    } catch {
+      setRecap("Recap unavailable right now.");
+    }
+    setRecapBusy(false);
+  }
+
   // --- trade list filter --------------------------------------------------
   const [filter, setFilter] = useState<"all" | "wins" | "losses">("all");
   const [q, setQ] = useState("");
@@ -328,6 +372,27 @@ export default function JournalPanel({
               tone={journaled != null && trades.length > 0 && journaled === trades.length ? "up" : undefined}
             />
           </div>
+
+          {/* weekly AI recap */}
+          {!isDay && (
+            <div className="mt-3 border-t border-border pt-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted">Week recap</span>
+                <button
+                  onClick={generateRecap}
+                  disabled={recapBusy}
+                  className="rounded-md border border-border2 px-2.5 py-1 text-xs text-muted transition hover:border-accent hover:text-foreground disabled:opacity-50"
+                >
+                  {recapBusy ? "Thinking…" : recap ? "Regenerate" : "Ask Sidekick"}
+                </button>
+              </div>
+              {recap && (
+                <p className="mt-2 whitespace-pre-wrap rounded-lg bg-surface2 px-3 py-2.5 text-xs leading-relaxed text-muted">
+                  {recap}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* plan followed */}
           <div className="mt-3 flex items-center justify-between border-t border-border py-2.5">

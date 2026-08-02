@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { moneySigned, sym } from "@/lib/format";
 import {
+  computeViolations,
   emptySettings,
   fetchSettings,
   isJournaled,
@@ -234,6 +235,60 @@ export default function JournalWorkspace() {
     return { counts, max };
   }, [stats.rs]);
 
+  // Discipline score (EdgeFlo's Edge Score, our math): the average of the
+  // month's measurable discipline rates - violation-free days, journaled
+  // trades, plan-followed verdicts (yes 1 / partial 0.5 / no 0), and routine
+  // completion on traded days. Components without data are left out rather
+  // than counted against you.
+  const discipline = useMemo(() => {
+    const tradedDays = Object.entries(byDay).filter(
+      ([d, list]) =>
+        list.length > 0 && +d.slice(0, 4) === cursor.y && +d.slice(5, 7) === cursor.m + 1
+    );
+    if (tradedDays.length === 0) return null;
+    const parts: number[] = [];
+    const clean = tradedDays.filter(
+      ([, list]) => computeViolations(list, settings, accSize ?? 0).length === 0
+    ).length;
+    parts.push(clean / tradedDays.length);
+    if (reviewsAvailable && monthTrades.length > 0) {
+      parts.push(
+        monthTrades.filter((t) => isJournaled(reviews.get(t.id))).length / monthTrades.length
+      );
+    }
+    const verdicts = tradedDays
+      .map(([d]) => dayReviews[d]?.plan_followed)
+      .filter((v): v is "yes" | "partial" | "no" => v != null);
+    if (verdicts.length > 0) {
+      parts.push(
+        verdicts.reduce((s, v) => s + (v === "yes" ? 1 : v === "partial" ? 0.5 : 0), 0) /
+          verdicts.length
+      );
+    }
+    if (dayReviewsAvailable && settings.routine_items.length > 0) {
+      const done = tradedDays.reduce(
+        (s, [d]) =>
+          s +
+          (dayReviews[d]?.routine_done ?? []).filter((x) => settings.routine_items.includes(x))
+            .length /
+            settings.routine_items.length,
+        0
+      );
+      parts.push(done / tradedDays.length);
+    }
+    return Math.round((parts.reduce((a, b) => a + b, 0) / parts.length) * 100);
+  }, [byDay, cursor, settings, accSize, reviews, reviewsAvailable, dayReviews, dayReviewsAvailable, monthTrades]);
+
+  const [fullCal, setFullCal] = useState(false);
+  useEffect(() => {
+    if (!fullCal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFullCal(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fullCal]);
+
   function shift(delta: number) {
     setCursor((c) => {
       const d = new Date(c.y, c.m + delta, 1);
@@ -361,7 +416,13 @@ export default function JournalWorkspace() {
         </p>
       )}
 
-      <div className="rounded-2xl bg-card p-2.5 ring-1 ring-border md:p-5">
+      <div
+        className={`bg-card ring-1 ring-border ${
+          fullCal
+            ? "fixed inset-0 z-50 overflow-y-auto rounded-none p-4 md:p-8"
+            : "rounded-2xl p-2.5 md:p-5"
+        }`}
+      >
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={() => shift(-1)} className="rounded-md border border-border2 px-3 py-2 text-sm text-muted hover:text-foreground" aria-label="Previous month"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg></button>
@@ -370,12 +431,28 @@ export default function JournalWorkspace() {
             </span>
             <button onClick={() => shift(1)} className="rounded-md border border-border2 px-3 py-2 text-sm text-muted hover:text-foreground" aria-label="Next month"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg></button>
           </div>
-          <button
-            onClick={() => setCursor({ y: now.getFullYear(), m: now.getMonth() })}
-            className="rounded-md border border-border2 px-3 py-2 text-xs text-muted hover:text-foreground"
-          >
-            This month
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCursor({ y: now.getFullYear(), m: now.getMonth() })}
+              className="rounded-md border border-border2 px-3 py-2 text-xs text-muted hover:text-foreground"
+            >
+              This month
+            </button>
+            <button
+              onClick={() => setFullCal((f) => !f)}
+              title={fullCal ? "Exit fullscreen" : "Fullscreen calendar"}
+              aria-label={fullCal ? "Exit fullscreen calendar" : "Fullscreen calendar"}
+              className="hidden rounded-md border border-border2 px-3 py-2 text-muted hover:text-foreground md:block"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                {fullCal ? (
+                  <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3" />
+                ) : (
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
+                )}
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-7 gap-1 md:gap-1.5">
@@ -478,6 +555,15 @@ export default function JournalWorkspace() {
                   tone={stats.expectancy >= 0 ? "up" : "down"}
                 />
                 <Metric label="Avg R" value={stats.avgR == null ? "—" : `${stats.avgR.toFixed(2)}R`} />
+                <div
+                  title="Average of this month's discipline rates on traded days: violation-free days, journaled trades, plan-followed verdicts, routine completion."
+                >
+                  <Metric
+                    label="Discipline score"
+                    value={discipline == null ? "—" : `${discipline}/100`}
+                    tone={discipline == null ? undefined : discipline >= 70 ? "up" : discipline < 40 ? "down" : undefined}
+                  />
+                </div>
                 <Metric label="Avg win" value={moneySigned(stats.avgWin, cur)} tone="up" />
                 <Metric label="Avg loss" value={moneySigned(stats.avgLoss, cur)} tone="down" />
                 <Metric label="Best trade" value={moneySigned(stats.best, cur)} tone="up" />

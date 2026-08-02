@@ -21,6 +21,8 @@ import {
   type UserSettings,
 } from "@/lib/settings";
 import PairFlag from "@/components/PairFlag";
+import { usePairs } from "@/lib/usePairs";
+import { tvSymbolFor } from "@/lib/pairs";
 
 type Trade = {
   id: string;
@@ -29,6 +31,8 @@ type Trade = {
   direction: string | null;
   pnl: number | null;
 };
+
+type NewsItem = { title: string; link: string; pubDate: string; source: string };
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const todayYmd = () => {
@@ -39,9 +43,13 @@ const todayYmd = () => {
 export default function TradingDayPanel({
   mobileOpen,
   onMobileClose,
+  currentTv,
+  onPickSymbol,
 }: {
   mobileOpen: boolean;
   onMobileClose: () => void;
+  currentTv?: string;
+  onPickSymbol?: (tv: string) => void;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -53,9 +61,12 @@ export default function TradingDayPanel({
   const [trades, setTrades] = useState<Trade[]>([]);
   const [cur, setCur] = useState("USD");
   const [accSize, setAccSize] = useState(0);
+  const [lifetimeNet, setLifetimeNet] = useState<number | null>(null);
+  const [news, setNews] = useState<NewsItem[] | null>(null);
   const [, setTick] = useState(0); // re-render each minute for the window pill
   const notifiedRef = useRef(false);
   const day = todayYmd();
+  const watchlist = usePairs();
 
   useEffect(() => {
     setCollapsed(localStorage.getItem("tb_tradingday_collapsed") === "1");
@@ -87,6 +98,33 @@ export default function TradingDayPanel({
   useEffect(() => {
     load();
   }, [load]);
+
+  // Lifetime net (for the derived balance) and today's headlines, once.
+  useEffect(() => {
+    supabase
+      .from("trades")
+      .select("pnl")
+      .then(({ data }) => {
+        if (data) {
+          setLifetimeNet(
+            (data as { pnl: number | null }[]).reduce((s, t) => s + (t.pnl ?? 0), 0)
+          );
+        }
+      });
+    fetch("/api/news")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { items?: NewsItem[] } | null) => {
+        if (!j?.items) return;
+        const today = new Date().toDateString();
+        setNews(
+          j.items
+            .filter((x) => new Date(x.pubDate).toDateString() === today)
+            .slice(0, 5)
+        );
+      })
+      .catch(() => setNews(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Minute tick: window open/closed pill + routine reminder.
   useEffect(() => {
@@ -222,6 +260,17 @@ export default function TradingDayPanel({
 
       {/* guardrails */}
       <div className="border-b border-border px-4 py-3">
+        {accSize > 0 && lifetimeNet != null && (
+          <div className="flex items-center justify-between py-1">
+            <span className="text-sm text-muted">Balance</span>
+            <span
+              className={`font-mono text-sm font-semibold ${lifetimeNet > 0 ? "text-success" : lifetimeNet < 0 ? "text-danger" : ""}`}
+              title="Account size + lifetime net PnL"
+            >
+              {moneySigned(accSize + lifetimeNet, cur).replace("+", "")}
+            </span>
+          </div>
+        )}
         <div className="flex items-center justify-between py-1">
           <span className="text-sm text-muted">Trades today</span>
           <span className="flex items-center gap-2">
@@ -345,6 +394,72 @@ export default function TradingDayPanel({
             </p>
           ))}
       </div>
+
+      {/* today's news: aware of the day before trading it */}
+      {news != null && (
+        <div className="border-b border-border px-4 py-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted">
+              Today&apos;s news
+            </span>
+            <Link href="/news" className="text-[11px] text-accent2 hover:underline">
+              All news + calendar
+            </Link>
+          </div>
+          <div className="mt-2 space-y-1">
+            {news.length === 0 && <p className="py-1 text-xs text-dim">Nothing published yet today.</p>}
+            {news.map((n) => (
+              <a
+                key={n.link}
+                href={n.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block rounded-lg px-1.5 py-1.5 transition hover:bg-surface2"
+              >
+                <span className="line-clamp-2 text-xs leading-snug">{n.title}</span>
+                <span className="mt-0.5 block font-mono text-[10px] text-dim">
+                  {n.source}
+                  {!Number.isNaN(new Date(n.pubDate).getTime()) &&
+                    ` · ${new Date(n.pubDate).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`}
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* watchlist: one-click symbol switching */}
+      {onPickSymbol && (
+        <div className="border-b border-border px-4 py-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted">Watchlist</span>
+            <Link href="/settings?tab=pairs" className="text-[11px] text-accent2 hover:underline">
+              Edit
+            </Link>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {watchlist.map((label) => {
+              const tv = tvSymbolFor(label);
+              if (!tv) return null;
+              const active = tv === currentTv;
+              return (
+                <button
+                  key={label}
+                  onClick={() => onPickSymbol(tv)}
+                  className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[11px] transition ${
+                    active
+                      ? "border-accent bg-accent-soft text-accent2"
+                      : "border-border text-muted hover:border-accent hover:text-foreground"
+                  }`}
+                >
+                  <PairFlag pair={label} size={14} />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* today's trades */}
       <div className="flex-1 px-4 py-3">

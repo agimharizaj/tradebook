@@ -192,7 +192,12 @@ export default function ChartsPage() {
           <TradingViewChart symbol={tv} studies={studies} interval={tf} />
           {showRisk && <RiskWidget pairLabel={current} onClose={() => setShowRisk(false)} />}
         </div>
-        <TradingDayPanel mobileOpen={showDaySheet} onMobileClose={() => setShowDaySheet(false)} />
+        <TradingDayPanel
+          mobileOpen={showDaySheet}
+          onMobileClose={() => setShowDaySheet(false)}
+          currentTv={tv}
+          onPickSymbol={(sym) => setTv(sym)}
+        />
       </div>
 
       {showLog && (

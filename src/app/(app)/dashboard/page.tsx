@@ -121,7 +121,16 @@ export default async function DashboardPage() {
         </p>
       )}
 
-      <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <Stat
+          label="Balance"
+          value={
+            accountSize > 0
+              ? `${sym(cur)}${(accountSize + net).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+              : "—"
+          }
+          tone={accountSize > 0 ? (net >= 0 ? "up" : "down") : undefined}
+        />
         <Stat label="Net PnL" value={moneySigned(net, cur)} tone={net >= 0 ? "up" : "down"} />
         <Stat
           label="Account growth"
@@ -136,7 +145,7 @@ export default async function DashboardPage() {
 
       {growthPct == null && (
         <p className="mt-3 text-xs text-dim">
-          Set your account size in <Link href="/profile" className="text-accent2">your profile</Link> to see account growth.
+          Set your account size in <Link href="/settings" className="text-accent2">Settings</Link> to see balance and account growth.
         </p>
       )}
 
