@@ -169,7 +169,7 @@ const PAGE_NOTES: [string, string][] = [
   ["/dashboard", "the Dashboard: lifetime stats from their logged trades (net PnL, win rate, profit factor, equity curve, max drawdown, day-of-week breakdown)"],
   ["/journal/trade", "a single trade's journal page: the trade's facts plus their review (plan followed, confluence/management/mistake tags, entry and exit emotions, chart screenshots, reflection)"],
   ["/journal", "the Journal: a monthly calendar of their trades with daily PnL, weekly and monthly summaries, expectancy and average R, plus a day/week panel with guardrail violations, pre-market routine and per-trade journaling"],
-  ["/charts", "the Charts page: a live TradingView chart of a pair from their watchlist, with a log of their saved chart analyses"],
+  ["/charts", "the Trading page: a live TradingView chart of a pair from their watchlist, the trading-day panel (pre-market routine, guardrails, today's news and trades, watchlist) and a log of their saved chart analyses"],
   ["/risk", "the Risk calculator: position sizing (account size and risk in, lot size out) with live prices"],
   ["/news", "the News page: market headlines and the economic calendar (recent headlines are in the snapshot below)"],
   ["/sessions", "the Sessions page: live market clocks for Sydney, Tokyo, London and New York with open/closed status, and a converter between those market times"],

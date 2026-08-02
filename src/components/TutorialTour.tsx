@@ -40,8 +40,8 @@ const STEPS: Step[] = [
   },
   {
     target: "nav-charts",
-    title: "Charts",
-    body: "TradingView with your watchlist, plus the trading-day panel: pre-market routine, live guardrails and today's trades beside the chart.",
+    title: "Trading",
+    body: "Your session cockpit: TradingView with your watchlist, plus the trading-day panel - pre-market routine, live guardrails, today's news and trades beside the chart.",
   },
   {
     target: "nav-sidekick",

@@ -103,7 +103,7 @@ export default function ChartsPage() {
     <div className="flex h-full flex-col">
       {/* One scrollable row on phones so the toolbar never stacks and eats chart height */}
       <div className="flex items-center gap-2 overflow-x-auto border-b border-border px-4 py-2.5 md:gap-3 md:py-3">
-        <h1 className="shrink-0 text-lg" style={{ fontFamily: "var(--font-display)" }}>Charts</h1>
+        <h1 className="shrink-0 text-lg" style={{ fontFamily: "var(--font-display)" }}>Trading</h1>
         <select
           value={tv}
           onChange={(e) => setTv(e.target.value)}
