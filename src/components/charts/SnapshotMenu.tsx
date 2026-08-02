@@ -25,6 +25,22 @@ export default function SnapshotMenu({
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The toolbar is an overflow-x-auto strip, which clips absolutely
+  // positioned children - so the dropdown renders position:fixed, anchored
+  // to the button's rect at open time.
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
+
+  function toggleOpen() {
+    if (!canSnap) return;
+    setOpen((o) => {
+      if (!o && btnRef.current) {
+        const r = btnRef.current.getBoundingClientRect();
+        setAnchor({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) });
+      }
+      return !o;
+    });
+  }
 
   function flash(text: string) {
     setMsg(text);
@@ -115,7 +131,8 @@ export default function SnapshotMenu({
   return (
     <div className="relative shrink-0">
       <button
-        onClick={() => canSnap && setOpen((o) => !o)}
+        ref={btnRef}
+        onClick={toggleOpen}
         disabled={busy || !canSnap}
         title={canSnap ? "Chart snapshot" : "Screen capture isn't supported in this browser"}
         aria-label="Chart snapshot menu"
@@ -132,10 +149,13 @@ export default function SnapshotMenu({
         </svg>
       </button>
 
-      {open && (
+      {open && anchor && (
         <>
           <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} aria-hidden="true" />
-          <div className="absolute right-0 top-full z-30 mt-1.5 w-56 rounded-xl border border-border2 bg-card py-1 shadow-2xl">
+          <div
+            style={{ top: anchor.top, right: anchor.right }}
+            className="fixed z-30 w-56 rounded-xl border border-border2 bg-card py-1 shadow-2xl"
+          >
             <div className="px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-dim">
               Chart snapshot
             </div>
@@ -155,10 +175,11 @@ export default function SnapshotMenu({
         </>
       )}
 
-      {msg && (
+      {msg && anchor && (
         <div
           aria-live="polite"
-          className="absolute right-0 top-full z-30 mt-1.5 w-max max-w-64 rounded-lg border border-border2 bg-card px-3 py-1.5 text-xs text-muted shadow-xl"
+          style={{ top: anchor.top, right: anchor.right }}
+          className="fixed z-30 w-max max-w-64 rounded-lg border border-border2 bg-card px-3 py-1.5 text-xs text-muted shadow-xl"
         >
           {msg}
         </div>

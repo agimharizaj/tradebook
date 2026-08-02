@@ -892,7 +892,7 @@ export default function StrategyWorkspace() {
                   accountSize={accountSize}
                 />
               </div>
-              <div className="mt-3 space-y-3">
+              <div className="mt-3 grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
                 <WindowPicker value={draft.window} on={(v) => patch({ window: v })} />
                 <WindowPicker
                   label="Trading window 2 (optional)"
