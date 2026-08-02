@@ -233,6 +233,11 @@ export async function POST(request: Request) {
     body.strategyId
       ? `\nFor this conversation's setup check the trader selected the strategy with id ${body.strategyId}. Use that strategy's written entry criteria and risk controls.`
       : "",
+    // Screenshot requests are only ever appropriate for chart reads. Without
+    // an attached image, everything else must be answered from the snapshot.
+    messages[messages.length - 1].image?.data
+      ? ""
+      : `\nThe current message has NO image attached. If they explicitly asked for a chart or setup read, tell them to attach a screenshot; for every other request answer from the data snapshot and never ask for an image.`,
     `\n===== TRADER DATA SNAPSHOT =====\n${context}\n===== END SNAPSHOT =====`,
   ].join("\n");
 

@@ -245,7 +245,7 @@ export default function JournalPanel({
       const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [{ role: "user", content: prompt }], page: "/journal" }),
+        body: JSON.stringify({ messages: [{ role: "user", text: prompt }], page: "/journal" }),
       });
       if (!res.ok || !res.body) {
         const j = await res.json().catch(() => null);
