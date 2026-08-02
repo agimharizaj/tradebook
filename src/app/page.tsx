@@ -100,7 +100,7 @@ export default async function Home({
               </Link>
             </div>
             <p className="mt-4 font-mono text-xs text-dim">
-              Installs on your phone. Your data stays in your own database.
+              Runs in the browser, on desktop and phone. Your data is yours.
             </p>
           </div>
 
