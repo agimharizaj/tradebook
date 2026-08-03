@@ -149,9 +149,6 @@ export default function SidekickDock() {
             aria-label="Ask Sidekick"
             className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-dim"
           />
-          <kbd className="hidden shrink-0 rounded-md border border-border2 px-1.5 py-0.5 font-mono text-[10px] text-dim lg:block">
-            {isMac ? "⌘I" : "Ctrl I"}
-          </kbd>
           <button
             type="button"
             onClick={() => setMin(true)}
