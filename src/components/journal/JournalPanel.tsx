@@ -15,6 +15,8 @@ import {
 } from "@/lib/settings";
 import PairFlag from "@/components/PairFlag";
 import MicButton from "@/components/MicButton";
+import NoteExpandModal from "@/components/NoteExpandModal";
+import { applyBulletEdit } from "@/lib/bullets";
 
 export type PanelTrade = {
   id: string;
@@ -236,6 +238,7 @@ export default function JournalPanel({
   }
   // Unmount (panel closed): flush, never discard.
   useEffect(() => () => flushNote(), [flushNote]);
+  const [noteExpanded, setNoteExpanded] = useState(false);
 
   // --- weekly AI recap (week scope): streams from /api/ai, which already
   // has the full data snapshot server-side --------------------------------
@@ -525,14 +528,26 @@ export default function JournalPanel({
                 <textarea
                   value={note}
                   onChange={(e) => onNote(e.target.value)}
+                  onKeyDown={(e) => applyBulletEdit(e, onNote)}
                   onBlur={flushNote}
                   placeholder={dayReviewsAvailable ? "Add a day note…" : "Day notes need migration 0015"}
                   disabled={!dayReviewsAvailable}
-                  rows={2}
+                  rows={3}
                   className="jfield w-full resize-y pr-11"
                   aria-label="Day note"
                 />
-                <div className="absolute bottom-2 right-2">
+                <div className="absolute bottom-2 right-2 flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setNoteExpanded(true)}
+                    title="Expand the day note"
+                    aria-label="Expand the day note"
+                    className="rounded-lg border border-border2 p-2 text-muted transition hover:border-accent hover:text-foreground"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
+                    </svg>
+                  </button>
                   <MicButton onText={(t) => onNote(note ? `${note} ${t}` : t)} title="Dictate day note" />
                 </div>
               </div>
@@ -634,6 +649,20 @@ export default function JournalPanel({
           </div>
         </div>
       </aside>
+
+      {noteExpanded && (
+        <NoteExpandModal
+          title="Day note"
+          value={note}
+          placeholder="Add a day note…"
+          disabled={!dayReviewsAvailable}
+          onChange={onNote}
+          onClose={() => {
+            setNoteExpanded(false);
+            flushNote();
+          }}
+        />
+      )}
     </>
   );
 }

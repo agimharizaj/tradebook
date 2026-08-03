@@ -13,6 +13,8 @@ import { moneySigned } from "@/lib/format";
 import { ENTRY_EMOTIONS, EXIT_EMOTIONS } from "@/lib/settings";
 import PairFlag from "@/components/PairFlag";
 import MicButton from "@/components/MicButton";
+import NoteExpandModal from "@/components/NoteExpandModal";
+import { applyBulletEdit } from "@/lib/bullets";
 import TagInput from "./TagInput";
 import TradeFormModal, { type TradeFormTrade } from "./TradeFormModal";
 
@@ -119,6 +121,7 @@ export default function TradeReview({ tradeId }: { tradeId: string }) {
   const [shareAvailable, setShareAvailable] = useState(true);
   const [shareMsg, setShareMsg] = useState<string | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
+  const [reflectionExpanded, setReflectionExpanded] = useState(false);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reviewRef = useRef(review);
@@ -745,12 +748,24 @@ export default function TradeReview({ tradeId }: { tradeId: string }) {
                   <textarea
                     value={review.reflection ?? ""}
                     onChange={(e) => update({ reflection: e.target.value })}
+                    onKeyDown={(e) => applyBulletEdit(e, (v) => update({ reflection: v }))}
                     placeholder="What went well? What will you do differently next time?"
                     rows={4}
                     disabled={!reviewsAvailable}
                     className="jfield w-full resize-y pr-11"
                   />
-                  <div className="absolute bottom-2 right-2">
+                  <div className="absolute bottom-2 right-2 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setReflectionExpanded(true)}
+                      title="Expand the reflection"
+                      aria-label="Expand the reflection"
+                      className="rounded-lg border border-border2 p-2 text-muted transition hover:border-accent hover:text-foreground"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
+                      </svg>
+                    </button>
                     <MicButton
                       onText={(t) =>
                         update({ reflection: review.reflection ? `${review.reflection} ${t}` : t })
@@ -764,6 +779,17 @@ export default function TradeReview({ tradeId }: { tradeId: string }) {
           </div>
         </div>
       </div>
+
+      {reflectionExpanded && (
+        <NoteExpandModal
+          title="Notes & reflection"
+          value={review.reflection ?? ""}
+          placeholder="What went well? What will you do differently next time?"
+          disabled={!reviewsAvailable}
+          onChange={(v) => update({ reflection: v })}
+          onClose={() => setReflectionExpanded(false)}
+        />
+      )}
 
       {editOpen && (
         <TradeFormModal
