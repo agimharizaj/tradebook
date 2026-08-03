@@ -353,9 +353,11 @@ export default function TradingDayPanel({
                   aria-hidden="true"
                 />
               </div>
-              <div className="mt-1 flex justify-between font-mono text-[10px] text-dim">
+              <div className="relative mt-1 flex justify-between font-mono text-[10px] text-dim">
                 <span>{lossCap != null ? `-${moneySigned(Math.abs(lossCap), cur).replace("+", "")} max loss` : ""}</span>
-                <span>0</span>
+                {/* pinned to exactly 50% - justify-between only centres it
+                    when the outer labels happen to be equal widths */}
+                <span className="absolute left-1/2 -translate-x-1/2">0</span>
                 <span>{target != null ? `${moneySigned(Math.abs(target), cur)} target` : ""}</span>
               </div>
             </>

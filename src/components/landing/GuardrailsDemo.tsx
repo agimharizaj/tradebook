@@ -86,9 +86,9 @@ export default function GuardrailsDemo() {
               aria-hidden="true"
             />
           </div>
-          <div className="mt-1 flex justify-between font-mono text-[10px] text-dim">
+          <div className="relative mt-1 flex justify-between font-mono text-[10px] text-dim">
             <span>-$3,000 max loss</span>
-            <span>0</span>
+            <span className="absolute left-1/2 -translate-x-1/2">0</span>
             <span>+$5,000 target</span>
           </div>
           <input
