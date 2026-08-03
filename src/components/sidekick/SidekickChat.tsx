@@ -102,6 +102,8 @@ export default function SidekickChat({
   compact = false,
   pendingImage = null,
   onPendingImageUsed,
+  pendingText = null,
+  onPendingTextUsed,
 }: {
   strategies: Strategy[];
   // Compact: used inside the floating dock panel; history lives in a
@@ -111,6 +113,10 @@ export default function SidekickChat({
   // attach to the composer as soon as the chat mounts.
   pendingImage?: Blob | null;
   onPendingImageUsed?: () => void;
+  // A question typed into the dock's ask bar before the chat mounted: send
+  // it immediately on mount.
+  pendingText?: string | null;
+  onPendingTextUsed?: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
   // Sent with every request so Sidekick knows which app page is on screen
@@ -153,6 +159,16 @@ export default function SidekickChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingImage]);
   const [busy, setBusy] = useState(false);
+  // A question handed over from the dock's ask bar: send it once, as soon as
+  // the chat is mounted.
+  const pendingTextSent = useRef(false);
+  useEffect(() => {
+    if (!pendingText || pendingTextSent.current) return;
+    pendingTextSent.current = true;
+    onPendingTextUsed?.();
+    send(pendingText);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingText]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);

@@ -7,95 +7,48 @@ import SidekickChat from "@/components/sidekick/SidekickChat";
 
 type Strategy = { id: string; name: string };
 
-// Floating Sidekick: available on every app page except /sidekick itself.
-// The chat component is only mounted after the first open, so pages don't
-// pay for it until it's used.
-const POS_KEY = "sk-dock-pos";
-const BTN = 48; // launcher size (h-12 w-12)
-const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
-
+// Sidekick entry point on every app page except /sidekick itself: a slim
+// "Ask Sidekick" bar pinned bottom-centre (docs-assistant style, Cmd+I to
+// focus). Typing a question and pressing Enter opens the right-hand panel
+// with the question already sent; clicking the bar empty just opens the
+// panel. The chat component is only mounted after the first open, so pages
+// don't pay for it until it's used.
 export default function SidekickDock() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [strategies, setStrategies] = useState<Strategy[] | null>(null);
-  // A chart captured by "Snap to Sidekick" on the Trading page, waiting to be
-  // attached once the chat mounts.
+  const [q, setQ] = useState("");
+  // Captured chart / typed question waiting for the chat to mount.
   const [pendingImage, setPendingImage] = useState<Blob | null>(null);
-  // Draggable launcher: null = default corner position (Tailwind classes);
-  // set once the user drags it, anchored right/bottom and persisted.
-  const [pos, setPos] = useState<{ right: number; bottom: number } | null>(null);
-  const dragRef = useRef<{ startX: number; startY: number; right: number; bottom: number; moved: boolean } | null>(null);
+  const [pendingText, setPendingText] = useState<string | null>(null);
+  const askRef = useRef<HTMLInputElement>(null);
+  const [isMac, setIsMac] = useState(true);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(POS_KEY);
-      if (raw) setPos(JSON.parse(raw));
-    } catch {
-      // Corrupt value: fall back to the default corner.
-    }
+    setIsMac(/Mac|iP(hone|ad|od)/.test(navigator.platform));
   }, []);
 
-  // Keep a custom position inside the viewport when the window resizes.
+  function ask() {
+    const text = q.trim();
+    if (text) setPendingText(text);
+    setQ("");
+    setOpen(true);
+  }
+
+  // Cmd+I / Ctrl+I focuses the ask bar from anywhere (like the docs sites).
   useEffect(() => {
-    const onResize = () =>
-      setPos((p) =>
-        p
-          ? {
-              right: clamp(p.right, 8, window.innerWidth - BTN - 8),
-              bottom: clamp(p.bottom, 8, window.innerHeight - BTN - 8),
-            }
-          : p
-      );
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  function onLauncherDown(e: React.PointerEvent<HTMLButtonElement>) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    dragRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      right: window.innerWidth - rect.right,
-      bottom: window.innerHeight - rect.bottom,
-      moved: false,
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "i") {
+        e.preventDefault();
+        if (open) return;
+        askRef.current?.focus();
+      }
     };
-    e.currentTarget.setPointerCapture(e.pointerId);
-  }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
-  function onLauncherMove(e: React.PointerEvent<HTMLButtonElement>) {
-    const d = dragRef.current;
-    if (!d) return;
-    const dx = e.clientX - d.startX;
-    const dy = e.clientY - d.startY;
-    // Below ~6px it's a tap, not a drag.
-    if (!d.moved && Math.hypot(dx, dy) < 6) return;
-    d.moved = true;
-    setPos({
-      right: clamp(d.right - dx, 8, window.innerWidth - BTN - 8),
-      bottom: clamp(d.bottom - dy, 8, window.innerHeight - BTN - 8),
-    });
-  }
-
-  function onLauncherUp() {
-    const d = dragRef.current;
-    dragRef.current = null;
-    if (d?.moved) {
-      setPos((p) => {
-        if (p) {
-          try {
-            localStorage.setItem(POS_KEY, JSON.stringify(p));
-          } catch {
-            // Storage full/blocked: position just won't persist.
-          }
-        }
-        return p;
-      });
-    } else {
-      setOpen(true);
-    }
-  }
-
-  // "Snap to Sidekick" (Trading page) dispatches a chart blob; open the drawer
+  // "Snap to Sidekick" (Trading page) dispatches a chart blob; open the panel
   // and hold the image until the chat mounts and consumes it.
   useEffect(() => {
     const onSnap = (e: Event) => {
@@ -149,24 +102,42 @@ export default function SidekickDock() {
   return (
     <>
       {!open && (
-        <button
-          onPointerDown={onLauncherDown}
-          onPointerMove={onLauncherMove}
-          onPointerUp={onLauncherUp}
-          title="Ask Sidekick (drag to move)"
-          aria-label="Ask Sidekick"
-          style={pos ? { right: pos.right, bottom: pos.bottom } : undefined}
-          className="sk-dock-launcher fixed bottom-24 right-4 z-40 hidden h-12 w-12 cursor-grab touch-none items-center justify-center rounded-2xl bg-accent text-white shadow-[0_8px_24px_rgba(106,88,240,0.45)] hover:brightness-110 active:cursor-grabbing md:bottom-10 md:right-6 md:flex"
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            ask();
+          }}
+          className="sk-dock-launcher fixed bottom-6 left-1/2 z-40 hidden w-[26rem] max-w-[calc(100vw-3rem)] -translate-x-1/2 items-center gap-2.5 rounded-full border border-border2 bg-card/95 py-2 pl-4 pr-2 shadow-[0_10px_34px_rgba(0,0,0,0.45)] backdrop-blur transition focus-within:border-accent md:flex"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-accent2" aria-hidden="true">
             <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3zM18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" />
           </svg>
-        </button>
+          <input
+            ref={askRef}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Ask Sidekick anything…"
+            aria-label="Ask Sidekick"
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-dim"
+          />
+          <kbd className="hidden shrink-0 rounded-md border border-border2 px-1.5 py-0.5 font-mono text-[10px] text-dim lg:block">
+            {isMac ? "⌘I" : "Ctrl I"}
+          </kbd>
+          <button
+            type="submit"
+            aria-label={q.trim() ? "Ask Sidekick" : "Open Sidekick"}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-white transition hover:brightness-110"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 19V5M5 12l7-7 7 7" />
+            </svg>
+          </button>
+        </form>
       )}
 
       {open && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/40" onClick={close} aria-hidden="true" />
+          <div className="fixed inset-0 z-40 bg-black/40 md:bg-transparent" onClick={close} aria-hidden="true" />
           <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-bg2 pt-[env(safe-area-inset-top)] shadow-2xl">
             <div className="flex h-12 shrink-0 items-center justify-between border-b border-border pl-2 pr-2 md:pl-4">
               {/* Mobile: a proper back control with a generous touch target,
@@ -203,6 +174,8 @@ export default function SidekickDock() {
                   compact
                   pendingImage={pendingImage}
                   onPendingImageUsed={() => setPendingImage(null)}
+                  pendingText={pendingText}
+                  onPendingTextUsed={() => setPendingText(null)}
                 />
               )}
             </div>

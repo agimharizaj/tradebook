@@ -4,7 +4,7 @@
 // breakdown row is clicked. One component, two scopes (day | week) - same
 // stats, guardrails, routine, note and trade list either way. Desktop: a
 // docked panel pinned to the right edge. Mobile: a full-screen sheet.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { moneySigned } from "@/lib/format";
 import {
   computeViolations,
@@ -199,24 +199,43 @@ export default function JournalPanel({
     (d) => routineTotal > 0 && (dayReviews[d]?.routine_done ?? []).length >= routineTotal
   ).length;
 
-  // --- note (debounced autosave) -----------------------------------------
+  // --- note (debounced autosave, flushed on close/day-switch/blur so a
+  // pending debounce can never eat the last keystrokes) ---------------------
   const [note, setNote] = useState(review?.note ?? "");
   const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const noteRef = useRef<{ day: string; value: string; dirty: boolean }>({
+    day: anchorDay,
+    value: review?.note ?? "",
+    dirty: false,
+  });
+  const flushNote = useCallback(() => {
+    if (noteTimer.current) {
+      clearTimeout(noteTimer.current);
+      noteTimer.current = null;
+    }
+    if (noteRef.current.dirty) {
+      onSaveDay(noteRef.current.day, { note: noteRef.current.value });
+      noteRef.current.dirty = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
+    flushNote(); // save whatever was typed for the previous day first
     setNote(dayReviews[anchorDay]?.note ?? "");
+    noteRef.current = { day: anchorDay, value: dayReviews[anchorDay]?.note ?? "", dirty: false };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anchorDay]);
   function onNote(v: string) {
     setNote(v);
+    noteRef.current = { day: anchorDay, value: v, dirty: true };
     if (noteTimer.current) clearTimeout(noteTimer.current);
-    noteTimer.current = setTimeout(() => onSaveDay(anchorDay, { note: v }), 800);
+    noteTimer.current = setTimeout(() => {
+      noteRef.current.dirty = false;
+      onSaveDay(anchorDay, { note: v });
+    }, 800);
   }
-  useEffect(
-    () => () => {
-      if (noteTimer.current) clearTimeout(noteTimer.current);
-    },
-    []
-  );
+  // Unmount (panel closed): flush, never discard.
+  useEffect(() => () => flushNote(), [flushNote]);
 
   // --- weekly AI recap (week scope): streams from /api/ai, which already
   // has the full data snapshot server-side --------------------------------
@@ -506,6 +525,7 @@ export default function JournalPanel({
                 <textarea
                   value={note}
                   onChange={(e) => onNote(e.target.value)}
+                  onBlur={flushNote}
                   placeholder={dayReviewsAvailable ? "Add a day note…" : "Day notes need migration 0015"}
                   disabled={!dayReviewsAvailable}
                   rows={2}
