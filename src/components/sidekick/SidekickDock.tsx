@@ -23,10 +23,19 @@ export default function SidekickDock() {
   const [pendingText, setPendingText] = useState<string | null>(null);
   const askRef = useRef<HTMLInputElement>(null);
   const [isMac, setIsMac] = useState(true);
+  // The bar can be tucked away into a small corner chip; remembered locally.
+  const [minimized, setMinimized] = useState(false);
 
   useEffect(() => {
     setIsMac(/Mac|iP(hone|ad|od)/.test(navigator.platform));
+    setMinimized(localStorage.getItem("tb_sk_bar_min") === "1");
   }, []);
+
+  function setMin(v: boolean) {
+    setMinimized(v);
+    localStorage.setItem("tb_sk_bar_min", v ? "1" : "0");
+    if (!v) requestAnimationFrame(() => askRef.current?.focus());
+  }
 
   function ask() {
     const text = q.trim();
@@ -35,18 +44,25 @@ export default function SidekickDock() {
     setOpen(true);
   }
 
-  // Cmd+I / Ctrl+I focuses the ask bar from anywhere (like the docs sites).
+  // Cmd+I / Ctrl+I focuses the ask bar from anywhere (like the docs sites),
+  // restoring it first if it was minimised.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "i") {
         e.preventDefault();
         if (open) return;
-        askRef.current?.focus();
+        if (minimized) {
+          setMinimized(false);
+          localStorage.setItem("tb_sk_bar_min", "0");
+          requestAnimationFrame(() => askRef.current?.focus());
+        } else {
+          askRef.current?.focus();
+        }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [open, minimized]);
 
   // "Snap to Sidekick" (Trading page) dispatches a chart blob; open the panel
   // and hold the image until the chat mounts and consumes it.
@@ -101,7 +117,20 @@ export default function SidekickDock() {
 
   return (
     <>
-      {!open && (
+      {!open && minimized && (
+        <button
+          onClick={() => setMin(false)}
+          title={`Ask Sidekick (${isMac ? "⌘I" : "Ctrl+I"})`}
+          aria-label="Restore the Sidekick ask bar"
+          className="sk-dock-launcher fixed bottom-6 right-6 z-40 hidden h-10 w-10 items-center justify-center rounded-full border border-border2 bg-card/95 text-accent2 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur transition hover:border-accent md:flex"
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3zM18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" />
+          </svg>
+        </button>
+      )}
+
+      {!open && !minimized && (
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -123,6 +152,17 @@ export default function SidekickDock() {
           <kbd className="hidden shrink-0 rounded-md border border-border2 px-1.5 py-0.5 font-mono text-[10px] text-dim lg:block">
             {isMac ? "⌘I" : "Ctrl I"}
           </kbd>
+          <button
+            type="button"
+            onClick={() => setMin(true)}
+            title="Minimise the ask bar"
+            aria-label="Minimise the ask bar"
+            className="flex h-8 w-7 shrink-0 items-center justify-center rounded-full text-dim transition hover:text-foreground"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
           <button
             type="submit"
             aria-label={q.trim() ? "Ask Sidekick" : "Open Sidekick"}
