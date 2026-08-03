@@ -207,7 +207,7 @@ export default async function SharedTradePage({
               )}
               {r.strategy_name && <span className="text-muted">Plan: {r.strategy_name}</span>}
               {emotions.length > 0 && (
-                <span className="text-muted">Emotions: {emotions.join(" → ")}</span>
+                <span className="text-muted">Emotions: {emotions.join(" · ")}</span>
               )}
             </div>
             {tagRow("Entry confluences", r.confluences)}

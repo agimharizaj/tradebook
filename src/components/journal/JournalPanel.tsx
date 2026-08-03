@@ -457,7 +457,7 @@ export default function JournalPanel({
           </button>
           {showViolations && (
             <div className="mb-1 rounded-lg bg-surface2 px-3 py-2">
-              {violations.length === 0 && <p className="py-1 text-xs text-dim">None. Guardrails come from Settings → Trading.</p>}
+              {violations.length === 0 && <p className="py-1 text-xs text-dim">None. Guardrails come from Settings > Trading.</p>}
               {violations.map((v, i) => (
                 <p key={i} className="flex items-start gap-2 py-1 text-xs text-danger">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
@@ -485,7 +485,7 @@ export default function JournalPanel({
           {showRoutine && isDay && (
             <div className="mb-1 rounded-lg bg-surface2 px-3 py-2">
               {settings.routine_items.length === 0 && (
-                <p className="py-1 text-xs text-dim">No routine yet. Build it in Settings → Pre-market routine.</p>
+                <p className="py-1 text-xs text-dim">No routine yet. Build it in Settings > Pre-market routine.</p>
               )}
               {settings.routine_items.map((item) => {
                 const done = routineDone.includes(item);
@@ -626,7 +626,7 @@ export default function JournalPanel({
                       <span className={`text-[11px] font-medium ${t.direction === "long" ? "text-success" : "text-danger"}`}>
                         {t.direction === "long" ? "Long" : t.direction === "short" ? "Short" : ""}
                       </span>
-                      {em.length > 0 && <span className="text-xs" aria-hidden="true">{em.join("→")}</span>}
+                      {em.length > 0 && <span className="text-xs" aria-hidden="true">{em.join(" · ")}</span>}
                     </button>
                     {t.pnl != null && (
                       <span
