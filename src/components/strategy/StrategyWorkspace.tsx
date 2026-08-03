@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { usePairs } from "@/lib/usePairs";
 import { MoneyOrPct, WindowPicker } from "@/components/RiskFields";
+import { applyBulletEdit } from "@/lib/bullets";
 
 type ListItem = { key: string; id?: string; text: string; checked: boolean };
 type ImgItem = { key: string; path: string; url: string };
@@ -861,6 +862,7 @@ export default function StrategyWorkspace() {
               <textarea
                 value={draft.notes}
                 onChange={(e) => patch({ notes: e.target.value })}
+                onKeyDown={(e) => applyBulletEdit(e, (v) => patch({ notes: v }))}
                 rows={4}
                 placeholder="Why this works, common mistakes, reminders under pressure"
                 className="field resize-y"
