@@ -80,9 +80,7 @@ export default function NoteExpandModal({
           className="jfield min-h-0 w-full flex-1 resize-none !text-[15px] leading-relaxed"
           aria-label={title}
         />
-        <p className="mt-2 text-[11px] text-dim">
-          Autosaves as you type. Type “-” then space for a bullet; Enter continues the list.
-        </p>
+        <p className="mt-2 text-[11px] text-dim">Autosaves as you type.</p>
       </div>
     </div>
   );

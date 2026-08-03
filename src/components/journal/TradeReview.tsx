@@ -752,9 +752,9 @@ export default function TradeReview({ tradeId }: { tradeId: string }) {
                     placeholder="What went well? What will you do differently next time?"
                     rows={4}
                     disabled={!reviewsAvailable}
-                    className="jfield w-full resize-y pr-11"
+                    className="jfield w-full resize-y"
                   />
-                  <div className="absolute bottom-2 right-2 flex items-center gap-1">
+                  <div className="mt-1 flex items-center justify-end gap-1">
                     <button
                       type="button"
                       onClick={() => setReflectionExpanded(true)}

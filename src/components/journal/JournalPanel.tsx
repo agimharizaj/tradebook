@@ -533,10 +533,10 @@ export default function JournalPanel({
                   placeholder={dayReviewsAvailable ? "Add a day note…" : "Day notes need migration 0015"}
                   disabled={!dayReviewsAvailable}
                   rows={3}
-                  className="jfield w-full resize-y pr-11"
+                  className="jfield w-full resize-y"
                   aria-label="Day note"
                 />
-                <div className="absolute bottom-2 right-2 flex items-center gap-1">
+                <div className="mt-1 flex items-center justify-end gap-1">
                   <button
                     type="button"
                     onClick={() => setNoteExpanded(true)}
