@@ -14,10 +14,12 @@ export default function GuardrailsDemo() {
   const [pnl, setPnl] = useState(-1200);
   const [count, setCount] = useState(3);
 
-  const pos = (v: number) =>
-    Math.min(100, Math.max(0, ((v - MAX_LOSS) / (TARGET - MAX_LOSS)) * 100));
-  const zeroPct = pos(0);
-  const nowPct = pos(pnl);
+  // Zero sits at the visual centre; each half scales to its own cap.
+  const nowPct =
+    pnl >= 0
+      ? 50 + Math.min(50, (pnl / TARGET) * 50)
+      : 50 - Math.min(50, (Math.abs(pnl) / Math.abs(MAX_LOSS)) * 50);
+  const zeroPct = 50;
   const fill = { left: Math.min(zeroPct, nowPct), width: Math.abs(nowPct - zeroPct) };
   const lossHit = pnl <= MAX_LOSS;
   const targetHit = pnl >= TARGET;
@@ -84,9 +86,9 @@ export default function GuardrailsDemo() {
               aria-hidden="true"
             />
           </div>
-          <div className="relative mt-1 flex justify-between font-mono text-[10px] text-dim">
+          <div className="mt-1 flex justify-between font-mono text-[10px] text-dim">
             <span>-$3,000 max loss</span>
-            <span className="absolute -translate-x-1/2" style={{ left: `${zeroPct}%` }}>0</span>
+            <span>0</span>
             <span>+$5,000 target</span>
           </div>
           <input

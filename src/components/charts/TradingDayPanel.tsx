@@ -193,17 +193,17 @@ export default function TradingDayPanel({
   const routineTotal = settings.routine_items.length;
   const routineCount = routineDone.filter((x) => settings.routine_items.includes(x)).length;
 
-  // PnL bar between loss cap and target: the fill grows from the zero point
-  // toward the current net, so a flat day shows an empty bar instead of a
-  // misleading green block.
+  // PnL bar, EdgeFlo-style: zero is always the visual centre and each half
+  // scales to its own cap (left = loss cap, right = target), so the fill
+  // grows from the middle and a flat day shows an empty bar.
   const bar = useMemo(() => {
-    const lo = lossCap != null ? -Math.abs(lossCap) : Math.min(net, 0) * 1.5 || -100;
-    const hi = target != null ? Math.abs(target) : Math.max(net, 0) * 1.5 || 100;
-    const span = hi - lo || 1;
-    const pos = (v: number) => Math.min(100, Math.max(0, ((v - lo) / span) * 100));
-    const zero = pos(0);
-    const now = pos(net);
-    return { left: Math.min(zero, now), width: Math.abs(now - zero), zero };
+    const lossSpan = Math.abs(lossCap ?? target ?? Math.max(Math.abs(net), 1));
+    const gainSpan = Math.abs(target ?? lossCap ?? Math.max(Math.abs(net), 1));
+    const now =
+      net >= 0
+        ? 50 + Math.min(50, (net / (gainSpan || 1)) * 50)
+        : 50 - Math.min(50, (Math.abs(net) / (lossSpan || 1)) * 50);
+    return { left: Math.min(50, now), width: Math.abs(now - 50), zero: 50 };
   }, [net, lossCap, target]);
 
   const body = (
@@ -353,16 +353,9 @@ export default function TradingDayPanel({
                   aria-hidden="true"
                 />
               </div>
-              {/* The scale is asymmetric (loss cap vs target), so the 0 label
-                  sits under the real zero tick, not the visual centre. */}
-              <div className="relative mt-1 flex justify-between font-mono text-[10px] text-dim">
+              <div className="mt-1 flex justify-between font-mono text-[10px] text-dim">
                 <span>{lossCap != null ? `-${moneySigned(Math.abs(lossCap), cur).replace("+", "")} max loss` : ""}</span>
-                <span
-                  className="absolute -translate-x-1/2"
-                  style={{ left: `${bar.zero}%` }}
-                >
-                  0
-                </span>
+                <span>0</span>
                 <span>{target != null ? `${moneySigned(Math.abs(target), cur)} target` : ""}</span>
               </div>
             </>
