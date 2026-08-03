@@ -14,7 +14,11 @@ export default function GuardrailsDemo() {
   const [pnl, setPnl] = useState(-1200);
   const [count, setCount] = useState(3);
 
-  const pct = Math.min(100, Math.max(0, ((pnl - MAX_LOSS) / (TARGET - MAX_LOSS)) * 100));
+  const pos = (v: number) =>
+    Math.min(100, Math.max(0, ((v - MAX_LOSS) / (TARGET - MAX_LOSS)) * 100));
+  const zeroPct = pos(0);
+  const nowPct = pos(pnl);
+  const fill = { left: Math.min(zeroPct, nowPct), width: Math.abs(nowPct - zeroPct) };
   const lossHit = pnl <= MAX_LOSS;
   const targetHit = pnl >= TARGET;
   const tradesMaxed = count >= MAX_TRADES;
@@ -69,15 +73,20 @@ export default function GuardrailsDemo() {
               {pnl >= 0 ? "+" : "-"}${Math.abs(pnl).toLocaleString()}
             </span>
           </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface2">
+          <div className="relative mt-2 h-1.5 rounded-full bg-surface2">
             <div
-              className={`h-full rounded-full transition-all ${pnl < 0 ? "bg-danger" : "bg-success"}`}
-              style={{ width: `${pct}%` }}
+              className={`absolute inset-y-0 rounded-full transition-all ${pnl < 0 ? "bg-danger" : "bg-success"}`}
+              style={{ left: `${fill.left}%`, width: `${fill.width}%` }}
+            />
+            <div
+              className="absolute inset-y-0 w-px bg-border2"
+              style={{ left: `${zeroPct}%` }}
+              aria-hidden="true"
             />
           </div>
-          <div className="mt-1 flex justify-between font-mono text-[10px] text-dim">
+          <div className="relative mt-1 flex justify-between font-mono text-[10px] text-dim">
             <span>-$3,000 max loss</span>
-            <span>0</span>
+            <span className="absolute -translate-x-1/2" style={{ left: `${zeroPct}%` }}>0</span>
             <span>+$5,000 target</span>
           </div>
           <input

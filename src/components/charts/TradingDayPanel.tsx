@@ -353,9 +353,16 @@ export default function TradingDayPanel({
                   aria-hidden="true"
                 />
               </div>
-              <div className="mt-1 flex justify-between font-mono text-[10px] text-dim">
+              {/* The scale is asymmetric (loss cap vs target), so the 0 label
+                  sits under the real zero tick, not the visual centre. */}
+              <div className="relative mt-1 flex justify-between font-mono text-[10px] text-dim">
                 <span>{lossCap != null ? `-${moneySigned(Math.abs(lossCap), cur).replace("+", "")} max loss` : ""}</span>
-                <span>0</span>
+                <span
+                  className="absolute -translate-x-1/2"
+                  style={{ left: `${bar.zero}%` }}
+                >
+                  0
+                </span>
                 <span>{target != null ? `${moneySigned(Math.abs(target), cur)} target` : ""}</span>
               </div>
             </>
