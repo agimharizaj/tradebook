@@ -400,7 +400,9 @@ export default function JournalWorkspace() {
         panel ? "md:mr-[390px] md:max-w-none" : ""
       }`}
     >
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {/* items-start: the controls line up with the "Journal" heading, the
+          subtitle hangs below on its own. */}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl">Journal</h1>
           <p className="mt-1 text-muted">
