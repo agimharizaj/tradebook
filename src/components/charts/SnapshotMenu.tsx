@@ -120,7 +120,25 @@ export default function SnapshotMenu({
     if (ok) flash("Image copied - paste it into the post.");
   }
 
+  // Capture-and-hand-off destinations: SnapToNote (mounted on the page) and
+  // the Sidekick dock both listen for these events.
+  async function sendToNote() {
+    setOpen(false);
+    const blob = await capture();
+    if (!blob) return;
+    window.dispatchEvent(new CustomEvent("tb:snap-to-note", { detail: { blob } }));
+  }
+
+  async function askSidekick() {
+    setOpen(false);
+    const blob = await capture();
+    if (!blob) return;
+    window.dispatchEvent(new CustomEvent("tb:snap-to-sidekick", { detail: { blob } }));
+  }
+
   const items: { label: string; run: () => void; icon: string }[] = [
+    { label: "Send to a note", run: sendToNote, icon: "M15.5 3.5a2.12 2.12 0 0 1 3 3L8 17l-4 1 1-4z" },
+    { label: "Ask Sidekick about it", run: askSidekick, icon: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3zM18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" },
     { label: "Download image", run: download, icon: "M12 3v12M7 10l5 5 5-5M4 21h16" },
     { label: "Copy image", run: () => void copyImage(), icon: "M8 8h12v12H8zM16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" },
     { label: "Copy chart link", run: copyLink, icon: "M10 14a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5M14 10a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5" },

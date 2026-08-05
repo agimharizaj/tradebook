@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+// Headless flow on the Trading page: the camera menu captures the chart and
+// dispatches "tb:snap-to-note" with the blob; this uploads it and asks which
+// note to file it in (chosen or new) with a timestamp line. No button of its
+// own - the trigger lives in SnapshotMenu.
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { captureChartArea } from "@/lib/captureChart";
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const BUCKET = "entry-models";
@@ -10,11 +13,8 @@ const BUCKET = "entry-models";
 type NoteRow = { id: string; title: string; updated_at: string };
 type NoteBlock = { id: string; type: string; text: string };
 
-// Toolbar button on the charts page: capture the chart and file it straight
-// into a note (chosen or new) with a timestamp line - no analysis log entry.
 export default function SnapToNote({ symbol }: { symbol: string }) {
   const supabase = createClient();
-  const [busy, setBusy] = useState(false);
   const [path, setPath] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [notes, setNotes] = useState<NoteRow[]>([]);
@@ -30,37 +30,34 @@ export default function SnapToNote({ symbol }: { symbol: string }) {
     setTimeout(() => setMsg(null), 4000);
   }
 
-  async function snap() {
-    setBusy(true);
-    const r = await captureChartArea();
-    if (!r.ok) {
-      setBusy(false);
-      if (r.reason === "unsupported") flash("Screen capture is not supported in this browser.");
-      else if (r.reason === "failed") flash("Could not read the captured frame.");
-      return;
-    }
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) {
-      setBusy(false);
-      flash("Not signed in.");
-      return;
-    }
-    const p = `${u.user.id}/analysis/snap-${uid()}.png`;
-    const { error } = await supabase.storage.from(BUCKET).upload(p, r.blob, { contentType: "image/png" });
-    setBusy(false);
-    if (error) {
-      flash(`Upload failed: ${error.message}`);
-      return;
-    }
-    const { data } = await supabase
-      .from("notes")
-      .select("id, title, updated_at")
-      .order("updated_at", { ascending: false })
-      .limit(50);
-    setNotes((data as NoteRow[]) ?? []);
-    setQ("");
-    setPath(p);
-  }
+  useEffect(() => {
+    const onSnap = async (e: Event) => {
+      const blob = (e as CustomEvent<{ blob?: Blob }>).detail?.blob;
+      if (!blob) return;
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) {
+        flash("Not signed in.");
+        return;
+      }
+      const p = `${u.user.id}/analysis/snap-${uid()}.png`;
+      const { error } = await supabase.storage.from(BUCKET).upload(p, blob, { contentType: "image/png" });
+      if (error) {
+        flash(`Upload failed: ${error.message}`);
+        return;
+      }
+      const { data } = await supabase
+        .from("notes")
+        .select("id, title, updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(50);
+      setNotes((data as NoteRow[]) ?? []);
+      setQ("");
+      setPath(p);
+    };
+    window.addEventListener("tb:snap-to-note", onSnap);
+    return () => window.removeEventListener("tb:snap-to-note", onSnap);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const blocks = (p: string): NoteBlock[] => [
     { id: uid(), type: "text", text: `${symbol} chart - ${stampNow()}` },
@@ -121,15 +118,6 @@ export default function SnapToNote({ symbol }: { symbol: string }) {
 
   return (
     <>
-      <button
-        onClick={snap}
-        disabled={busy}
-        title="Capture the chart and send it to a note"
-        className="shrink-0 whitespace-nowrap rounded-lg border border-border2 px-3 py-2 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground disabled:opacity-50"
-      >
-        {busy ? "Capturing..." : "Snap to note"}
-      </button>
-
       {path && (
         <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setPath(null)}>
           <div

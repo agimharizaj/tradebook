@@ -8,7 +8,6 @@ import AnalysisPanel from "@/components/charts/AnalysisPanel";
 import RiskWidget from "@/components/charts/RiskWidget";
 import { PAIR_CATALOG, tvSymbolFor } from "@/lib/pairs";
 import SnapToNote from "@/components/charts/SnapToNote";
-import SnapToSidekick from "@/components/charts/SnapToSidekick";
 import TradingDayPanel from "@/components/charts/TradingDayPanel";
 import SnapshotMenu from "@/components/charts/SnapshotMenu";
 import PairSelect from "@/components/charts/PairSelect";
@@ -154,8 +153,8 @@ export default function ChartsPage() {
         >
           Day
         </button>
+        {/* SnapToNote is headless: the camera menu dispatches the capture. */}
         {canSnap && <SnapToNote symbol={current} />}
-        {canSnap && <SnapToSidekick />}
         <SnapshotMenu current={current} tfLabel={tfLabel} tv={tv} canSnap={canSnap} />
       </div>
 
