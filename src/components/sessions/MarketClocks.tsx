@@ -472,10 +472,6 @@ export default function MarketClocks() {
             ))}
           </div>
         )}
-        <p className="mt-3 text-[11.5px] text-dim">
-          Session hours are indicative local exchange/session times; FX itself trades around the clock Monday to
-          Friday. DST is handled automatically.
-        </p>
       </div>
     </div>
   );

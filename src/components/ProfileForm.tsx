@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import DeleteAccount from "@/components/DeleteAccount";
 import Link from "next/link";
@@ -84,6 +84,94 @@ export default function ProfileForm({
   }
 
   const [savingDetails, setSavingDetails] = useState(false);
+
+  // Profile photo: stored in the private entry-models bucket under
+  // <uid>/avatar-*, path kept in user_metadata.avatar_path, shown via a
+  // signed URL. Auth metadata updates merge, so only the one key is sent.
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const path = str(meta, "avatar_path");
+    if (!path) return;
+    supabase.storage
+      .from("entry-models")
+      .createSignedUrl(path, 3600)
+      .then(({ data }) => {
+        if (data?.signedUrl) setAvatarUrl(data.signedUrl);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function uploadAvatar(file: File) {
+    setAvatarBusy(true);
+    setMsg(null);
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) {
+      setAvatarBusy(false);
+      return;
+    }
+    const ext = (file.name.split(".").pop() || "png").toLowerCase();
+    const path = `${u.user.id}/avatar-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("entry-models").upload(path, file, {
+      contentType: file.type || "image/png",
+    });
+    if (error) {
+      setMsg({ t: "err", text: `Could not upload photo: ${error.message}` });
+      setAvatarBusy(false);
+      return;
+    }
+    const old = str((u.user.user_metadata ?? {}) as Meta, "avatar_path");
+    if (old) supabase.storage.from("entry-models").remove([old]);
+    const { error: metaErr } = await supabase.auth.updateUser({ data: { avatar_path: path } });
+    setAvatarBusy(false);
+    if (metaErr) {
+      setMsg({ t: "err", text: metaErr.message });
+      return;
+    }
+    const { data } = await supabase.storage.from("entry-models").createSignedUrl(path, 3600);
+    setAvatarUrl(data?.signedUrl ?? null);
+    setMsg({ t: "ok", text: "Photo updated." });
+  }
+
+  async function removeAvatar() {
+    setAvatarBusy(true);
+    const { data: u } = await supabase.auth.getUser();
+    const old = str((u.user?.user_metadata ?? {}) as Meta, "avatar_path");
+    if (old) supabase.storage.from("entry-models").remove([old]);
+    await supabase.auth.updateUser({ data: { avatar_path: null } });
+    setAvatarUrl(null);
+    setAvatarBusy(false);
+  }
+
+  // Email change: Supabase sends confirmation links (to the old and new
+  // address with secure email change on); the switch happens on confirm.
+  const [newEmail, setNewEmail] = useState("");
+  const [showEmail, setShowEmail] = useState(false);
+  const [savingEmail, setSavingEmail] = useState(false);
+
+  async function changeEmail() {
+    const target = newEmail.trim();
+    if (!/^\S+@\S+\.\S+$/.test(target)) {
+      setMsg({ t: "err", text: "Enter a valid email address." });
+      return;
+    }
+    setSavingEmail(true);
+    setMsg(null);
+    const { error } = await supabase.auth.updateUser({ email: target });
+    setSavingEmail(false);
+    if (error) {
+      setMsg({ t: "err", text: error.message });
+      return;
+    }
+    setShowEmail(false);
+    setNewEmail("");
+    setMsg({
+      t: "ok",
+      text: "Confirmation sent - check both your current and new inbox. The change applies once confirmed.",
+    });
+  }
+
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
@@ -181,13 +269,54 @@ export default function ProfileForm({
       <div className="mt-8 space-y-6">
         <div className="rounded-2xl bg-card p-6 ring-1 ring-border">
           <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-soft text-lg font-semibold text-accent2">
-              {(fullName || email).slice(0, 1).toUpperCase()}
-            </div>
+            <button
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={avatarBusy}
+              title="Change profile photo"
+              aria-label="Change profile photo"
+              className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-full disabled:opacity-60"
+            >
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="Profile photo" className="h-full w-full object-cover" />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center bg-accent-soft text-lg font-semibold text-accent2">
+                  {(fullName || email).slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition group-hover:opacity-100">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+                  <circle cx="12" cy="13" r="3" />
+                </svg>
+              </span>
+            </button>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) uploadAvatar(f);
+                e.target.value = "";
+              }}
+            />
             <div>
               <div className="font-medium">{fullName || "No name set"}</div>
               <div className="text-sm text-muted">{email}</div>
-              <div className="text-xs text-dim">Member since {joined}</div>
+              <div className="text-xs text-dim">
+                Member since {joined}
+                {avatarBusy && " · uploading…"}
+                {avatarUrl && !avatarBusy && (
+                  <>
+                    {" · "}
+                    <button onClick={removeAvatar} className="text-dim underline hover:text-foreground">
+                      remove photo
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -278,6 +407,54 @@ export default function ProfileForm({
               Open Settings
             </Link>
           </div>
+        </div>
+
+        <div className="rounded-2xl bg-card p-6 ring-1 ring-border">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted">Email</div>
+              <p className="mt-1 break-all text-sm text-muted">{email}</p>
+            </div>
+            {!showEmail && (
+              <button
+                onClick={() => { setShowEmail(true); setMsg(null); }}
+                className="shrink-0 rounded-lg border border-border2 px-4 py-2 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground"
+              >
+                Change email
+              </button>
+            )}
+          </div>
+          {showEmail && (
+            <div className="mt-5 space-y-3 border-t border-border pt-5">
+              <Field label="New email address">
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="field"
+                />
+              </Field>
+              <p className="text-xs text-dim">
+                Confirmation links go to your current and new address; the change applies once confirmed.
+              </p>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => { setShowEmail(false); setNewEmail(""); setMsg(null); }}
+                  className="rounded-lg border border-border2 px-4 py-2 text-sm text-muted transition hover:text-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={changeEmail}
+                  disabled={savingEmail}
+                  className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {savingEmail ? "Sending…" : "Send confirmation"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="rounded-2xl bg-card p-6 ring-1 ring-border">
