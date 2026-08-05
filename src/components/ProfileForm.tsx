@@ -73,12 +73,13 @@ export default function ProfileForm({
     const newDial = DIAL[v] ?? "";
     setForm((f) => {
       if (!newDial) return { ...f, country: v };
-      // Swap the dial-code prefix in place, keeping the rest of the number:
-      // ""            -> "+44 "
-      // "+355 "       -> "+44 "
-      // "+355 692..." -> "+44 692..."
-      // "0779..."     -> "+44 0779..."
-      const rest = f.phone.trim().replace(/^\+\d{1,4}\s*/, "");
+      // Swap the dial-code prefix in place, keeping the rest of the number.
+      // Prefer the OLD country's exact dial code (handles numbers stored
+      // without a space, where a greedy \d{1,4} would eat real digits).
+      const oldDial = DIAL[f.country] ?? "";
+      let rest = f.phone.trim();
+      if (oldDial && rest.startsWith(oldDial)) rest = rest.slice(oldDial.length).trim();
+      else rest = rest.replace(/^\+\d{1,3}\s+/, "");
       return { ...f, country: v, phone: rest ? `${newDial} ${rest}` : `${newDial} ` };
     });
   }
@@ -158,7 +159,12 @@ export default function ProfileForm({
     }
     setSavingEmail(true);
     setMsg(null);
-    const { error } = await supabase.auth.updateUser({ email: target });
+    // Send the confirm link back to THIS origin (production or local); the
+    // Supabase project's Site URL / redirect allow-list must include it.
+    const { error } = await supabase.auth.updateUser(
+      { email: target },
+      { emailRedirectTo: `${window.location.origin}/auth/callback` }
+    );
     setSavingEmail(false);
     if (error) {
       setMsg({ t: "err", text: error.message });
@@ -192,10 +198,17 @@ export default function ProfileForm({
   const fullName = `${form.first_name} ${form.last_name}`.trim();
 
   // Phone renders as [dial code | number] when a prefix exists. The stored
-  // value stays a single string ("+39 692..."), so onCountry's prefix swap
-  // and everything downstream keep working unchanged.
-  const phonePrefix = form.phone.match(/^\+\d{1,4}/)?.[0] ?? "";
-  const phoneRest = form.phone.replace(/^\+\d{1,4}\s*/, "");
+  // value stays a single string ("+39 692..."). The prefix is the selected
+  // country's exact dial code when the number starts with it; the generic
+  // fallback requires a space so "+447438..." can't be split as "+4474".
+  const countryDial = DIAL[form.country] ?? "";
+  const phonePrefix =
+    countryDial && form.phone.startsWith(countryDial)
+      ? countryDial
+      : form.phone.match(/^\+\d{1,3}(?=\s)/)?.[0] ?? "";
+  const phoneRest = phonePrefix
+    ? form.phone.slice(phonePrefix.length).replace(/^\s+/, "")
+    : form.phone;
 
   async function saveDetails() {
     setSavingDetails(true);
