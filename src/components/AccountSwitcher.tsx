@@ -22,7 +22,18 @@ export default function AccountSwitcher({ className = "" }: { className?: string
     fetchAccounts(createClient()).then(({ accounts: a }) => setAccounts(a));
   }, []);
 
+  // Exactly one visible account: a chooser with one real choice is noise
+  // (and "All" would quietly include hidden accounts' trades). Lock the
+  // scope to it and render nothing; the switcher returns when a second
+  // visible account exists.
+  const unhidden = (accounts ?? []).filter((a) => !a.hidden);
+  const soleId = unhidden.length === 1 ? unhidden[0].id : null;
+  useEffect(() => {
+    if (soleId && sel !== soleId) setSel(soleId);
+  }, [soleId, sel, setSel]);
+
   if (!accounts || accounts.length === 0) return null;
+  if (soleId) return null;
 
   // Hidden accounts stay out of the everyday list entirely (unhide them in
   // Settings > Accounts) - unless one is the current selection.
