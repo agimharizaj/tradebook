@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 // their time falls in (all defined in New York time, so DST is handled by Intl),
 // over a chosen date range. Answers "which windows do I actually make money in".
 
-type Trade = { pnl: number | null; traded_on: string };
+type Trade = { pnl: number | null; traded_on: string; opened_at?: string | null };
 
 // ICT kill zones in America/New_York local time, as minutes from midnight.
 const ZONES = [
@@ -60,12 +60,21 @@ export default function KillZones() {
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await createClient()
+      const c = createClient();
+      // opened_at (0018) is the honest bucket - the zone you ENTERED in. It
+      // ships code-first, so fall back to the legacy select if missing.
+      let res = await c
         .from("trades")
-        .select("pnl, traded_on")
+        .select("pnl, traded_on, opened_at")
         .order("traded_on", { ascending: false });
-      if (error) setError(error.message);
-      setTrades((data as Trade[]) ?? []);
+      if (res.error) {
+        res = (await c
+          .from("trades")
+          .select("pnl, traded_on")
+          .order("traded_on", { ascending: false })) as typeof res;
+      }
+      if (res.error) setError(res.error.message);
+      setTrades((res.data as Trade[]) ?? []);
     })();
   }, []);
 
@@ -85,7 +94,8 @@ export default function KillZones() {
     const buckets: Record<string, Bucket> = {};
     for (const k of keys) buckets[k] = { count: 0, net: 0, wins: 0, withPnl: 0 };
     for (const t of inRange) {
-      const mins = nyMinutes(t.traded_on);
+      // Entry time when known (opened_at), else the recorded close time.
+      const mins = nyMinutes(t.opened_at || t.traded_on);
       if (mins == null) continue;
       const b = buckets[zoneOf(mins)];
       b.count += 1;
@@ -212,12 +222,15 @@ export default function KillZones() {
             <span className="min-w-0 flex-1 text-right sm:w-20 sm:flex-none">PnL</span>
           </div>
           <div className="divide-y divide-border">
-            {ZONES.map((z) => row(z.name, z.ny, agg.buckets[z.key]))}
-            {row("Outside", "no zone", agg.buckets.outside, true)}
+            {ZONES.filter((z) => agg.buckets[z.key].count > 0).map((z) =>
+              row(z.name, z.ny, agg.buckets[z.key])
+            )}
+            {agg.buckets.outside.count > 0 && row("Outside", "no zone", agg.buckets.outside, true)}
           </div>
           <p className="mt-3 text-[11.5px] text-dim">
-            {agg.total} trade{agg.total === 1 ? "" : "s"} in range, bucketed by each trade&apos;s
-            recorded time converted to New York. DST is handled automatically.
+            {agg.total} trade{agg.total === 1 ? "" : "s"} in range, bucketed by entry time (or close
+            time when no entry is recorded) in New York. Broker exports often use server time, not
+            UTC - if one zone swallows everything, check your import&apos;s timestamps.
           </p>
         </>
       )}
