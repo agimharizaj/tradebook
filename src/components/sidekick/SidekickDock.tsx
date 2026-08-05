@@ -37,6 +37,20 @@ export default function SidekickDock() {
     setOpen(true);
   }
 
+  // The bar unmounts when the panel opens or the route changes, so its
+  // mouseleave/blur never fire - clear the expansion state explicitly or the
+  // bar comes back stuck open.
+  useEffect(() => {
+    if (open) {
+      setHovered(false);
+      setFocused(false);
+    }
+  }, [open]);
+  useEffect(() => {
+    setHovered(false);
+    setFocused(false);
+  }, [pathname]);
+
   // "/" hands over to the panel composer, where the real slash menu lives.
   function onType(v: string) {
     if (v.startsWith("/")) {
