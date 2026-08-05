@@ -252,7 +252,11 @@ export default function TradeFormModal({
           <Field label="Emotion">
             <input value={f.emotion} onChange={(e) => set("emotion", e.target.value)} placeholder="Calm, FOMO..." list="journal-emotions" className="jfield" />
             <datalist id="journal-emotions">
-              {ENTRY_EMOTIONS.map((x) => (<option key={x.label} value={x.label} />))}
+              {/* label carries the emoji for the dropdown; the stored value
+                  stays the clean word */}
+              {ENTRY_EMOTIONS.map((x) => (
+                <option key={x.label} value={x.label} label={`${x.e} ${x.label}`} />
+              ))}
             </datalist>
           </Field>
           <Field label="Strategy">
