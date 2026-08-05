@@ -46,8 +46,8 @@ export default function ThemeToggle({ collapsed = false }: { collapsed?: boolean
     <button
       onClick={cycle}
       title={`Theme: ${label}`}
-      className={`flex items-center rounded-lg px-3 py-2 text-sm font-medium text-muted transition hover:bg-surface2 hover:text-foreground ${
-        collapsed ? "justify-center" : "w-full gap-2"
+      className={`flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-muted transition hover:bg-surface2 hover:text-foreground ${
+        collapsed ? "justify-center" : "gap-2"
       }`}
     >
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">

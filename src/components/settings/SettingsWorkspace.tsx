@@ -35,7 +35,7 @@ type TabId = (typeof TABS)[number]["id"];
 
 export default function SettingsWorkspace({ meta }: { meta: Meta }) {
   const supabase = createClient();
-  const [tab, setTab] = useState<TabId>("trading");
+  const [tab, setTab] = useState<TabId>("accounts");
   const [settings, setSettings] = useState<UserSettings>(emptySettings());
   const [available, setAvailable] = useState(true);
   const [loaded, setLoaded] = useState(false);
