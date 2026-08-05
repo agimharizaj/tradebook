@@ -80,9 +80,12 @@ export default function AccountsTab({
   const [msg, setMsg] = useState<string | null>(null);
   const [unassigned, setUnassigned] = useState(0);
   const [attachTo, setAttachTo] = useState("");
-  // Selective attach: expandable list of the unassigned trades with checkboxes.
+  // Selective attach: expandable list of the unassigned trades with checkboxes
+  // and a date-range filter (imports often mix several old accounts).
   const [pickList, setPickList] = useState<UnassignedTrade[] | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [pickFrom, setPickFrom] = useState("");
+  const [pickTo, setPickTo] = useState("");
 
   const load = useCallback(async () => {
     const { accounts: a, available: ok } = await fetchAccounts(supabase);
@@ -389,25 +392,63 @@ export default function AccountsTab({
             </button>
           </div>
 
-          {pickList && (
+          {pickList && (() => {
+            const visible = pickList.filter((t) => {
+              const d = t.traded_on.slice(0, 10);
+              if (pickFrom && d < pickFrom) return false;
+              if (pickTo && d > pickTo) return false;
+              return true;
+            });
+            const allVisiblePicked =
+              visible.length > 0 && visible.every((t) => picked.has(t.id));
+            return (
             <div className="mt-3 border-t border-gold/30 pt-3">
-              <div className="mb-2 flex items-center justify-between">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <input
+                  type="date"
+                  value={pickFrom}
+                  onChange={(e) => setPickFrom(e.target.value)}
+                  className="field !w-auto !px-2 !py-1 !text-xs"
+                  aria-label="From date"
+                  title="From date"
+                />
+                <span className="text-xs text-dim">to</span>
+                <input
+                  type="date"
+                  value={pickTo}
+                  onChange={(e) => setPickTo(e.target.value)}
+                  className="field !w-auto !px-2 !py-1 !text-xs"
+                  aria-label="To date"
+                  title="To date"
+                />
+                {(pickFrom || pickTo) && (
+                  <button
+                    onClick={() => { setPickFrom(""); setPickTo(""); }}
+                    className="text-xs text-dim hover:text-foreground"
+                  >
+                    Clear
+                  </button>
+                )}
                 <button
                   onClick={() =>
-                    setPicked(
-                      picked.size === pickList.length
-                        ? new Set()
-                        : new Set(pickList.map((t) => t.id))
-                    )
+                    setPicked((prev) => {
+                      const next = new Set(prev);
+                      if (allVisiblePicked) visible.forEach((t) => next.delete(t.id));
+                      else visible.forEach((t) => next.add(t.id));
+                      return next;
+                    })
                   }
-                  className="text-xs text-accent2 hover:underline"
+                  className="ml-auto text-xs text-accent2 hover:underline"
                 >
-                  {picked.size === pickList.length ? "Select none" : "Select all"}
+                  {allVisiblePicked ? "Deselect shown" : `Select shown (${visible.length})`}
                 </button>
                 <span className="font-mono text-xs text-muted">{picked.size} selected</span>
               </div>
               <div className="max-h-64 space-y-0.5 overflow-y-auto pr-1">
-                {pickList.map((t) => {
+                {visible.length === 0 && (
+                  <p className="py-2 text-center text-xs text-dim">No unassigned trades in this range.</p>
+                )}
+                {visible.map((t) => {
                   const on = picked.has(t.id);
                   return (
                     <button
@@ -452,7 +493,8 @@ export default function AccountsTab({
                 Attach {picked.size || ""} selected{!attachTo ? " (choose an account above)" : ""}
               </button>
             </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
