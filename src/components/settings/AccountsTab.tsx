@@ -449,9 +449,6 @@ export default function AccountsTab({
             <span className="rounded-full border border-border2 px-2 py-0.5 font-mono text-[10px] text-dim">
               {hiddenAccounts.length}
             </span>
-            <span className="ml-auto text-[11px] text-dim">
-              off the switcher and dashboard; trades still count
-            </span>
           </button>
           {showHidden && <div className="mt-2 space-y-2">{hiddenAccounts.map(accountCard)}</div>}
         </div>
