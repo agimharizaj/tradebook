@@ -2,6 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  ALL_ACCOUNTS,
+  fetchAccounts,
+  getSelectedAccountId,
+  type Account,
+} from "@/lib/accounts";
 
 type Grid = { headers: string[]; rows: string[][] };
 type FieldKey = "symbol" | "direction" | "date" | "opened" | "lots" | "pnl" | "commissions" | "swap" | "entry" | "stop" | "exit" | "ticket";
@@ -161,6 +167,18 @@ export default function ImportTradesModal({
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [confirmWipe, setConfirmWipe] = useState(false);
   const lastIdx = useRef<number | null>(null);
+  // Prop-firm accounts: the whole import lands on one account.
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accountId, setAccountId] = useState<string>("");
+  useEffect(() => {
+    fetchAccounts(supabase).then(({ accounts: a }) => {
+      setAccounts(a);
+      const sel = getSelectedAccountId();
+      if (sel !== ALL_ACCOUNTS && a.some((x) => x.id === sel)) setAccountId(sel);
+      else if (a.length === 1) setAccountId(a[0].id);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -270,15 +288,26 @@ export default function ImportTradesModal({
       }
     }
 
-    const toInsert = rows.map((t) => ({ ...t, user_id: userId }));
+    const toInsert = rows.map((t) => ({
+      ...t,
+      user_id: userId,
+      account_id: accountId || null,
+    }));
     let inserted = 0;
+    // opened_at (0018) and account_id (0019) ship code-first: retry without
+    // whichever column the database says it doesn't have yet.
+    const OPTIONAL_COLS = /opened_at|account_id/;
     for (let i = 0; i < toInsert.length; i += 500) {
       let chunk: Record<string, unknown>[] = toInsert.slice(i, i + 500);
       let { error } = await supabase.from("trades").insert(chunk);
-      // opened_at ships code-first (migration 0018): retry without it when
-      // the column doesn't exist yet.
-      if (error && /opened_at/.test(error.message)) {
-        chunk = chunk.map(({ opened_at: _o, ...rest }) => rest);
+      while (error && OPTIONAL_COLS.test(error.message)) {
+        const col = error.message.match(OPTIONAL_COLS)![0];
+        if (!(col in chunk[0])) break;
+        chunk = chunk.map((r) => {
+          const c = { ...r };
+          delete c[col];
+          return c;
+        });
         ({ error } = await supabase.from("trades").insert(chunk));
       }
       if (error) { setResult(`Import error: ${error.message}`); setImporting(false); return; }
@@ -333,6 +362,18 @@ export default function ImportTradesModal({
           {fileName ? `Selected: ${fileName}` : "Choose file (.html or .csv)"}
           <input type="file" accept=".csv,.html,.htm,.txt" onChange={onFile} className="hidden" />
         </label>
+
+        {accounts.length > 0 && (
+          <label className="mt-3 block">
+            <span className="mb-1 block text-xs text-dim">Import into account</span>
+            <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className="jfield">
+              <option value="">None</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          </label>
+        )}
 
         {grid && (
           <>

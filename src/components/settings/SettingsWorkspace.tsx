@@ -18,11 +18,13 @@ import PairsManager from "@/components/PairsManager";
 import ThemeToggle from "@/components/ThemeToggle";
 import BackLink from "@/components/BackLink";
 import { MoneyOrPct, WindowPicker } from "@/components/RiskFields";
+import AccountsTab from "@/components/settings/AccountsTab";
 
 type Meta = Record<string, unknown>;
 const str = (m: Meta, k: string) => (typeof m[k] === "string" ? (m[k] as string) : "");
 
 const TABS = [
+  { id: "accounts", label: "Accounts" },
   { id: "trading", label: "Trading" },
   { id: "routine", label: "Pre-market routine" },
   { id: "pairs", label: "Trading pairs" },
@@ -206,11 +208,20 @@ export default function SettingsWorkspace({ meta }: { meta: Meta }) {
       </div>
 
       <div className="mt-6 space-y-6">
+        {tab === "accounts" && (
+          <Section
+            title="Accounts"
+            lead="One entry per prop-firm account instance (or your personal account). Trades attach to the account you have selected; guardrails are set per account; outcomes are recorded, never deleted."
+          >
+            <AccountsTab defaults={settings} cur={profile.account_currency || "USD"} />
+          </Section>
+        )}
+
         {tab === "trading" && (
           <>
             <Section
-              title="Trading guardrails"
-              lead="Account-level limits. These drive the guardrail violations in your journal and the live warnings on the Trading page. Money limits take a figure (200) or a percent of account (5%)."
+              title="Default guardrails"
+              lead="These prefill every new account and act as the fallback for trades with no account. Per-account limits (Settings > Accounts) win when an account is selected. Money limits take a figure (200) or a percent of account (5%)."
             >
               {migrationNote}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

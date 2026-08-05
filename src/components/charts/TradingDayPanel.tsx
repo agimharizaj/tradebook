@@ -23,6 +23,14 @@ import {
 import PairFlag from "@/components/PairFlag";
 import { usePairs } from "@/lib/usePairs";
 import { tvSymbolFor } from "@/lib/pairs";
+import AccountSwitcher from "@/components/AccountSwitcher";
+import {
+  ALL_ACCOUNTS,
+  effectiveGuardrails,
+  fetchAccounts,
+  useSelectedAccount,
+  type Account,
+} from "@/lib/accounts";
 
 type Trade = {
   id: string;
@@ -54,8 +62,12 @@ export default function TradingDayPanel({
   const supabase = createClient();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
-  const [settings, setSettings] = useState<UserSettings>(emptySettings());
+  const [defaults, setDefaults] = useState<UserSettings>(emptySettings());
   const [settingsAvailable, setSettingsAvailable] = useState(true);
+  // Prop-firm accounts: guardrails, size and currency follow the selection.
+  const [account, setAccount] = useState<Account | null>(null);
+  const [selAccount] = useSelectedAccount();
+  const settings = useMemo(() => effectiveGuardrails(account, defaults), [account, defaults]);
   const [dayAvailable, setDayAvailable] = useState(true);
   const [routineDone, setRoutineDone] = useState<string[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -73,44 +85,55 @@ export default function TradingDayPanel({
   }, []);
 
   const load = useCallback(async () => {
-    const [{ settings: s, available }, dayRes, tradesRes, userRes] = await Promise.all([
+    const [{ settings: s, available }, dayRes, userRes, accRes] = await Promise.all([
       fetchSettings(supabase),
       supabase.from("day_reviews").select("routine_done").eq("day", day).maybeSingle(),
-      supabase
-        .from("trades")
-        .select("id, traded_on, pair, direction, pnl")
-        .gte("traded_on", day)
-        .lt("traded_on", `${day}T23:59:59.999Z`)
-        .order("traded_on", { ascending: true }),
       supabase.auth.getUser(),
+      fetchAccounts(supabase),
     ]);
-    setSettings(s);
+    setDefaults(s);
     setSettingsAvailable(available);
+    const acct =
+      accRes.available && selAccount !== ALL_ACCOUNTS
+        ? accRes.accounts.find((a) => a.id === selAccount) ?? null
+        : null;
+    setAccount(acct);
     if (dayRes.error) setDayAvailable(false);
     else setRoutineDone(((dayRes.data as { routine_done: string[] } | null)?.routine_done ?? []));
-    setTrades((tradesRes.data as Trade[]) ?? []);
     const m = userRes.data.user?.user_metadata ?? {};
-    if (typeof m.account_currency === "string" && m.account_currency) setCur(m.account_currency);
-    const sz = parseFloat(m.account_size);
-    if (!Number.isNaN(sz) && sz > 0) setAccSize(sz);
-  }, [supabase, day]);
+    const metaCur = typeof m.account_currency === "string" && m.account_currency ? m.account_currency : "USD";
+    setCur(acct?.currency ?? metaCur);
+    const metaSize = parseFloat(m.account_size);
+    setAccSize(acct?.size ?? (!Number.isNaN(metaSize) && metaSize > 0 ? metaSize : 0));
+
+    // Today's trades + lifetime net (for the derived balance), scoped to the
+    // selected account when there is one.
+    let todayQ = supabase
+      .from("trades")
+      .select("id, traded_on, pair, direction, pnl")
+      .gte("traded_on", day)
+      .lt("traded_on", `${day}T23:59:59.999Z`)
+      .order("traded_on", { ascending: true });
+    let lifeQ = supabase.from("trades").select("pnl");
+    if (acct) {
+      todayQ = todayQ.eq("account_id", acct.id);
+      lifeQ = lifeQ.eq("account_id", acct.id);
+    }
+    const [tradesRes, lifeRes] = await Promise.all([todayQ, lifeQ]);
+    setTrades((tradesRes.data as Trade[]) ?? []);
+    if (lifeRes.data) {
+      setLifetimeNet(
+        (lifeRes.data as { pnl: number | null }[]).reduce((sm, t) => sm + (t.pnl ?? 0), 0)
+      );
+    }
+  }, [supabase, day, selAccount]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  // Lifetime net (for the derived balance) and today's headlines, once.
+  // Today's headlines, once.
   useEffect(() => {
-    supabase
-      .from("trades")
-      .select("pnl")
-      .then(({ data }) => {
-        if (data) {
-          setLifetimeNet(
-            (data as { pnl: number | null }[]).reduce((s, t) => s + (t.pnl ?? 0), 0)
-          );
-        }
-      });
     fetch("/api/news")
       .then((r) => (r.ok ? r.json() : null))
       .then((j: { items?: NewsItem[] } | null) => {
@@ -208,6 +231,16 @@ export default function TradingDayPanel({
 
   const body = (
     <div className="flex h-full flex-col overflow-y-auto">
+      {/* account context */}
+      <div className="border-b border-border px-4 py-2.5">
+        <AccountSwitcher className="w-full !py-1.5 !text-xs" />
+        {account && (
+          <p className="mt-1 text-[10px] text-dim">
+            Guardrails, balance and trades scoped to {account.name}.
+          </p>
+        )}
+      </div>
+
       {/* routine */}
       <div className="border-b border-border px-4 py-3">
         <div className="flex items-center justify-between">

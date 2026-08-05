@@ -7,6 +7,7 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 type TradeRow = {
   id: string;
+  account_id?: string | null;
   pnl: number | null;
   r_multiple: number | null;
   pair: string | null;
@@ -154,10 +155,11 @@ export async function buildAiContext(supabase: SupabaseClient, user: User): Prom
     settingsRes,
     dayRevRes,
     tradeRevRes,
+    accountsRes,
   ] = await Promise.all([
     supabase
       .from("trades")
-      .select("id, pnl, r_multiple, pair, direction, traded_on, size_lots, emotion, notes, strategy_id")
+      .select("id, account_id, pnl, r_multiple, pair, direction, traded_on, size_lots, emotion, notes, strategy_id")
       .order("traded_on", { ascending: true }),
     supabase.from("strategies").select(
       "id, name, plan_type, is_active, max_trades_per_day, max_daily_loss, max_daily_profit, risk_per_trade_pct, trading_window, trading_window_2, strategy_date, pair"
@@ -193,9 +195,23 @@ export async function buildAiContext(supabase: SupabaseClient, user: User): Prom
         "trade_id, plan_followed, confluences, management, mistakes, entry_emotion, exit_emotion, reflection, strategy_name"
       )
       .limit(400),
+    supabase
+      .from("accounts")
+      .select("id, name, firm, phase, size, currency, status, started_on, ended_on, max_trades_per_day, max_daily_loss, max_daily_profit, trading_window, trading_window_2")
+      .order("started_on", { ascending: false }),
   ]);
 
-  const trades = (tradesRes.data as TradeRow[]) ?? [];
+  // account_id ships code-first (migration 0019): selecting a missing column
+  // fails the whole query, so retry without it rather than losing Sidekick.
+  let tradesData = tradesRes.data as TradeRow[] | null;
+  if (tradesRes.error) {
+    const retry = await supabase
+      .from("trades")
+      .select("id, pnl, r_multiple, pair, direction, traded_on, size_lots, emotion, notes, strategy_id")
+      .order("traded_on", { ascending: true });
+    tradesData = retry.data as TradeRow[] | null;
+  }
+  const trades = tradesData ?? [];
   const strategies = (stratRes.data as StrategyRow[]) ?? [];
   const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
   const cur = (meta.account_currency as string) || "USD";
@@ -365,6 +381,36 @@ export async function buildAiContext(supabase: SupabaseClient, user: User): Prom
     return `- ${bits.join(" | ")}`;
   });
 
+  // Prop-firm accounts (migration 0019): the ledger plus per-account nets.
+  type AccountRow = {
+    id: string; name: string; firm: string | null; phase: string | null;
+    size: number | null; currency: string | null; status: string;
+    started_on: string; ended_on: string | null;
+    max_trades_per_day: number | null; max_daily_loss: string | null;
+    max_daily_profit: string | null; trading_window: string | null; trading_window_2: string | null;
+  };
+  const accountRows = (accountsRes.error ? [] : ((accountsRes.data as AccountRow[]) ?? []));
+  const accountLines = accountRows.map((a) => {
+    const acctTrades = trades.filter((t) => t.account_id === a.id && t.pnl != null);
+    const acctNet = acctTrades.reduce((s, t) => s + (t.pnl as number), 0);
+    const rails = [
+      a.max_trades_per_day != null ? `max trades/day ${a.max_trades_per_day}` : null,
+      a.max_daily_loss ? `max daily loss ${a.max_daily_loss}` : null,
+      a.max_daily_profit ? `profit target ${a.max_daily_profit}` : null,
+      a.trading_window ? `window ${a.trading_window}` : null,
+      a.trading_window_2 ? `window 2 ${a.trading_window_2}` : null,
+    ].filter(Boolean);
+    return [
+      `- ${a.name}${a.firm ? ` (${a.firm})` : ""}${a.phase ? ` [${a.phase}]` : ""} - ${a.status}`,
+      a.size != null ? `size ${n1(a.size)} ${a.currency ?? cur}` : null,
+      `${a.started_on}${a.ended_on ? ` to ${a.ended_on}` : ""}`,
+      acctTrades.length ? `${acctTrades.length} trades, net ${n1(acctNet)} ${a.currency ?? cur}` : "no trades yet",
+      rails.length ? `guardrails: ${rails.join(", ")}` : "guardrails: defaults",
+    ]
+      .filter(Boolean)
+      .join(" | ");
+  });
+
   // Account guardrails block.
   const guardrailLines: string[] = [];
   if (gs) {
@@ -437,7 +483,10 @@ export async function buildAiContext(supabase: SupabaseClient, user: User): Prom
     `## Strategies (${strategies.length})`,
     stratBlocks.length ? stratBlocks.join("\n\n") : "(none created yet)",
     ``,
-    `## Account guardrails (from Settings; violations in the journal are judged against these)`,
+    `## Trading accounts (prop-firm ledger; guardrails are per account, Settings holds the defaults)`,
+    accountLines.length ? accountLines.join("\n") : "(no accounts created yet)",
+    ``,
+    `## Default guardrails (from Settings; used when a trade has no account)`,
     guardrailLines.length ? guardrailLines.join("\n") : "(none set)",
     ``,
     `## Recurring journal tags (across all trade reviews)`,

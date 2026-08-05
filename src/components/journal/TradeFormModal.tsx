@@ -11,11 +11,18 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { usePairs } from "@/lib/usePairs";
 import { ENTRY_EMOTIONS } from "@/lib/settings";
+import {
+  ALL_ACCOUNTS,
+  fetchAccounts,
+  getSelectedAccountId,
+  type Account,
+} from "@/lib/accounts";
 
 export type TradeFormTrade = {
   id: string;
   traded_on: string;
   opened_at?: string | null;
+  account_id?: string | null;
   pair: string | null;
   direction: string | null;
   entry_price: number | null;
@@ -84,6 +91,21 @@ export default function TradeFormModal({
   const [err, setErr] = useState<string | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
+  // Prop-firm accounts: new trades default to the globally selected account.
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accountId, setAccountId] = useState<string>(trade?.account_id ?? "");
+  useEffect(() => {
+    fetchAccounts(supabase).then(({ accounts: a }) => {
+      setAccounts(a);
+      if (!trade) {
+        const sel = getSelectedAccountId();
+        if (sel !== ALL_ACCOUNTS && a.some((x) => x.id === sel)) setAccountId(sel);
+        else if (a.length === 1) setAccountId(a[0].id);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function requestClose() {
     if (dirty) setConfirmDiscard(true);
     else onClose();
@@ -129,15 +151,20 @@ export default function TradeFormModal({
       strategy_id: f.strategyId || null,
       ...(editing ? (f.time !== initial.time ? { traded_on: tradedOn } : {}) : {}),
       ...(f.openTime !== initial.openTime || !editing ? { opened_at: openedAt } : {}),
+      account_id: accountId || null,
     };
-    // opened_at ships code-first (migration 0018): retry without it when the
-    // column doesn't exist yet.
-    const stripOpened = ({ opened_at: _o, ...rest }: Record<string, unknown>) => rest;
+    // opened_at (0018) and account_id (0019) ship code-first: retry without
+    // whichever column the database says it doesn't have yet.
+    const OPTIONAL_COLS = /opened_at|account_id/;
     let id = trade?.id ?? null;
     if (editing && id) {
-      let { error } = await supabase.from("trades").update(payload).eq("id", id);
-      if (error && /opened_at/.test(error.message)) {
-        ({ error } = await supabase.from("trades").update(stripOpened(payload)).eq("id", id));
+      const row: Record<string, unknown> = { ...payload };
+      let { error } = await supabase.from("trades").update(row).eq("id", id);
+      while (error && OPTIONAL_COLS.test(error.message)) {
+        const col = error.message.match(OPTIONAL_COLS)![0];
+        if (!(col in row)) break;
+        delete row[col];
+        ({ error } = await supabase.from("trades").update(row).eq("id", id));
       }
       if (error) {
         setErr(error.message);
@@ -145,14 +172,13 @@ export default function TradeFormModal({
         return;
       }
     } else {
-      const row = { user_id: u.user.id, traded_on: tradedOn, ...payload };
+      const row: Record<string, unknown> = { user_id: u.user.id, traded_on: tradedOn, ...payload };
       let { data, error } = await supabase.from("trades").insert(row).select("id").single();
-      if (error && /opened_at/.test(error.message)) {
-        ({ data, error } = await supabase
-          .from("trades")
-          .insert(stripOpened(row))
-          .select("id")
-          .single());
+      while (error && OPTIONAL_COLS.test(error.message)) {
+        const col = error.message.match(OPTIONAL_COLS)![0];
+        if (!(col in row)) break;
+        delete row[col];
+        ({ data, error } = await supabase.from("trades").insert(row).select("id").single());
       }
       if (error) {
         setErr(error.message);
@@ -231,6 +257,16 @@ export default function TradeFormModal({
               ))}
             </select>
           </Field>
+          {accounts.length > 0 && (
+            <Field label="Account">
+              <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className="jfield">
+                <option value="">None</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            </Field>
+          )}
         </div>
         <div className="mt-3">
           <Field label="Notes">

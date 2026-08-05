@@ -14,6 +14,14 @@ import {
 } from "@/lib/settings";
 import ImportTradesModal from "./ImportTradesModal";
 import TradeFormModal, { type TradeFormTrade } from "./TradeFormModal";
+import AccountSwitcher from "@/components/AccountSwitcher";
+import {
+  ALL_ACCOUNTS,
+  effectiveGuardrails,
+  fetchAccounts,
+  useSelectedAccount,
+  type Account,
+} from "@/lib/accounts";
 import JournalPanel, {
   fmtNet,
   type DayReview,
@@ -109,6 +117,10 @@ export default function JournalWorkspace() {
   const [cur, setCur] = useState("USD");
   const [accSize, setAccSize] = useState<number | null>(null);
   const [unit, setUnit] = useState<Unit>("money");
+  // Prop-firm accounts (migration 0019): scope everything to the selection.
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accountsAvailable, setAccountsAvailable] = useState(false);
+  const [selAccount] = useSelectedAccount();
 
   // The 6x7 Monday-first grid; fetches cover the whole grid so weeks crossing
   // month boundaries are complete.
@@ -133,12 +145,16 @@ export default function JournalWorkspace() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from("trades")
       .select("*")
       .gte("traded_on", gridStartStr)
       .lt("traded_on", gridEndStr)
       .order("traded_on", { ascending: true });
+    if (accountsAvailable && selAccount !== ALL_ACCOUNTS) {
+      query = query.eq("account_id", selAccount);
+    }
+    const { data, error } = await query;
     setLoadError(error ? `Could not load trades: ${error.message}` : null);
     const list = (data as Trade[]) ?? [];
     setTrades(list);
@@ -182,7 +198,7 @@ export default function JournalWorkspace() {
       setDayReviews(map);
     }
     setLoading(false);
-  }, [supabase, gridStartStr, gridEndStr]);
+  }, [supabase, gridStartStr, gridEndStr, accountsAvailable, selAccount]);
 
   useEffect(() => {
     load();
@@ -201,6 +217,10 @@ export default function JournalWorkspace() {
       if (!Number.isNaN(s) && s > 0) setAccSize(s);
     });
     fetchSettings(supabase).then(({ settings: s }) => setSettings(s));
+    fetchAccounts(supabase).then(({ accounts: a, available }) => {
+      setAccounts(a);
+      setAccountsAvailable(available);
+    });
     const savedUnit = localStorage.getItem("tb_journal_unit");
     if (savedUnit === "money" || savedUnit === "pct" || savedUnit === "r") setUnit(savedUnit);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -210,6 +230,19 @@ export default function JournalWorkspace() {
     setUnit(u);
     localStorage.setItem("tb_journal_unit", u);
   }
+
+  // Selected account context: its guardrails, size and currency win over the
+  // account-wide defaults when a specific account is chosen.
+  const selectedAccount = useMemo(
+    () => (selAccount === ALL_ACCOUNTS ? null : accounts.find((a) => a.id === selAccount) ?? null),
+    [accounts, selAccount]
+  );
+  const effSettings = useMemo(
+    () => effectiveGuardrails(selectedAccount, settings),
+    [selectedAccount, settings]
+  );
+  const effAccSize = selectedAccount?.size ?? accSize;
+  const effCur = selectedAccount?.currency ?? cur;
 
   const byDay = useMemo(() => {
     const map: Record<string, Trade[]> = {};
@@ -248,7 +281,7 @@ export default function JournalWorkspace() {
     if (tradedDays.length === 0) return null;
     const parts: number[] = [];
     const clean = tradedDays.filter(
-      ([, list]) => computeViolations(list, settings, accSize ?? 0).length === 0
+      ([, list]) => computeViolations(list, effSettings, effAccSize ?? 0).length === 0
     ).length;
     parts.push(clean / tradedDays.length);
     if (reviewsAvailable && monthTrades.length > 0) {
@@ -265,19 +298,19 @@ export default function JournalWorkspace() {
           verdicts.length
       );
     }
-    if (dayReviewsAvailable && settings.routine_items.length > 0) {
+    if (dayReviewsAvailable && effSettings.routine_items.length > 0) {
       const done = tradedDays.reduce(
         (s, [d]) =>
           s +
-          (dayReviews[d]?.routine_done ?? []).filter((x) => settings.routine_items.includes(x))
+          (dayReviews[d]?.routine_done ?? []).filter((x) => effSettings.routine_items.includes(x))
             .length /
-            settings.routine_items.length,
+            effSettings.routine_items.length,
         0
       );
       parts.push(done / tradedDays.length);
     }
     return Math.round((parts.reduce((a, b) => a + b, 0) / parts.length) * 100);
-  }, [byDay, cursor, settings, accSize, reviews, reviewsAvailable, dayReviews, dayReviewsAvailable, monthTrades]);
+  }, [byDay, cursor, effSettings, effAccSize, reviews, reviewsAvailable, dayReviews, dayReviewsAvailable, monthTrades]);
 
   const [fullCal, setFullCal] = useState(false);
   useEffect(() => {
@@ -375,17 +408,18 @@ export default function JournalWorkspace() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <AccountSwitcher />
           <div
             className="flex items-center gap-0.5 rounded-lg border border-border2 bg-card p-0.5"
             role="group"
             aria-label="PnL display unit"
           >
-            {([["money", sym(cur).trim() || "$"], ["pct", "%"], ["r", "R"]] as [Unit, string][]).map(
+            {([["money", sym(effCur).trim() || "$"], ["pct", "%"], ["r", "R"]] as [Unit, string][]).map(
               ([u, label]) => (
                 <button
                   key={u}
                   onClick={() => pickUnit(u)}
-                  title={u === "pct" && !accSize ? "Set your account size in Settings first" : undefined}
+                  title={u === "pct" && !effAccSize ? "Set your account size in Settings first" : undefined}
                   className={`rounded-md px-2.5 py-1.5 font-mono text-xs font-medium transition ${
                     unit === u ? "bg-accent text-white" : "text-muted hover:text-foreground"
                   }`}
@@ -518,10 +552,10 @@ export default function JournalWorkspace() {
                     >
                       <span className="md:hidden">
                         {unit === "money"
-                          ? `${net > 0 ? "+" : net < 0 ? "-" : ""}${sym(cur)}${compactMoney(net)}`
-                          : fmtNet(dayTradesCell, unit, cur, accSize)}
+                          ? `${net > 0 ? "+" : net < 0 ? "-" : ""}${sym(effCur)}${compactMoney(net)}`
+                          : fmtNet(dayTradesCell, unit, effCur, effAccSize)}
                       </span>
-                      <span className="hidden md:inline">{fmtNet(dayTradesCell, unit, cur, accSize)}</span>
+                      <span className="hidden md:inline">{fmtNet(dayTradesCell, unit, effCur, effAccSize)}</span>
                     </span>
                   </span>
                 )}
@@ -541,17 +575,17 @@ export default function JournalWorkspace() {
           ) : (
             <>
               <div className="grid grid-cols-2 gap-3">
-                <Metric label="Net PnL" value={moneySigned(stats.net, cur)} tone={stats.net >= 0 ? "up" : "down"} />
+                <Metric label="Net PnL" value={moneySigned(stats.net, effCur)} tone={stats.net >= 0 ? "up" : "down"} />
                 <Metric
                   label="Account growth"
-                  value={accSize ? `${stats.net >= 0 ? "+" : ""}${((stats.net / accSize) * 100).toFixed(2)}%` : "—"}
+                  value={effAccSize ? `${stats.net >= 0 ? "+" : ""}${((stats.net / effAccSize) * 100).toFixed(2)}%` : "—"}
                   tone={stats.net >= 0 ? "up" : "down"}
                 />
                 <Metric label="Win rate" value={`${stats.winRate.toFixed(1)}%`} />
                 <Metric label="Total trades" value={String(stats.total)} />
                 <Metric
                   label="Expectancy / trade"
-                  value={moneySigned(stats.expectancy, cur)}
+                  value={moneySigned(stats.expectancy, effCur)}
                   tone={stats.expectancy >= 0 ? "up" : "down"}
                 />
                 <Metric label="Avg R" value={stats.avgR == null ? "—" : `${stats.avgR.toFixed(2)}R`} />
@@ -564,10 +598,10 @@ export default function JournalWorkspace() {
                     tone={discipline == null ? undefined : discipline >= 70 ? "up" : discipline < 40 ? "down" : undefined}
                   />
                 </div>
-                <Metric label="Avg win" value={moneySigned(stats.avgWin, cur)} tone="up" />
-                <Metric label="Avg loss" value={moneySigned(stats.avgLoss, cur)} tone="down" />
-                <Metric label="Best trade" value={moneySigned(stats.best, cur)} tone="up" />
-                <Metric label="Worst trade" value={moneySigned(stats.worst, cur)} tone="down" />
+                <Metric label="Avg win" value={moneySigned(stats.avgWin, effCur)} tone="up" />
+                <Metric label="Avg loss" value={moneySigned(stats.avgLoss, effCur)} tone="down" />
+                <Metric label="Best trade" value={moneySigned(stats.best, effCur)} tone="up" />
+                <Metric label="Worst trade" value={moneySigned(stats.worst, effCur)} tone="down" />
               </div>
               {stats.rs.length > 0 && (
                 <div className="mt-5">
@@ -609,7 +643,7 @@ export default function JournalWorkspace() {
               const daysTraded = new Set(wt.map((t) => dayKey(t.traded_on))).size;
               const isCurrent = todayStr >= start && todayStr < end;
               const selected = panel?.kind === "week" && panel.start === start;
-              const netStr = fmtNet(wt, unit, cur, accSize);
+              const netStr = fmtNet(wt, unit, effCur, effAccSize);
               const netVal = wt.reduce((s, t) => s + (t.pnl ?? 0), 0);
               return (
                 <button
@@ -650,11 +684,11 @@ export default function JournalWorkspace() {
           trades={panelTrades}
           reviews={reviews}
           dayReviews={dayReviews}
-          settings={settings}
+          settings={effSettings}
           dayReviewsAvailable={dayReviewsAvailable}
           reviewsAvailable={reviewsAvailable}
-          cur={cur}
-          accSize={accSize}
+          cur={effCur}
+          accSize={effAccSize}
           unit={unit}
           todayStr={todayStr}
           onClose={() => setPanel(null)}
