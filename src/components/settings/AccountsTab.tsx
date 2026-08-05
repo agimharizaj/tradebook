@@ -12,8 +12,10 @@ import { MoneyOrPct, WindowPicker } from "@/components/RiskFields";
 import { withCommas } from "@/lib/format";
 import {
   ACCOUNT_PHASES,
+  ALL_ACCOUNTS,
   accountStatusTone,
   fetchAccounts,
+  getSelectedAccountId,
   setSelectedAccountId,
   type Account,
 } from "@/lib/accounts";
@@ -86,6 +88,8 @@ export default function AccountsTab({
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [pickFrom, setPickFrom] = useState("");
   const [pickTo, setPickTo] = useState("");
+  // Two-step delete: the confirm shows how many trades will detach.
+  const [confirmDelete, setConfirmDelete] = useState<{ account: Account; trades: number } | null>(null);
 
   const load = useCallback(async () => {
     const { accounts: a, available: ok } = await fetchAccounts(supabase);
@@ -233,6 +237,29 @@ export default function AccountsTab({
     });
   }
 
+  async function openDeleteConfirm(a: Account) {
+    const { count } = await supabase
+      .from("trades")
+      .select("id", { count: "exact", head: true })
+      .eq("account_id", a.id);
+    setConfirmDelete({ account: a, trades: count ?? 0 });
+  }
+
+  async function deleteAccount() {
+    if (!confirmDelete) return;
+    const { error } = await supabase.from("accounts").delete().eq("id", confirmDelete.account.id);
+    if (error) {
+      setMsg(`Could not delete: ${error.message}`);
+      setConfirmDelete(null);
+      return;
+    }
+    // Trades detach automatically (account_id is on delete set null).
+    if (getSelectedAccountId() === confirmDelete.account.id) setSelectedAccountId(ALL_ACCOUNTS);
+    if (draft?.id === confirmDelete.account.id) setDraft(null);
+    setConfirmDelete(null);
+    load();
+  }
+
   async function attachPicked() {
     if (!attachTo || picked.size === 0) return;
     const { error } = await supabase
@@ -345,6 +372,12 @@ export default function AccountsTab({
                   </button>
                 </>
               )}
+              <button
+                onClick={() => openDeleteConfirm(a)}
+                className="ml-auto rounded-md px-2.5 py-1 text-xs text-dim transition hover:bg-danger/10 hover:text-danger"
+              >
+                Delete
+              </button>
             </div>
           </div>
         ))}
@@ -357,6 +390,42 @@ export default function AccountsTab({
         >
           + New account
         </button>
+      )}
+
+      {confirmDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setConfirmDelete(null);
+          }}
+        >
+          <div className="w-full max-w-sm rounded-2xl bg-card p-6 ring-1 ring-border2">
+            <h3 className="text-base font-medium" style={{ fontFamily: "var(--font-display)" }}>
+              Delete {confirmDelete.account.name}?
+            </h3>
+            <p className="mt-1.5 text-sm text-muted">
+              The account entry is removed permanently - there is no undo.{" "}
+              {confirmDelete.trades > 0
+                ? `Its ${confirmDelete.trades} trade${confirmDelete.trades === 1 ? "" : "s"} stay in your journal and become unassigned.`
+                : "It has no trades attached."}{" "}
+              If you're recording an outcome, use Mark failed or Close instead - that keeps the history.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="rounded-lg border border-border2 px-4 py-2 text-sm text-muted hover:text-foreground"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={deleteAccount}
+                className="rounded-lg bg-danger/15 px-4 py-2 text-sm font-medium text-danger transition hover:bg-danger/25"
+              >
+                Delete account
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* unassigned trades */}
