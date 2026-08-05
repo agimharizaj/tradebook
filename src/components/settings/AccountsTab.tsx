@@ -383,13 +383,18 @@ export default function AccountsTab({
             </button>
           </>
         )}
-        <button
-          onClick={() => toggleHidden(a)}
-          title={a.hidden ? "Show in the switcher and dashboard again" : "Hide from the switcher and dashboard (trades still count in All accounts)"}
-          className="ml-auto rounded-md px-2.5 py-1 text-xs text-dim transition hover:bg-surface2 hover:text-foreground"
+        <label
+          title={a.hidden ? "Ticking shows it in the switcher and dashboard again" : "Unticking hides it from the switcher and dashboard (trades still count in All accounts)"}
+          className="ml-auto flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted transition hover:bg-surface2 hover:text-foreground"
         >
-          {a.hidden ? "Unhide" : "Hide"}
-        </button>
+          <input
+            type="checkbox"
+            checked={!a.hidden}
+            onChange={() => toggleHidden(a)}
+            className="h-3.5 w-3.5 accent-[color:var(--accent)]"
+          />
+          Visible
+        </label>
         <button
           onClick={() => openDeleteConfirm(a)}
           className="rounded-md px-2.5 py-1 text-xs text-dim transition hover:bg-danger/10 hover:text-danger"
