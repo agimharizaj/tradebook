@@ -6,6 +6,7 @@
 // users never see it). Native <option> can't render SVG, so status is shown
 // with a text prefix there (tolerated exception).
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   ALL_ACCOUNTS,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/accounts";
 
 export default function AccountSwitcher({ className = "" }: { className?: string }) {
+  const router = useRouter();
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [sel, setSel] = useSelectedAccount();
 
@@ -46,7 +48,13 @@ export default function AccountSwitcher({ className = "" }: { className?: string
   return (
     <select
       value={valid ? sel : ALL_ACCOUNTS}
-      onChange={(e) => setSel(e.target.value)}
+      onChange={(e) => {
+        if (e.target.value === "__manage") {
+          router.push("/settings?tab=accounts");
+          return;
+        }
+        setSel(e.target.value);
+      }}
       aria-label="Account"
       title="Which account you're viewing and logging to"
       className={`shrink-0 rounded-lg border border-border2 bg-surface2 px-3 py-2 text-sm outline-none focus:border-accent ${className}`}
@@ -66,6 +74,9 @@ export default function AccountSwitcher({ className = "" }: { className?: string
           ))}
         </optgroup>
       )}
+      {/* Discoverability bridge: hide/unhide, lifecycle and creation all
+          live in Settings > Accounts. */}
+      <option value="__manage">Manage accounts…</option>
     </select>
   );
 }
