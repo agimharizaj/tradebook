@@ -167,15 +167,18 @@ export default function ImportTradesModal({
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [confirmWipe, setConfirmWipe] = useState(false);
   const lastIdx = useRef<number | null>(null);
-  // Prop-firm accounts: the whole import lands on one account.
+  // Prop-firm accounts: the whole import lands on one account. Hidden
+  // accounts stay out of the picker; a sole visible account auto-assigns
+  // with no field shown.
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountId, setAccountId] = useState<string>("");
   useEffect(() => {
     fetchAccounts(supabase).then(({ accounts: a }) => {
-      setAccounts(a);
+      const visible = a.filter((x) => !x.hidden);
+      setAccounts(visible);
       const sel = getSelectedAccountId();
-      if (sel !== ALL_ACCOUNTS && a.some((x) => x.id === sel)) setAccountId(sel);
-      else if (a.length === 1) setAccountId(a[0].id);
+      if (sel !== ALL_ACCOUNTS && visible.some((x) => x.id === sel)) setAccountId(sel);
+      else if (visible.length === 1) setAccountId(visible[0].id);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -363,7 +366,7 @@ export default function ImportTradesModal({
           <input type="file" accept=".csv,.html,.htm,.txt" onChange={onFile} className="hidden" />
         </label>
 
-        {accounts.length > 0 && (
+        {accounts.length > 1 && (
           <label className="mt-3 block">
             <span className="mb-1 block text-xs text-dim">Import into account</span>
             <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className="jfield">

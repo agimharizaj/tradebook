@@ -92,19 +92,25 @@ export default function TradeFormModal({
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   // Prop-firm accounts: new trades default to the globally selected account.
+  // Hidden accounts stay out of the picker (unless this trade already belongs
+  // to one); a sole visible account auto-assigns with no field shown.
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountId, setAccountId] = useState<string>(trade?.account_id ?? "");
   useEffect(() => {
     fetchAccounts(supabase).then(({ accounts: a }) => {
       setAccounts(a);
       if (!trade) {
+        const visible = a.filter((x) => !x.hidden);
         const sel = getSelectedAccountId();
-        if (sel !== ALL_ACCOUNTS && a.some((x) => x.id === sel)) setAccountId(sel);
-        else if (a.length === 1) setAccountId(a[0].id);
+        if (sel !== ALL_ACCOUNTS && visible.some((x) => x.id === sel)) setAccountId(sel);
+        else if (visible.length === 1) setAccountId(visible[0].id);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const accountOptions = accounts.filter((a) => !a.hidden || a.id === accountId);
+  const showAccountField =
+    accountOptions.length > 1 || accountOptions.some((a) => a.hidden && a.id === accountId);
 
   function requestClose() {
     if (dirty) setConfirmDiscard(true);
@@ -257,12 +263,15 @@ export default function TradeFormModal({
               ))}
             </select>
           </Field>
-          {accounts.length > 0 && (
+          {showAccountField && (
             <Field label="Account">
               <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className="jfield">
                 <option value="">None</option>
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
+                {accountOptions.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                    {a.hidden ? " (hidden)" : ""}
+                  </option>
                 ))}
               </select>
             </Field>
