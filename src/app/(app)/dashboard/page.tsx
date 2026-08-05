@@ -1,30 +1,78 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { moneySigned, sym } from "@/lib/format";
 import { DailyBars, EquityCurve, HBars } from "@/components/dashboard/Charts";
 import KillZones from "@/components/sessions/KillZones";
+import DashboardAccountBar from "@/components/dashboard/DashboardAccountBar";
 
 export const dynamic = "force-dynamic";
 
-type Trade = { pnl: number | null; traded_on: string; created_at: string; pair: string | null; direction: string | null };
+type Trade = {
+  pnl: number | null;
+  r_multiple: number | null;
+  traded_on: string;
+  created_at: string;
+  pair: string | null;
+  direction: string | null;
+  account_id?: string | null;
+};
 
-export default async function DashboardPage() {
+type Account = {
+  id: string;
+  name: string;
+  firm: string | null;
+  phase: string | null;
+  size: number | null;
+  currency: string | null;
+  status: string;
+};
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ account?: string }>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const sp = await searchParams;
 
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
   const name = (meta.display_name as string) ?? (meta.full_name as string) ?? "";
-  const cur = (meta.account_currency as string) || "USD";
-  const accountSize = parseFloat((meta.account_size as string) ?? "");
 
-  const { data, error: loadError } = await supabase
+  // Accounts (migration 0019); tolerate the table not existing yet.
+  const accountsRes = await supabase
+    .from("accounts")
+    .select("id, name, firm, phase, size, currency, status")
+    .order("started_on", { ascending: false });
+  const accounts = (accountsRes.error ? [] : ((accountsRes.data as Account[]) ?? []));
+  const selected = accounts.find((a) => a.id === sp.account) ?? null;
+
+  // All trades once (with account_id when the column exists) - the selected
+  // scope filters in memory and the per-account cards need the full set.
+  let tradesRes = await supabase
     .from("trades")
-    .select("pnl, traded_on, created_at, pair, direction")
+    .select("pnl, r_multiple, traded_on, created_at, pair, direction, account_id")
     .order("traded_on", { ascending: true })
     .order("created_at", { ascending: true });
-  const trades = (data as Trade[]) ?? [];
+  if (tradesRes.error) {
+    // account_id ships code-first (0019): the row shape without it still
+    // satisfies Trade (the field is optional), so the cast is safe.
+    tradesRes = (await supabase
+      .from("trades")
+      .select("pnl, r_multiple, traded_on, created_at, pair, direction")
+      .order("traded_on", { ascending: true })
+      .order("created_at", { ascending: true })) as typeof tradesRes;
+  }
+  const loadError = tradesRes.error;
+  const allTrades = (tradesRes.data as Trade[]) ?? [];
+  const trades = selected ? allTrades.filter((t) => t.account_id === selected.id) : allTrades;
+
+  const cur = selected?.currency ?? ((meta.account_currency as string) || "USD");
+  const metaSize = parseFloat((meta.account_size as string) ?? "");
+  const accountSize = selected?.size ?? metaSize;
 
   const withPnl = trades.filter((t) => t.pnl != null) as (Trade & { pnl: number })[];
   const wins = withPnl.filter((t) => t.pnl > 0);
@@ -41,11 +89,14 @@ export default async function DashboardPage() {
   const worst = withPnl.length ? Math.min(...withPnl.map((t) => t.pnl)) : 0;
   const avgPerTrade = withPnl.length ? net / withPnl.length : 0;
   const growthPct = accountSize > 0 ? (net / accountSize) * 100 : null;
+  const rVals = trades.filter((t) => t.r_multiple != null).map((t) => t.r_multiple as number);
+  const avgR = rVals.length ? rVals.reduce((a, b) => a + b, 0) / rVals.length : null;
 
   // Equity curve (balance if account size known, else cumulative PnL).
   let run = accountSize > 0 ? accountSize : 0;
   const equity = withPnl.map((t) => (run += t.pnl));
   const curveStart = accountSize > 0 ? accountSize : 0;
+  const balance = accountSize > 0 ? accountSize + net : null;
 
   // Max drawdown: largest peak-to-trough drop along the equity curve.
   let peak = curveStart;
@@ -107,13 +158,43 @@ export default async function DashboardPage() {
   });
 
   const pct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
-  // Dates matching each equity point, for the curve's x-axis labels.
   const equityDates = withPnl.map((t) => t.traded_on.slice(0, 10));
+
+  // Per-account cards (all accounts, regardless of the current scope).
+  const accountCards = accounts.map((a) => {
+    const at = allTrades.filter((t) => t.account_id === a.id && t.pnl != null);
+    const aNet = at.reduce((s, t) => s + (t.pnl as number), 0);
+    return { ...a, net: aNet, count: at.length, balance: a.size != null ? a.size + aNet : null };
+  });
+
+  const statusTone = (s: string) =>
+    s === "active"
+      ? "border-accent/50 bg-accent-soft text-accent2"
+      : s === "passed"
+        ? "border-success/40 bg-success/10 text-success"
+        : s === "failed"
+          ? "border-danger/40 bg-danger/10 text-danger"
+          : "border-border2 text-dim";
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 md:px-8 md:py-10">
-      <h1 className="text-2xl">{name ? `Welcome back, ${name.split(" ")[0]}` : "Dashboard"}</h1>
-      <p className="mt-1 text-muted">Your trading workspace at a glance.</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl">{name ? `Welcome back, ${name.split(" ")[0]}` : "Dashboard"}</h1>
+          <p className="mt-1 text-muted">
+            {selected ? (
+              <>Viewing <span className="text-foreground">{selected.name}</span></>
+            ) : accounts.length > 0 ? (
+              "All accounts combined."
+            ) : (
+              "Your trading workspace at a glance."
+            )}
+          </p>
+        </div>
+        <Suspense fallback={null}>
+          <DashboardAccountBar />
+        </Suspense>
+      </div>
 
       {loadError && (
         <p className="mt-4 rounded-lg border border-danger/40 bg-danger/10 px-4 py-2.5 text-sm text-danger">
@@ -121,46 +202,109 @@ export default async function DashboardPage() {
         </p>
       )}
 
-      <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        <Stat
-          label="Balance"
-          value={
-            accountSize > 0
-              ? `${sym(cur)}${(accountSize + net).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-              : "—"
-          }
-          tone={accountSize > 0 ? (net >= 0 ? "up" : "down") : undefined}
-        />
-        <Stat label="Net PnL" value={moneySigned(net, cur)} tone={net >= 0 ? "up" : "down"} />
-        <Stat
-          label="Account growth"
-          value={growthPct == null ? "—" : pct(growthPct)}
-          tone={growthPct == null ? undefined : growthPct >= 0 ? "up" : "down"}
-        />
-        <Stat label="Win rate" value={`${winRate.toFixed(1)}%`} />
-        <Stat label="Profit factor" value={profitFactor === Infinity ? "∞" : profitFactor.toFixed(2)} />
-        <Stat label="Trades" value={String(trades.length)} />
-        <Stat label="Avg / trade" value={moneySigned(avgPerTrade, cur)} tone={avgPerTrade >= 0 ? "up" : "down"} />
-      </div>
-
-      {growthPct == null && (
-        <p className="mt-3 text-xs text-dim">
-          Set your account size in <Link href="/settings" className="text-accent2">Settings</Link> to see balance and account growth.
-        </p>
-      )}
-
-      {equity.length >= 2 ? (
+      {equity.length >= 2 || withPnl.length > 0 ? (
         <>
-          <div className="mt-6 rounded-2xl bg-card p-5 ring-1 ring-border">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-medium uppercase tracking-wide text-muted">
-                {accountSize > 0 ? "Balance curve" : "Cumulative PnL"}
-              </h2>
-              <span className="font-mono text-sm text-muted">
-                {accountSize > 0 ? `${sym(cur)}${equity[equity.length - 1].toLocaleString(undefined, { maximumFractionDigits: 0 })}` : moneySigned(net, cur)}
-              </span>
+          {/* hero: balance + equity curve in one band */}
+          <div className="mt-6 grid gap-4 rounded-2xl bg-card p-5 ring-1 ring-border lg:grid-cols-[280px_1fr]">
+            <div className="flex flex-col justify-center border-border lg:border-r lg:pr-5">
+              <div className="text-xs uppercase tracking-wide text-dim">
+                {selected ? `${selected.name} balance` : "Balance"}
+              </div>
+              <div
+                className={`mt-1 text-3xl font-semibold ${net > 0 ? "text-success" : net < 0 ? "text-danger" : ""}`}
+                style={{ fontFamily: "var(--font-mono)" }}
+              >
+                {balance != null
+                  ? `${sym(cur)}${balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                  : "—"}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                <Chip label="Net" value={moneySigned(net, cur)} tone={net >= 0 ? "up" : "down"} />
+                {growthPct != null && (
+                  <Chip label="Growth" value={pct(growthPct)} tone={growthPct >= 0 ? "up" : "down"} />
+                )}
+                {avgR != null && (
+                  <Chip label="Avg R" value={`${avgR.toFixed(2)}R`} tone={avgR >= 0 ? "up" : "down"} />
+                )}
+              </div>
+              {balance == null && (
+                <p className="mt-3 text-xs text-dim">
+                  Set an account size in{" "}
+                  <Link href="/settings?tab=accounts" className="text-accent2">Settings</Link> to
+                  track balance.
+                </p>
+              )}
             </div>
-            <EquityCurve values={equity} baseline={curveStart} dates={equityDates} cur={cur} />
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="text-sm font-medium uppercase tracking-wide text-muted">
+                  {accountSize > 0 ? "Balance curve" : "Cumulative PnL"}
+                </h2>
+                <span className="font-mono text-sm text-muted">
+                  {equity.length >= 2
+                    ? accountSize > 0
+                      ? `${sym(cur)}${equity[equity.length - 1].toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                      : moneySigned(net, cur)
+                    : ""}
+                </span>
+              </div>
+              {equity.length >= 2 ? (
+                <EquityCurve values={equity} baseline={curveStart} dates={equityDates} cur={cur} />
+              ) : (
+                <p className="py-10 text-center text-sm text-dim">
+                  Two or more trades with PnL draw the curve.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* accounts strip */}
+          {accountCards.length > 0 && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {accountCards.map((a) => (
+                <Link
+                  key={a.id}
+                  href={selected?.id === a.id ? "/dashboard" : `/dashboard?account=${a.id}`}
+                  className={`rounded-xl bg-card p-4 ring-1 transition hover:ring-accent ${
+                    selected?.id === a.id ? "ring-accent" : "ring-border"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-sm font-medium">{a.name}</span>
+                    {a.phase && (
+                      <span className="rounded-full border border-border2 px-1.5 py-0.5 text-[9px] capitalize text-muted">
+                        {a.phase}
+                      </span>
+                    )}
+                    <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-medium capitalize ${statusTone(a.status)}`}>
+                      {a.status}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-baseline justify-between">
+                    <span
+                      className={`font-mono text-sm font-medium ${a.net > 0 ? "text-success" : a.net < 0 ? "text-danger" : "text-muted"}`}
+                    >
+                      {moneySigned(a.net, a.currency ?? cur)}
+                    </span>
+                    <span className="font-mono text-[11px] text-dim">
+                      {a.balance != null
+                        ? `bal ${sym(a.currency ?? cur)}${a.balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                        : `${a.count} trades`}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {/* stat tiles */}
+          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+            <Stat label="Win rate" value={`${winRate.toFixed(1)}%`} />
+            <Stat label="Profit factor" value={profitFactor === Infinity ? "∞" : profitFactor.toFixed(2)} />
+            <Stat label="Trades" value={String(trades.length)} />
+            <Stat label="Avg / trade" value={moneySigned(avgPerTrade, cur)} tone={avgPerTrade >= 0 ? "up" : "down"} />
+            <Stat label="Best" value={moneySigned(best, cur)} tone="up" />
+            <Stat label="Worst" value={moneySigned(worst, cur)} tone="down" />
           </div>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
@@ -192,26 +336,24 @@ export default async function DashboardPage() {
           <div className="mt-6 rounded-2xl bg-card p-5 ring-1 ring-border">
             <h2 className="mb-4 text-sm font-medium uppercase tracking-wide text-muted">Breakdown</h2>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                <Mini label="Wins" value={String(wins.length)} />
-                <Mini label="Losses" value={String(losses.length)} />
-                <Mini label="Avg win" value={moneySigned(avgWin, cur)} tone="up" />
-                <Mini label="Avg loss" value={moneySigned(avgLoss, cur)} tone="down" />
-                <Mini label="Best" value={moneySigned(best, cur)} tone="up" />
-                <Mini label="Worst" value={moneySigned(worst, cur)} tone="down" />
-                <Mini
-                  label="Max drawdown"
-                  value={maxDd > 0 ? moneySigned(-maxDd, cur) : moneySigned(0, cur)}
-                  tone={maxDd > 0 ? "down" : undefined}
-                />
-                <Mini
-                  label="Max drawdown %"
-                  value={curveStart > 0 && maxDd > 0 ? `-${maxDdPct.toFixed(2)}%` : "—"}
-                  tone={maxDd > 0 && curveStart > 0 ? "down" : undefined}
-                />
-                <Mini label={`Longs (${longs.length})`} value={moneySigned(netOf(longs), cur)} tone={netOf(longs) >= 0 ? "up" : "down"} />
-                <Mini label={`Shorts (${shorts.length})`} value={moneySigned(netOf(shorts), cur)} tone={netOf(shorts) >= 0 ? "up" : "down"} />
-                <Mini label="Max win streak" value={String(maxW)} tone="up" />
-                <Mini label="Max loss streak" value={String(maxL)} tone="down" />
+              <Mini label="Wins" value={String(wins.length)} />
+              <Mini label="Losses" value={String(losses.length)} />
+              <Mini label="Avg win" value={moneySigned(avgWin, cur)} tone="up" />
+              <Mini label="Avg loss" value={moneySigned(avgLoss, cur)} tone="down" />
+              <Mini
+                label="Max drawdown"
+                value={maxDd > 0 ? moneySigned(-maxDd, cur) : moneySigned(0, cur)}
+                tone={maxDd > 0 ? "down" : undefined}
+              />
+              <Mini
+                label="Max drawdown %"
+                value={curveStart > 0 && maxDd > 0 ? `-${maxDdPct.toFixed(2)}%` : "—"}
+                tone={maxDd > 0 && curveStart > 0 ? "down" : undefined}
+              />
+              <Mini label={`Longs (${longs.length})`} value={moneySigned(netOf(longs), cur)} tone={netOf(longs) >= 0 ? "up" : "down"} />
+              <Mini label={`Shorts (${shorts.length})`} value={moneySigned(netOf(shorts), cur)} tone={netOf(shorts) >= 0 ? "up" : "down"} />
+              <Mini label="Max win streak" value={String(maxW)} tone="up" />
+              <Mini label="Max loss streak" value={String(maxL)} tone="down" />
             </div>
           </div>
 
@@ -221,11 +363,24 @@ export default async function DashboardPage() {
         </>
       ) : (
         <p className="mt-6 text-sm text-dim">
-          No trades logged yet. Head to the <Link href="/journal" className="text-accent2">Journal</Link> to add or import trades.
+          No trades logged yet{selected ? ` on ${selected.name}` : ""}. Head to the{" "}
+          <Link href="/journal" className="text-accent2">Journal</Link> to add or import trades.
         </p>
       )}
-
     </div>
+  );
+}
+
+function Chip({ label, value, tone }: { label: string; value: string; tone?: "up" | "down" }) {
+  return (
+    <span className="inline-flex items-baseline gap-1.5 rounded-lg bg-surface2 px-2.5 py-1">
+      <span className="text-[10px] uppercase tracking-wide text-dim">{label}</span>
+      <span
+        className={`font-mono text-xs font-medium ${tone === "up" ? "text-success" : tone === "down" ? "text-danger" : ""}`}
+      >
+        {value}
+      </span>
+    </span>
   );
 }
 
