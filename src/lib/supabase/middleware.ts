@@ -42,6 +42,16 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+
+  // Supabase auth links sometimes land on the site root (?code=...) instead
+  // of /auth/callback (e.g. a Site URL without a path). Forward them so the
+  // code actually gets exchanged instead of dying on the landing page.
+  if (pathname === "/" && request.nextUrl.searchParams.has("code")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/callback";
+    return NextResponse.redirect(url);
+  }
+
   const isPublic =
     pathname === "/" || // landing page (redirects signed-in users itself)
     pathname.startsWith("/login") ||
