@@ -261,8 +261,9 @@ export default async function DashboardPage({
             </div>
           </div>
 
-          {/* accounts strip */}
-          {accountCards.length > 0 && (
+          {/* accounts strip: only when there's an actual choice to make - a
+              single card would just repeat the hero's numbers */}
+          {accountCards.length > 1 && (
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {accountCards.map((a) => (
                 <Link
