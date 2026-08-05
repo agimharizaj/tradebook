@@ -36,9 +36,9 @@ export default function MicButton({
         title={listening ? "Stop dictating" : title}
         aria-label={listening ? "Stop dictating" : title}
         aria-pressed={listening}
-        className={`inline-flex items-center justify-center rounded-lg border p-2 transition ${
+        className={`inline-flex items-center justify-center rounded-lg border bg-card p-2 transition ${
           listening
-            ? "border-danger bg-danger/15 text-danger"
+            ? "border-danger text-danger"
             : "border-border2 text-muted hover:border-accent hover:text-foreground"
         } ${className}`}
       >

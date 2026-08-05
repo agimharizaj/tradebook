@@ -533,16 +533,18 @@ export default function JournalPanel({
                   placeholder={dayReviewsAvailable ? "Add a day note…" : "Day notes need migration 0015"}
                   disabled={!dayReviewsAvailable}
                   rows={3}
-                  className="jfield w-full resize-y"
+                  className="jfield w-full resize-y pr-20"
                   aria-label="Day note"
                 />
-                <div className="mt-1 flex items-center justify-end gap-1">
+                {/* Inside the box, solid backgrounds so wrapped text never
+                    shows through; pr-20 keeps typing clear of them. */}
+                <div className="absolute bottom-2 right-2 flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => setNoteExpanded(true)}
                     title="Expand the day note"
                     aria-label="Expand the day note"
-                    className="rounded-lg border border-border2 p-2 text-muted transition hover:border-accent hover:text-foreground"
+                    className="rounded-lg border border-border2 bg-card p-2 text-muted transition hover:border-accent hover:text-foreground"
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
