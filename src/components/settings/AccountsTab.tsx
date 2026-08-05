@@ -18,6 +18,16 @@ import {
   type Account,
 } from "@/lib/accounts";
 import type { UserSettings } from "@/lib/settings";
+import PairFlag from "@/components/PairFlag";
+import { moneySigned } from "@/lib/format";
+
+type UnassignedTrade = {
+  id: string;
+  traded_on: string;
+  pair: string | null;
+  direction: string | null;
+  pnl: number | null;
+};
 
 type Draft = {
   id: string | null;
@@ -70,6 +80,9 @@ export default function AccountsTab({
   const [msg, setMsg] = useState<string | null>(null);
   const [unassigned, setUnassigned] = useState(0);
   const [attachTo, setAttachTo] = useState("");
+  // Selective attach: expandable list of the unassigned trades with checkboxes.
+  const [pickList, setPickList] = useState<UnassignedTrade[] | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     const { accounts: a, available: ok } = await fetchAccounts(supabase);
@@ -188,6 +201,47 @@ export default function AccountsTab({
       .update({ account_id: attachTo })
       .is("account_id", null);
     if (error) setMsg(`Could not attach: ${error.message}`);
+    setPickList(null);
+    setPicked(new Set());
+    load();
+  }
+
+  async function openPicker() {
+    const { data, error } = await supabase
+      .from("trades")
+      .select("id, traded_on, pair, direction, pnl")
+      .is("account_id", null)
+      .order("traded_on", { ascending: false })
+      .limit(500);
+    if (error) {
+      setMsg(`Could not load trades: ${error.message}`);
+      return;
+    }
+    setPickList((data as UnassignedTrade[]) ?? []);
+    setPicked(new Set());
+  }
+
+  function togglePick(id: string) {
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function attachPicked() {
+    if (!attachTo || picked.size === 0) return;
+    const { error } = await supabase
+      .from("trades")
+      .update({ account_id: attachTo })
+      .in("id", Array.from(picked));
+    if (error) {
+      setMsg(`Could not attach: ${error.message}`);
+      return;
+    }
+    setPickList(null);
+    setPicked(new Set());
     load();
   }
 
@@ -327,7 +381,78 @@ export default function AccountsTab({
             >
               Attach all
             </button>
+            <button
+              onClick={() => (pickList ? setPickList(null) : openPicker())}
+              className="rounded-lg border border-border2 px-3 py-1.5 text-xs font-medium text-muted transition hover:border-accent hover:text-foreground"
+            >
+              {pickList ? "Hide list" : "Choose trades…"}
+            </button>
           </div>
+
+          {pickList && (
+            <div className="mt-3 border-t border-gold/30 pt-3">
+              <div className="mb-2 flex items-center justify-between">
+                <button
+                  onClick={() =>
+                    setPicked(
+                      picked.size === pickList.length
+                        ? new Set()
+                        : new Set(pickList.map((t) => t.id))
+                    )
+                  }
+                  className="text-xs text-accent2 hover:underline"
+                >
+                  {picked.size === pickList.length ? "Select none" : "Select all"}
+                </button>
+                <span className="font-mono text-xs text-muted">{picked.size} selected</span>
+              </div>
+              <div className="max-h-64 space-y-0.5 overflow-y-auto pr-1">
+                {pickList.map((t) => {
+                  const on = picked.has(t.id);
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => togglePick(t.id)}
+                      className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition ${
+                        on ? "bg-accent-soft" : "hover:bg-surface2"
+                      }`}
+                    >
+                      <span
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                          on ? "border-accent bg-accent" : "border-border2"
+                        }`}
+                        aria-hidden="true"
+                      >
+                        {on && (
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                        )}
+                      </span>
+                      <span className="font-mono text-[11px] text-dim">{t.traded_on.slice(0, 10)}</span>
+                      <PairFlag pair={t.pair} size={15} />
+                      <span className="truncate text-xs">{t.pair ?? "Trade"}</span>
+                      <span className={`text-[10px] ${t.direction === "long" ? "text-success" : "text-danger"}`}>
+                        {t.direction === "long" ? "Long" : t.direction === "short" ? "Short" : ""}
+                      </span>
+                      {t.pnl != null && (
+                        <span
+                          className={`ml-auto font-mono text-[11px] ${t.pnl > 0 ? "text-success" : t.pnl < 0 ? "text-danger" : "text-muted"}`}
+                        >
+                          {moneySigned(t.pnl, cur)}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={attachPicked}
+                disabled={!attachTo || picked.size === 0}
+                className="mt-2.5 rounded-lg bg-accent px-4 py-2 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+              >
+                Attach {picked.size || ""} selected{!attachTo ? " (choose an account above)" : ""}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
