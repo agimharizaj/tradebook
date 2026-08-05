@@ -305,6 +305,100 @@ export default function AccountsTab({
 
   const draftSize = draft ? parseFloat(draft.size.replace(/,/g, "")) : NaN;
   const nameOf = (id: string | null) => accounts.find((x) => x.id === id)?.name;
+  const visibleAccounts = accounts.filter((a) => !a.hidden);
+  const hiddenAccounts = accounts.filter((a) => a.hidden);
+
+  const accountCard = (a: Account) => (
+    <div
+      key={a.id}
+      className={`rounded-xl border border-border bg-surface2 p-3.5 ${a.hidden ? "opacity-70" : ""}`}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium">{a.name}</span>
+        {a.firm && <span className="text-xs text-dim">{a.firm}</span>}
+        {a.phase && (
+          <span className="rounded-full border border-border2 px-2 py-0.5 text-[10px] capitalize text-muted">
+            {a.phase}
+          </span>
+        )}
+        <span
+          className={`rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize ${accountStatusTone(a.status)}`}
+        >
+          {a.status}
+        </span>
+        {a.size != null && (
+          <span className="font-mono text-xs text-muted">
+            {a.currency ?? cur} {a.size.toLocaleString()}
+          </span>
+        )}
+        <span className="ml-auto font-mono text-[10px] text-dim">
+          {a.started_on}
+          {a.ended_on ? ` to ${a.ended_on}` : ""}
+        </span>
+      </div>
+      {a.successor_of && nameOf(a.successor_of) && (
+        <p className="mt-1 text-[11px] text-dim">Successor of {nameOf(a.successor_of)}</p>
+      )}
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
+        <button
+          onClick={() => edit(a)}
+          className="rounded-md border border-border2 px-2.5 py-1 text-xs text-muted transition hover:border-accent hover:text-foreground"
+        >
+          Edit
+        </button>
+        {a.status === "active" ? (
+          <>
+            <button
+              onClick={() => setStatus(a, "passed")}
+              className="rounded-md border border-success/40 px-2.5 py-1 text-xs text-success transition hover:bg-success/10"
+            >
+              Mark passed
+            </button>
+            <button
+              onClick={() => setStatus(a, "failed")}
+              className="rounded-md border border-danger/40 px-2.5 py-1 text-xs text-danger transition hover:bg-danger/10"
+            >
+              Mark failed
+            </button>
+            <button
+              onClick={() => setStatus(a, "closed")}
+              className="rounded-md border border-border2 px-2.5 py-1 text-xs text-muted transition hover:text-foreground"
+            >
+              Close
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => startSuccessor(a)}
+              className="rounded-md border border-accent/50 px-2.5 py-1 text-xs text-accent2 transition hover:bg-accent-soft"
+            >
+              Start successor
+            </button>
+            <button
+              onClick={() => setStatus(a, "active")}
+              className="rounded-md border border-border2 px-2.5 py-1 text-xs text-muted transition hover:text-foreground"
+            >
+              Reopen
+            </button>
+          </>
+        )}
+        <button
+          onClick={() => toggleHidden(a)}
+          title={a.hidden ? "Show in the switcher and dashboard again" : "Hide from the switcher and dashboard (trades still count in All accounts)"}
+          className="ml-auto rounded-md px-2.5 py-1 text-xs text-dim transition hover:bg-surface2 hover:text-foreground"
+        >
+          {a.hidden ? "Unhide" : "Hide"}
+        </button>
+        <button
+          onClick={() => openDeleteConfirm(a)}
+          className="rounded-md px-2.5 py-1 text-xs text-dim transition hover:bg-danger/10 hover:text-danger"
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
@@ -317,107 +411,7 @@ export default function AccountsTab({
           personal account - and every trade you log gets attached to it.
         </p>
       )}
-      {accounts.some((a) => a.hidden) && (
-        <button
-          onClick={() => setShowHidden((s) => !s)}
-          className="text-xs text-dim transition hover:text-foreground"
-        >
-          {showHidden ? "Conceal hidden accounts" : `Show hidden (${accounts.filter((a) => a.hidden).length})`}
-        </button>
-      )}
-      <div className="space-y-2">
-        {accounts.filter((a) => !a.hidden || showHidden).map((a) => (
-          <div
-            key={a.id}
-            className={`rounded-xl border border-border bg-surface2 p-3.5 ${a.hidden ? "opacity-60" : ""}`}
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium">{a.name}</span>
-              {a.firm && <span className="text-xs text-dim">{a.firm}</span>}
-              {a.phase && (
-                <span className="rounded-full border border-border2 px-2 py-0.5 text-[10px] capitalize text-muted">
-                  {a.phase}
-                </span>
-              )}
-              <span
-                className={`rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize ${accountStatusTone(a.status)}`}
-              >
-                {a.status}
-              </span>
-              {a.size != null && (
-                <span className="font-mono text-xs text-muted">
-                  {a.currency ?? cur} {a.size.toLocaleString()}
-                </span>
-              )}
-              <span className="ml-auto font-mono text-[10px] text-dim">
-                {a.started_on}
-                {a.ended_on ? ` to ${a.ended_on}` : ""}
-              </span>
-            </div>
-            {a.successor_of && nameOf(a.successor_of) && (
-              <p className="mt-1 text-[11px] text-dim">Successor of {nameOf(a.successor_of)}</p>
-            )}
-            <div className="mt-2.5 flex flex-wrap gap-1.5">
-              <button
-                onClick={() => edit(a)}
-                className="rounded-md border border-border2 px-2.5 py-1 text-xs text-muted transition hover:border-accent hover:text-foreground"
-              >
-                Edit
-              </button>
-              {a.status === "active" ? (
-                <>
-                  <button
-                    onClick={() => setStatus(a, "passed")}
-                    className="rounded-md border border-success/40 px-2.5 py-1 text-xs text-success transition hover:bg-success/10"
-                  >
-                    Mark passed
-                  </button>
-                  <button
-                    onClick={() => setStatus(a, "failed")}
-                    className="rounded-md border border-danger/40 px-2.5 py-1 text-xs text-danger transition hover:bg-danger/10"
-                  >
-                    Mark failed
-                  </button>
-                  <button
-                    onClick={() => setStatus(a, "closed")}
-                    className="rounded-md border border-border2 px-2.5 py-1 text-xs text-muted transition hover:text-foreground"
-                  >
-                    Close
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => startSuccessor(a)}
-                    className="rounded-md border border-accent/50 px-2.5 py-1 text-xs text-accent2 transition hover:bg-accent-soft"
-                  >
-                    Start successor
-                  </button>
-                  <button
-                    onClick={() => setStatus(a, "active")}
-                    className="rounded-md border border-border2 px-2.5 py-1 text-xs text-muted transition hover:text-foreground"
-                  >
-                    Reopen
-                  </button>
-                </>
-              )}
-              <button
-                onClick={() => toggleHidden(a)}
-                title={a.hidden ? "Show in the switcher and dashboard again" : "Hide from the switcher and dashboard (trades still count in All accounts)"}
-                className="ml-auto rounded-md px-2.5 py-1 text-xs text-dim transition hover:bg-surface2 hover:text-foreground"
-              >
-                {a.hidden ? "Unhide" : "Hide"}
-              </button>
-              <button
-                onClick={() => openDeleteConfirm(a)}
-                className="rounded-md px-2.5 py-1 text-xs text-dim transition hover:bg-danger/10 hover:text-danger"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+      <div className="space-y-2">{visibleAccounts.map(accountCard)}</div>
 
       {!draft && (
         <button
@@ -426,6 +420,41 @@ export default function AccountsTab({
         >
           + New account
         </button>
+      )}
+
+      {/* Hidden accounts live in their own collapsed drawer at the bottom,
+          out of the working ledger, one click away. */}
+      {hiddenAccounts.length > 0 && (
+        <div className="border-t border-border pt-3">
+          <button
+            onClick={() => setShowHidden((s) => !s)}
+            aria-expanded={showHidden}
+            className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 text-left text-sm text-muted transition hover:text-foreground"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`shrink-0 transition-transform ${showHidden ? "rotate-90" : ""}`}
+              aria-hidden="true"
+            >
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+            Hidden accounts
+            <span className="rounded-full border border-border2 px-2 py-0.5 font-mono text-[10px] text-dim">
+              {hiddenAccounts.length}
+            </span>
+            <span className="ml-auto text-[11px] text-dim">
+              off the switcher and dashboard; trades still count
+            </span>
+          </button>
+          {showHidden && <div className="mt-2 space-y-2">{hiddenAccounts.map(accountCard)}</div>}
+        </div>
       )}
 
       {confirmDelete && (
