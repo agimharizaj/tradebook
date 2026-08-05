@@ -11,6 +11,7 @@ import SnapToNote from "@/components/charts/SnapToNote";
 import SnapToSidekick from "@/components/charts/SnapToSidekick";
 import TradingDayPanel from "@/components/charts/TradingDayPanel";
 import SnapshotMenu from "@/components/charts/SnapshotMenu";
+import PairSelect from "@/components/charts/PairSelect";
 import { usePairs } from "@/lib/usePairs";
 
 const STUDIES: { id: string; label: string }[] = [
@@ -104,15 +105,7 @@ export default function ChartsPage() {
       {/* One scrollable row on phones so the toolbar never stacks and eats chart height */}
       <div className="flex items-center gap-2 overflow-x-auto border-b border-border px-4 py-2.5 md:gap-3 md:py-3">
         <h1 className="shrink-0 text-lg" style={{ fontFamily: "var(--font-display)" }}>Trading</h1>
-        <select
-          value={tv}
-          onChange={(e) => setTv(e.target.value)}
-          className="shrink-0 rounded-lg border border-border2 bg-surface2 px-3 py-2 text-sm outline-none focus:border-accent"
-        >
-          {pairs.map((p) => (
-            <option key={p.tv} value={p.tv}>{p.label}</option>
-          ))}
-        </select>
+        <PairSelect pairs={pairs} value={tv} onPick={setTv} />
         <Link
           href="/settings?tab=pairs"
           className="shrink-0 whitespace-nowrap text-xs text-dim transition hover:text-accent2"
