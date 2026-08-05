@@ -24,10 +24,13 @@ export default function AccountSwitcher({ className = "" }: { className?: string
 
   if (!accounts || accounts.length === 0) return null;
 
+  // Hidden accounts stay out of the everyday list entirely (unhide them in
+  // Settings > Accounts) - unless one is the current selection.
+  const visible = accounts.filter((a) => !a.hidden || a.id === sel);
   // A stale selection (deleted account) falls back to all.
-  const valid = sel === ALL_ACCOUNTS || accounts.some((a) => a.id === sel);
-  const active = accounts.filter((a) => a.status === "active");
-  const ended = accounts.filter((a) => a.status !== "active");
+  const valid = sel === ALL_ACCOUNTS || visible.some((a) => a.id === sel);
+  const active = visible.filter((a) => a.status === "active");
+  const ended = visible.filter((a) => a.status !== "active");
 
   return (
     <select

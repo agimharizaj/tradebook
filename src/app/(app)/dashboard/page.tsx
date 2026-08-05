@@ -26,6 +26,7 @@ type Account = {
   size: number | null;
   currency: string | null;
   status: string;
+  hidden?: boolean;
 };
 
 export default async function DashboardPage({
@@ -43,9 +44,10 @@ export default async function DashboardPage({
   const name = (meta.display_name as string) ?? (meta.full_name as string) ?? "";
 
   // Accounts (migration 0019); tolerate the table not existing yet.
+  // select * so optional columns (hidden, 0020) don't break older databases.
   const accountsRes = await supabase
     .from("accounts")
-    .select("id, name, firm, phase, size, currency, status")
+    .select("*")
     .order("started_on", { ascending: false });
   const accounts = (accountsRes.error ? [] : ((accountsRes.data as Account[]) ?? []));
   const selected = accounts.find((a) => a.id === sp.account) ?? null;
@@ -160,8 +162,9 @@ export default async function DashboardPage({
   const pct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
   const equityDates = withPnl.map((t) => t.traded_on.slice(0, 10));
 
-  // Per-account cards (all accounts, regardless of the current scope).
-  const accountCards = accounts.map((a) => {
+  // Per-account cards (hidden accounts stay off the dashboard; their trades
+  // still count in the combined numbers).
+  const accountCards = accounts.filter((a) => !a.hidden || a.id === selected?.id).map((a) => {
     const at = allTrades.filter((t) => t.account_id === a.id && t.pnl != null);
     const aNet = at.reduce((s, t) => s + (t.pnl as number), 0);
     return { ...a, net: aNet, count: at.length, balance: a.size != null ? a.size + aNet : null };

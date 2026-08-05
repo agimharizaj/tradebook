@@ -227,11 +227,6 @@ export default function KillZones() {
             )}
             {agg.buckets.outside.count > 0 && row("Outside", "no zone", agg.buckets.outside, true)}
           </div>
-          <p className="mt-3 text-[11.5px] text-dim">
-            {agg.total} trade{agg.total === 1 ? "" : "s"} in range, bucketed by entry time (or close
-            time when no entry is recorded) in New York. Broker exports often use server time, not
-            UTC - if one zone swallows everything, check your import&apos;s timestamps.
-          </p>
         </>
       )}
     </div>

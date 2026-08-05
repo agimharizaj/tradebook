@@ -90,6 +90,7 @@ export default function AccountsTab({
   const [pickTo, setPickTo] = useState("");
   // Two-step delete: the confirm shows how many trades will detach.
   const [confirmDelete, setConfirmDelete] = useState<{ account: Account; trades: number } | null>(null);
+  const [showHidden, setShowHidden] = useState(false);
 
   const load = useCallback(async () => {
     const { accounts: a, available: ok } = await fetchAccounts(supabase);
@@ -237,6 +238,23 @@ export default function AccountsTab({
     });
   }
 
+  async function toggleHidden(a: Account) {
+    const { error } = await supabase
+      .from("accounts")
+      .update({ hidden: !a.hidden })
+      .eq("id", a.id);
+    if (error) {
+      setMsg(
+        /hidden/.test(error.message)
+          ? "Hiding needs migration 0020 (accounts.hidden) applied first."
+          : `Could not update: ${error.message}`
+      );
+      return;
+    }
+    if (!a.hidden && getSelectedAccountId() === a.id) setSelectedAccountId(ALL_ACCOUNTS);
+    load();
+  }
+
   async function openDeleteConfirm(a: Account) {
     const { count } = await supabase
       .from("trades")
@@ -299,9 +317,20 @@ export default function AccountsTab({
           personal account - and every trade you log gets attached to it.
         </p>
       )}
+      {accounts.some((a) => a.hidden) && (
+        <button
+          onClick={() => setShowHidden((s) => !s)}
+          className="text-xs text-dim transition hover:text-foreground"
+        >
+          {showHidden ? "Conceal hidden accounts" : `Show hidden (${accounts.filter((a) => a.hidden).length})`}
+        </button>
+      )}
       <div className="space-y-2">
-        {accounts.map((a) => (
-          <div key={a.id} className="rounded-xl border border-border bg-surface2 p-3.5">
+        {accounts.filter((a) => !a.hidden || showHidden).map((a) => (
+          <div
+            key={a.id}
+            className={`rounded-xl border border-border bg-surface2 p-3.5 ${a.hidden ? "opacity-60" : ""}`}
+          >
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-medium">{a.name}</span>
               {a.firm && <span className="text-xs text-dim">{a.firm}</span>}
@@ -373,8 +402,15 @@ export default function AccountsTab({
                 </>
               )}
               <button
+                onClick={() => toggleHidden(a)}
+                title={a.hidden ? "Show in the switcher and dashboard again" : "Hide from the switcher and dashboard (trades still count in All accounts)"}
+                className="ml-auto rounded-md px-2.5 py-1 text-xs text-dim transition hover:bg-surface2 hover:text-foreground"
+              >
+                {a.hidden ? "Unhide" : "Hide"}
+              </button>
+              <button
                 onClick={() => openDeleteConfirm(a)}
-                className="ml-auto rounded-md px-2.5 py-1 text-xs text-dim transition hover:bg-danger/10 hover:text-danger"
+                className="rounded-md px-2.5 py-1 text-xs text-dim transition hover:bg-danger/10 hover:text-danger"
               >
                 Delete
               </button>

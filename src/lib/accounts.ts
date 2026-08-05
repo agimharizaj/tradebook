@@ -25,6 +25,8 @@ export type Account = {
   ended_on: string | null;
   successor_of: string | null;
   notes: string | null;
+  // Cosmetic hide (migration 0020); absent before it, treated as false.
+  hidden?: boolean;
 };
 
 export const ACCOUNT_PHASES = ["challenge", "verification", "funded", "personal", "demo"] as const;
