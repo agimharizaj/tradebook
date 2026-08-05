@@ -104,6 +104,8 @@ export default function SidekickChat({
   onPendingImageUsed,
   pendingText = null,
   onPendingTextUsed,
+  pendingDraft = null,
+  onPendingDraftUsed,
 }: {
   strategies: Strategy[];
   // Compact: used inside the floating dock panel; history lives in a
@@ -117,6 +119,9 @@ export default function SidekickChat({
   // it immediately on mount.
   pendingText?: string | null;
   onPendingTextUsed?: () => void;
+  // A composer draft (slash command started in the dock): prefill, don't send.
+  pendingDraft?: string | null;
+  onPendingDraftUsed?: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
   // Sent with every request so Sidekick knows which app page is on screen
@@ -169,6 +174,17 @@ export default function SidekickChat({
     send(pendingText);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingText]);
+  // A draft handed over from the dock (e.g. a "/" command started there):
+  // lands in the composer, focused, NOT sent - the slash menu takes over.
+  const pendingDraftUsed = useRef(false);
+  useEffect(() => {
+    if (!pendingDraft || pendingDraftUsed.current) return;
+    pendingDraftUsed.current = true;
+    onPendingDraftUsed?.();
+    setInput(pendingDraft);
+    requestAnimationFrame(() => inputRef.current?.focus());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingDraft]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
