@@ -61,10 +61,17 @@ export function setSelectedAccountId(id: string) {
 }
 
 // Selected account id, kept in sync across every component that uses it.
+// Initialised synchronously from localStorage so the FIRST render (and the
+// first data fetch) is already scoped - starting at "all" and correcting in
+// an effect made every page briefly show other accounts' data.
 export function useSelectedAccount(): [string, (id: string) => void] {
-  const [sel, setSel] = useState<string>(ALL_ACCOUNTS);
+  const [sel, setSel] = useState<string>(getSelectedAccountId);
   useEffect(() => {
-    setSel(getSelectedAccountId());
+    const cur = getSelectedAccountId();
+    setSel(cur);
+    // Backfill the cookie for selections saved before the cookie mirror
+    // existed, so the server-rendered dashboard scopes on first paint.
+    document.cookie = `${SEL_KEY}=${encodeURIComponent(cur)}; path=/; max-age=31536000; SameSite=Lax`;
     const onChange = (e: Event) => {
       const id = (e as CustomEvent<{ id?: string }>).detail?.id;
       if (id) setSel(id);

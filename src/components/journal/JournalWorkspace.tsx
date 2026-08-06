@@ -119,7 +119,6 @@ export default function JournalWorkspace() {
   const [unit, setUnit] = useState<Unit>("money");
   // Prop-firm accounts (migration 0019): scope everything to the selection.
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [accountsAvailable, setAccountsAvailable] = useState(false);
   const [selAccount] = useSelectedAccount();
 
   // The 6x7 Monday-first grid; fetches cover the whole grid so weeks crossing
@@ -145,16 +144,23 @@ export default function JournalWorkspace() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    let query = supabase
-      .from("trades")
-      .select("*")
-      .gte("traded_on", gridStartStr)
-      .lt("traded_on", gridEndStr)
-      .order("traded_on", { ascending: true });
-    if (accountsAvailable && selAccount !== ALL_ACCOUNTS) {
-      query = query.eq("account_id", selAccount);
+    // Scope by the selected account IMMEDIATELY - waiting for fetchAccounts
+    // to confirm the migration made the first fetch unscoped, flashing other
+    // accounts' trades before the scoped refetch wiped them. If account_id
+    // doesn't exist yet (migration 0019 missing) the scoped query errors and
+    // we retry unscoped.
+    const base = () =>
+      supabase
+        .from("trades")
+        .select("*")
+        .gte("traded_on", gridStartStr)
+        .lt("traded_on", gridEndStr)
+        .order("traded_on", { ascending: true });
+    const scoped = selAccount !== ALL_ACCOUNTS;
+    let { data, error } = await (scoped ? base().eq("account_id", selAccount) : base());
+    if (error && scoped && /account_id/i.test(error.message)) {
+      ({ data, error } = await base());
     }
-    const { data, error } = await query;
     setLoadError(error ? `Could not load trades: ${error.message}` : null);
     const list = (data as Trade[]) ?? [];
     setTrades(list);
@@ -198,7 +204,7 @@ export default function JournalWorkspace() {
       setDayReviews(map);
     }
     setLoading(false);
-  }, [supabase, gridStartStr, gridEndStr, accountsAvailable, selAccount]);
+  }, [supabase, gridStartStr, gridEndStr, selAccount]);
 
   useEffect(() => {
     load();
@@ -217,10 +223,7 @@ export default function JournalWorkspace() {
       if (!Number.isNaN(s) && s > 0) setAccSize(s);
     });
     fetchSettings(supabase).then(({ settings: s }) => setSettings(s));
-    fetchAccounts(supabase).then(({ accounts: a, available }) => {
-      setAccounts(a);
-      setAccountsAvailable(available);
-    });
+    fetchAccounts(supabase).then(({ accounts: a }) => setAccounts(a));
     const savedUnit = localStorage.getItem("tb_journal_unit");
     if (savedUnit === "money" || savedUnit === "pct" || savedUnit === "r") setUnit(savedUnit);
     // eslint-disable-next-line react-hooks/exhaustive-deps
