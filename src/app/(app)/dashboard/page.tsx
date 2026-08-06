@@ -211,59 +211,68 @@ export default async function DashboardPage({
       )}
 
       {/* hero: balance + equity curve in one band - always shown; a fresh
-          account's balance (its size) matters before any trade exists */}
-          <div className="mt-6 grid gap-4 rounded-2xl bg-card p-5 ring-1 ring-border lg:grid-cols-[280px_1fr]">
-            <div className="flex flex-col justify-center border-border lg:border-r lg:pr-5">
-              <div className="text-xs uppercase tracking-wide text-dim">
-                {selected ? `${selected.name} balance` : "Balance"}
-              </div>
-              <div
-                className={`mt-1 text-3xl font-semibold ${net > 0 ? "text-success" : net < 0 ? "text-danger" : ""}`}
-                style={{ fontFamily: "var(--font-mono)" }}
-              >
-                {balance != null
-                  ? `${sym(cur)}${balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-                  : "—"}
-              </div>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                <Chip label="Net" value={moneySigned(net, cur)} tone={net >= 0 ? "up" : "down"} />
-                {growthPct != null && (
-                  <Chip label="Growth" value={pct(growthPct)} tone={growthPct >= 0 ? "up" : "down"} />
-                )}
-                {avgR != null && (
-                  <Chip label="Avg R" value={`${avgR.toFixed(2)}R`} tone={avgR >= 0 ? "up" : "down"} />
-                )}
-              </div>
-              {balance == null && (
-                <p className="mt-3 text-xs text-dim">
-                  Set an account size in{" "}
-                  <Link href="/settings?tab=accounts" className="text-accent2">Settings</Link> to
-                  track balance.
-                </p>
-              )}
-            </div>
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-sm font-medium uppercase tracking-wide text-muted">
-                  {accountSize > 0 ? "Balance curve" : "Cumulative PnL"}
-                </h2>
-                <span className="font-mono text-sm text-muted">
-                  {equity.length >= 2
-                    ? accountSize > 0
-                      ? `${sym(cur)}${equity[equity.length - 1].toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-                      : moneySigned(net, cur)
-                    : ""}
-                </span>
-              </div>
-              {equity.length >= 2 ? (
-                <EquityCurve values={equity} baseline={curveStart} dates={equityDates} cur={cur} />
-              ) : (
-                <p className="py-10 text-center text-sm text-dim">
-                  Two or more trades with PnL draw the curve.
-                </p>
-              )}
-            </div>
+          account's balance (its size) matters before any trade exists. With
+          fewer than two PnL trades the curve column is dropped entirely so a
+          fresh account gets a compact card, not a tall empty box. */}
+      <div
+        className={`mt-6 grid gap-4 rounded-2xl bg-card p-5 ring-1 ring-border ${
+          equity.length >= 2 ? "lg:grid-cols-[280px_1fr]" : ""
+        }`}
+      >
+        <div
+          className={`flex flex-col justify-center ${
+            equity.length >= 2 ? "border-border lg:border-r lg:pr-5" : ""
+          }`}
+        >
+          <div className="text-xs uppercase tracking-wide text-dim">
+            {selected ? `${selected.name} balance` : "Balance"}
           </div>
+          <div
+            className={`mt-1 text-3xl font-semibold ${net > 0 ? "text-success" : net < 0 ? "text-danger" : ""}`}
+            style={{ fontFamily: "var(--font-mono)" }}
+          >
+            {balance != null
+              ? `${sym(cur)}${balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+              : "—"}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <Chip label="Net" value={moneySigned(net, cur)} tone={net >= 0 ? "up" : "down"} />
+            {growthPct != null && (
+              <Chip label="Growth" value={pct(growthPct)} tone={growthPct >= 0 ? "up" : "down"} />
+            )}
+            {avgR != null && (
+              <Chip label="Avg R" value={`${avgR.toFixed(2)}R`} tone={avgR >= 0 ? "up" : "down"} />
+            )}
+          </div>
+          {balance == null && (
+            <p className="mt-3 text-xs text-dim">
+              Set an account size in{" "}
+              <Link href="/settings?tab=accounts" className="text-accent2">Settings</Link> to
+              track balance.
+            </p>
+          )}
+          {equity.length < 2 && (
+            <p className="mt-3 text-xs text-dim">
+              Your balance curve appears here after two trades with PnL.
+            </p>
+          )}
+        </div>
+        {equity.length >= 2 && (
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-sm font-medium uppercase tracking-wide text-muted">
+                {accountSize > 0 ? "Balance curve" : "Cumulative PnL"}
+              </h2>
+              <span className="font-mono text-sm text-muted">
+                {accountSize > 0
+                  ? `${sym(cur)}${equity[equity.length - 1].toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                  : moneySigned(net, cur)}
+              </span>
+            </div>
+            <EquityCurve values={equity} baseline={curveStart} dates={equityDates} cur={cur} />
+          </div>
+        )}
+      </div>
 
           {/* accounts strip: only when there's an actual choice to make - a
               single card would just repeat the hero's numbers */}
@@ -374,10 +383,18 @@ export default async function DashboardPage({
           </div>
         </>
       ) : (
-        <p className="mt-6 text-sm text-dim">
-          No trades logged yet{selected ? ` on ${selected.name}` : ""}. Head to the{" "}
-          <Link href="/journal" className="text-accent2">Journal</Link> to add or import trades.
-        </p>
+        <div className="mt-4 flex flex-col items-center gap-3 rounded-2xl bg-card px-5 py-8 text-center ring-1 ring-border">
+          <p className="text-sm text-muted">
+            No trades logged yet{selected ? ` on ${selected.name}` : ""}. Stats and charts appear
+            after your first trade.
+          </p>
+          <Link
+            href="/journal"
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+          >
+            Add or import trades
+          </Link>
+        </div>
       )}
     </div>
   );
