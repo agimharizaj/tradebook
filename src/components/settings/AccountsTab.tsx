@@ -93,7 +93,20 @@ export default function AccountsTab({
   const [showHidden, setShowHidden] = useState(false);
 
   const load = useCallback(async () => {
-    const { accounts: a, available: ok } = await fetchAccounts(supabase);
+    const res = await fetchAccounts(supabase);
+    let a = res.accounts;
+    const ok = res.available;
+    // Self-heal: active accounts can no longer be hidden, but rows hidden
+    // before that rule (or hidden then reopened elsewhere) would be stuck
+    // with no toggle to bring them back. Unhide them on sight.
+    const stuck = a.filter((x) => x.status === "active" && x.hidden);
+    if (stuck.length) {
+      await supabase
+        .from("accounts")
+        .update({ hidden: false })
+        .in("id", stuck.map((x) => x.id));
+      a = a.map((x) => (x.status === "active" ? { ...x, hidden: false } : x));
+    }
     setAccounts(a);
     setAvailable(ok);
     setLoaded(true);
@@ -157,10 +170,14 @@ export default function AccountsTab({
   }
 
   async function setStatus(a: Account, status: Account["status"]) {
-    const { error } = await supabase
-      .from("accounts")
-      .update({ status, ended_on: status === "active" ? null : new Date().toISOString().slice(0, 10) })
-      .eq("id", a.id);
+    // Reopening a hidden ended account must unhide it - active accounts are
+    // never hideable (the tickbox only exists on ended ones).
+    const patch: Record<string, unknown> = {
+      status,
+      ended_on: status === "active" ? null : new Date().toISOString().slice(0, 10),
+    };
+    if (status === "active" && a.hidden) patch.hidden = false;
+    const { error } = await supabase.from("accounts").update(patch).eq("id", a.id);
     if (error) {
       setMsg(`Could not update: ${error.message}`);
       return;
@@ -383,21 +400,25 @@ export default function AccountsTab({
             </button>
           </>
         )}
-        <label
-          title={a.hidden ? "Ticking shows it in the switcher and dashboard again" : "Unticking hides it from the switcher and dashboard (trades still count in All accounts)"}
-          className="ml-auto flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted transition hover:bg-surface2 hover:text-foreground"
-        >
-          <input
-            type="checkbox"
-            checked={!a.hidden}
-            onChange={() => toggleHidden(a)}
-            className="h-3.5 w-3.5 accent-[color:var(--accent)]"
-          />
-          Visible
-        </label>
+        {/* Only ended accounts can be hidden - the account you're actively
+            trading always stays in the switcher and on the dashboard. */}
+        {a.status !== "active" && (
+          <label
+            title={a.hidden ? "Ticking shows it in the switcher and dashboard again" : "Unticking hides it from the switcher and dashboard (trades still count in All accounts)"}
+            className="ml-auto flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted transition hover:bg-surface2 hover:text-foreground"
+          >
+            <input
+              type="checkbox"
+              checked={!a.hidden}
+              onChange={() => toggleHidden(a)}
+              className="h-3.5 w-3.5 accent-[color:var(--accent)]"
+            />
+            Visible
+          </label>
+        )}
         <button
           onClick={() => openDeleteConfirm(a)}
-          className="rounded-md px-2.5 py-1 text-xs text-dim transition hover:bg-danger/10 hover:text-danger"
+          className={`rounded-md px-2.5 py-1 text-xs text-dim transition hover:bg-danger/10 hover:text-danger ${a.status === "active" ? "ml-auto" : ""}`}
         >
           Delete
         </button>
