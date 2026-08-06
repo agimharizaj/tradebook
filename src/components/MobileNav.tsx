@@ -6,40 +6,52 @@ import { NAV, PROFILE, SETTINGS } from "@/lib/nav";
 
 const ITEMS = [...NAV, SETTINGS, PROFILE];
 
+// Instagram-style floating tab bar: a detached rounded pill with icon-only
+// items over a blurred backdrop; the active item sits in a filled circle.
+// Still horizontally scrollable - every destination stays reachable.
 export default function MobileNav() {
   const pathname = usePathname();
   return (
     <div className="relative shrink-0 md:hidden">
-      {/* Sit partway into the home-indicator zone like native tab bars do,
-          instead of reserving the full inset and floating high. */}
-      <nav className="scrollbar-none flex overflow-x-auto border-t border-border bg-background pb-[max(6px,calc(env(safe-area-inset-bottom)-12px))]">
+      <nav
+        className="scrollbar-none mx-3 mb-[max(10px,env(safe-area-inset-bottom))] mt-1.5 flex items-center overflow-x-auto rounded-full border border-border2 bg-background/90 px-1.5 py-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur"
+        aria-label="Primary"
+      >
         {ITEMS.map((item) => {
           const active = pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
+              aria-label={item.label}
+              title={item.label}
               data-tour={item.href === "/settings" ? "settings" : `nav${item.href.replace("/", "-")}`}
-              className={`flex w-[72px] shrink-0 flex-col items-center gap-1 py-2.5 text-[11px] transition ${
-                active ? "text-accent2" : "text-muted"
-              }`}
+              className="flex h-11 w-[52px] shrink-0 items-center justify-center"
             >
               <span
-                className={`flex h-7 w-12 items-center justify-center rounded-full transition ${
-                  active ? "bg-accent-soft" : ""
+                className={`flex h-10 w-10 items-center justify-center rounded-full transition ${
+                  active ? "bg-accent-soft text-accent2" : "text-muted"
                 }`}
               >
-                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={active ? 2.2 : 1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d={item.icon} />
                 </svg>
               </span>
-              {item.short}
             </Link>
           );
         })}
       </nav>
-      {/* Right-edge fade: signals the bar scrolls without hiding anything permanently */}
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent" />
+      {/* Right-edge fade: signals the pill scrolls without hiding anything permanently */}
+      <div className="pointer-events-none absolute inset-y-1.5 right-3 w-10 rounded-r-full bg-gradient-to-l from-background/90 to-transparent" />
     </div>
   );
 }
