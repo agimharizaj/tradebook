@@ -11,14 +11,10 @@ import {
 } from "@/lib/risk";
 
 import Link from "next/link";
+import CurrencySelect from "@/components/CurrencySelect";
 import { isSizable } from "@/lib/pairs";
 import { numFromInput, withCommas } from "@/lib/format";
 import { usePairs } from "@/lib/usePairs";
-const CURRENCIES = [
-  "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD",
-  "SGD", "HKD", "SEK", "NOK", "DKK", "PLN", "ZAR", "AED",
-];
-
 type Mode = "size" | "stop" | "risk";
 const MODES: { id: Mode; label: string }[] = [
   { id: "size", label: "Risk › lot size" },
@@ -291,15 +287,7 @@ export default function RiskPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Account currency">
-              <input
-                list="ccy-list"
-                value={accountCurrency}
-                onChange={(e) => setAccountCurrency(e.target.value.toUpperCase())}
-                className="input"
-              />
-              <datalist id="ccy-list">
-                {CURRENCIES.map((c) => (<option key={c} value={c} />))}
-              </datalist>
+              <CurrencySelect value={accountCurrency} onChange={setAccountCurrency} className="input" />
             </Field>
             <Field label="Account size">
               <input inputMode="decimal" value={accountSize} onChange={(e) => setAccountSize(withCommas(e.target.value))} className="input" />

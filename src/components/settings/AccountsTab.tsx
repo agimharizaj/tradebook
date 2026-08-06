@@ -21,6 +21,7 @@ import {
 } from "@/lib/accounts";
 import type { UserSettings } from "@/lib/settings";
 import PairFlag from "@/components/PairFlag";
+import CurrencySelect from "@/components/CurrencySelect";
 import { moneySigned } from "@/lib/format";
 
 type UnassignedTrade = {
@@ -691,7 +692,7 @@ export default function AccountsTab({
             </label>
             <label className="block">
               <span className="mb-1 block text-xs text-dim">Currency</span>
-              <input value={draft.currency} onChange={(e) => set("currency", e.target.value.toUpperCase())} placeholder="USD" className="field" />
+              <CurrencySelect value={draft.currency} onChange={(v) => set("currency", v)} />
             </label>
             <label className="block">
               <span className="mb-1 block text-xs text-dim">Max trades / day</span>

@@ -19,6 +19,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import BackLink from "@/components/BackLink";
 import { MoneyOrPct, WindowPicker } from "@/components/RiskFields";
 import AccountsTab from "@/components/settings/AccountsTab";
+import CurrencySelect from "@/components/CurrencySelect";
 
 type Meta = Record<string, unknown>;
 const str = (m: Meta, k: string) => (typeof m[k] === "string" ? (m[k] as string) : "");
@@ -276,17 +277,10 @@ export default function SettingsWorkspace({ meta }: { meta: Meta }) {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Broker / prop firm"><input value={profile.broker} onChange={(e) => setP("broker", e.target.value)} placeholder="FTMO" className="field" /></Field>
                 <Field label="Account currency">
-                  <input
-                    list="ccy-list"
+                  <CurrencySelect
                     value={profile.account_currency}
-                    onChange={(e) => setP("account_currency", e.target.value.toUpperCase())}
-                    className="field"
+                    onChange={(v) => setP("account_currency", v)}
                   />
-                  <datalist id="ccy-list">
-                    {["USD","EUR","GBP","JPY","AUD","CAD","CHF","NZD","SGD","HKD","SEK","NOK","DKK","PLN","ZAR","AED"].map((c) => (
-                      <option key={c} value={c} />
-                    ))}
-                  </datalist>
                 </Field>
                 <Field label="Account size"><input inputMode="decimal" value={profile.account_size} onChange={(e) => setP("account_size", withCommas(e.target.value))} placeholder="10,000" className="field" /></Field>
                 <Field label="Default risk % / trade"><input inputMode="decimal" value={profile.default_risk_pct} onChange={(e) => setP("default_risk_pct", e.target.value)} placeholder="1" className="field" /></Field>
