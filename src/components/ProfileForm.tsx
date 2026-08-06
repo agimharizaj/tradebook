@@ -104,7 +104,30 @@ export default function ProfileForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Avatars over 150KB get downscaled to 512px JPEG - a profile photo never
+  // needs more. Animated GIFs skip compression (canvas would freeze them).
+  async function compressAvatar(file: File): Promise<Blob> {
+    if (file.size <= 150 * 1024 || file.type === "image/gif") return file;
+    try {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, 512 / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+      const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.85));
+      return blob ?? file;
+    } catch {
+      return file; // unreadable as an image bitmap: upload as-is
+    }
+  }
+
   async function uploadAvatar(file: File) {
+    if (file.size > 2 * 1024 * 1024) {
+      setMsg({ t: "err", text: "That image is over 2 MB - pick a smaller one." });
+      return;
+    }
     setAvatarBusy(true);
     setMsg(null);
     const { data: u } = await supabase.auth.getUser();
@@ -112,10 +135,14 @@ export default function ProfileForm({
       setAvatarBusy(false);
       return;
     }
-    const ext = (file.name.split(".").pop() || "png").toLowerCase();
+    const processed = await compressAvatar(file);
+    const ext =
+      processed.type === "image/jpeg"
+        ? "jpg"
+        : (file.name.split(".").pop() || "png").toLowerCase();
     const path = `${u.user.id}/avatar-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("entry-models").upload(path, file, {
-      contentType: file.type || "image/png",
+    const { error } = await supabase.storage.from("entry-models").upload(path, processed, {
+      contentType: processed.type || file.type || "image/png",
     });
     if (error) {
       setMsg({ t: "err", text: `Could not upload photo: ${error.message}` });
@@ -318,19 +345,28 @@ export default function ProfileForm({
             <div>
               <div className="font-medium">{fullName || "No name set"}</div>
               <div className="text-sm text-muted">{email}</div>
-              <div className="text-xs text-dim">
-                Member since {joined}
-                {avatarBusy && " · uploading…"}
-                {avatarUrl && !avatarBusy && (
-                  <>
-                    {" · "}
-                    <button onClick={removeAvatar} className="text-dim underline hover:text-foreground">
-                      remove photo
-                    </button>
-                  </>
-                )}
-              </div>
+              <div className="text-xs text-dim">Member since {joined}</div>
             </div>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4">
+            <button
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={avatarBusy}
+              className="rounded-lg border border-border2 px-4 py-2 text-sm font-medium text-muted transition hover:border-accent hover:text-foreground disabled:opacity-50"
+            >
+              {avatarBusy ? "Uploading…" : "Change avatar"}
+            </button>
+            {avatarUrl && !avatarBusy && (
+              <button
+                onClick={removeAvatar}
+                className="rounded-lg px-3 py-2 text-sm text-dim transition hover:bg-danger/10 hover:text-danger"
+              >
+                Remove
+              </button>
+            )}
+            <span className="text-xs text-dim">
+              JPG, PNG or GIF. Max 2 MB; files over 150KB are compressed.
+            </span>
           </div>
         </div>
 
