@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { moneySigned, sym } from "@/lib/format";
 import { DailyBars, EquityCurve, HBars } from "@/components/dashboard/Charts";
@@ -50,7 +51,11 @@ export default async function DashboardPage({
     .select("*")
     .order("started_on", { ascending: false });
   const accounts = (accountsRes.error ? [] : ((accountsRes.data as Account[]) ?? []));
-  const selected = accounts.find((a) => a.id === sp.account) ?? null;
+  // Scope: explicit ?account= wins; otherwise the device-wide selection
+  // mirrored into a cookie, so the first server render is already scoped.
+  const cookieSel = (await cookies()).get("tb_account")?.value;
+  const wanted = sp.account ?? (cookieSel && cookieSel !== "all" ? cookieSel : undefined);
+  const selected = accounts.find((a) => a.id === wanted) ?? null;
 
   // All trades once (with account_id when the column exists) - the selected
   // scope filters in memory and the per-account cards need the full set.
@@ -205,9 +210,8 @@ export default async function DashboardPage({
         </p>
       )}
 
-      {equity.length >= 2 || withPnl.length > 0 ? (
-        <>
-          {/* hero: balance + equity curve in one band */}
+      {/* hero: balance + equity curve in one band - always shown; a fresh
+          account's balance (its size) matters before any trade exists */}
           <div className="mt-6 grid gap-4 rounded-2xl bg-card p-5 ring-1 ring-border lg:grid-cols-[280px_1fr]">
             <div className="flex flex-col justify-center border-border lg:border-r lg:pr-5">
               <div className="text-xs uppercase tracking-wide text-dim">
@@ -301,6 +305,10 @@ export default async function DashboardPage({
             </div>
           )}
 
+      {/* stats and charts wait for trades; the hero and account cards above
+          always render */}
+      {withPnl.length > 0 ? (
+        <>
           {/* stat tiles */}
           <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             <Stat label="Win rate" value={`${winRate.toFixed(1)}%`} />

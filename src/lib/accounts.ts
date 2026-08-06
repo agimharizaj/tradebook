@@ -54,6 +54,9 @@ export function getSelectedAccountId(): string {
 
 export function setSelectedAccountId(id: string) {
   localStorage.setItem(SEL_KEY, id);
+  // Mirror into a cookie so server-rendered pages (dashboard) can scope on
+  // the FIRST paint instead of flashing "all accounts" and re-rendering.
+  document.cookie = `${SEL_KEY}=${encodeURIComponent(id)}; path=/; max-age=31536000; SameSite=Lax`;
   window.dispatchEvent(new CustomEvent("tb:account-changed", { detail: { id } }));
 }
 
