@@ -40,7 +40,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var t=localStorage.getItem('tb_theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){document.documentElement.dataset.theme='dark';}try{var h=function(){document.documentElement.style.setProperty('--app-height',window.innerHeight+'px')};h();window.addEventListener('resize',h);window.addEventListener('orientationchange',h);}catch(e){}})();",
+              "(function(){try{var t=localStorage.getItem('tb_theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){document.documentElement.dataset.theme='dark';}try{var h=function(){var v=window.visualViewport;var px=v?Math.round(v.height+v.offsetTop):window.innerHeight;document.documentElement.style.setProperty('--app-height',px+'px')};var hh=function(){h();setTimeout(h,120);setTimeout(h,400)};h();window.addEventListener('resize',hh);window.addEventListener('orientationchange',hh);window.addEventListener('focusout',hh);window.addEventListener('pageshow',hh);document.addEventListener('visibilitychange',hh);if(window.visualViewport){window.visualViewport.addEventListener('resize',hh)}}catch(e){}})();",
           }}
         />
         {children}
