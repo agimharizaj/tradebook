@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { usePairs } from "@/lib/usePairs";
 import AnalysisPanel from "@/components/charts/AnalysisPanel";
+import PairPicker from "@/components/PairPicker";
 import BlockEditor, { NoteView } from "./BlockEditor";
 
 type NoteRow = { id: string; title: string; updated_at: string; created_at: string; pinned: boolean };
@@ -479,19 +480,14 @@ export default function NotebookWorkspace() {
               )}
               {noteMode === "edit" ? (
                 <>
-                  <select
+                  <PairPicker
+                    pairs={watchlist}
                     value={note.pair ?? ""}
-                    onChange={(e) => edit({ pair: e.target.value })}
-                    className="rounded-lg border border-border2 bg-surface2 px-2 py-2 text-xs text-muted outline-none focus:border-accent"
-                    aria-label="Pair"
-                    title="Tag this note with a pair (edit the list in Profile)"
-                  >
-                    <option value="">No pair</option>
-                    {watchlist.map((pr) => (<option key={pr} value={pr}>{pr}</option>))}
-                    {note.pair && !watchlist.includes(note.pair) && (
-                      <option value={note.pair}>{note.pair}</option>
-                    )}
-                  </select>
+                    onChange={(p) => edit({ pair: p })}
+                    emptyLabel="No pair"
+                    ariaLabel="Pair"
+                    className="flex items-center gap-2 rounded-lg border border-border2 bg-surface2 px-2 py-2 text-xs text-muted outline-none focus:border-accent"
+                  />
                   <Link href="/settings?tab=pairs" className="text-[11px] text-accent2 hover:underline">Edit</Link>
                 </>
               ) : (

@@ -104,26 +104,41 @@ export default function TradingDayPanel({
     const metaCur = typeof m.account_currency === "string" && m.account_currency ? m.account_currency : "USD";
     setCur(acct?.currency ?? metaCur);
     const metaSize = parseFloat(m.account_size);
-    setAccSize(acct?.size ?? (!Number.isNaN(metaSize) && metaSize > 0 ? metaSize : 0));
+    // All-accounts balance base mirrors the dashboard: sum of VISIBLE account
+    // sizes when a ledger exists, profile default otherwise.
+    const visibleSizes = accRes.accounts
+      .filter((a) => !a.hidden)
+      .reduce((sm, a) => sm + (a.size ?? 0), 0);
+    setAccSize(
+      acct?.size ??
+        (visibleSizes > 0 ? visibleSizes : !Number.isNaN(metaSize) && metaSize > 0 ? metaSize : 0)
+    );
 
     // Today's trades + lifetime net (for the derived balance), scoped to the
-    // selected account when there is one.
+    // selected account when there is one. Unscoped, hidden accounts' trades
+    // are excluded from the combined numbers (unassigned trades count).
+    const hiddenIds = new Set(accRes.accounts.filter((a) => a.hidden).map((a) => a.id));
+    const withAcc = accRes.available; // trades.account_id ships with 0019
     let todayQ = supabase
       .from("trades")
-      .select("id, traded_on, pair, direction, pnl")
+      .select(withAcc ? "id, traded_on, pair, direction, pnl, account_id" : "id, traded_on, pair, direction, pnl")
       .gte("traded_on", day)
       .lt("traded_on", `${day}T23:59:59.999Z`)
       .order("traded_on", { ascending: true });
-    let lifeQ = supabase.from("trades").select("pnl");
+    let lifeQ = supabase.from("trades").select(withAcc ? "pnl, account_id" : "pnl");
     if (acct) {
       todayQ = todayQ.eq("account_id", acct.id);
       lifeQ = lifeQ.eq("account_id", acct.id);
     }
     const [tradesRes, lifeRes] = await Promise.all([todayQ, lifeQ]);
-    setTrades((tradesRes.data as Trade[]) ?? []);
+    type WithAcc = { account_id?: string | null };
+    const skipHidden = (t: WithAcc) => acct || !t.account_id || !hiddenIds.has(t.account_id);
+    setTrades((((tradesRes.data as unknown as (Trade & WithAcc)[]) ?? []).filter(skipHidden)));
     if (lifeRes.data) {
       setLifetimeNet(
-        (lifeRes.data as { pnl: number | null }[]).reduce((sm, t) => sm + (t.pnl ?? 0), 0)
+        ((lifeRes.data as unknown as ({ pnl: number | null } & WithAcc)[]))
+          .filter(skipHidden)
+          .reduce((sm, t) => sm + (t.pnl ?? 0), 0)
       );
     }
   }, [supabase, day, selAccount]);

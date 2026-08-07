@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { usePairs } from "@/lib/usePairs";
 import { MoneyOrPct, WindowPicker } from "@/components/RiskFields";
+import PairPicker from "@/components/PairPicker";
 import { applyBulletEdit } from "@/lib/bullets";
 
 type ListItem = { key: string; id?: string; text: string; checked: boolean };
@@ -761,19 +762,13 @@ export default function StrategyWorkspace() {
               </Section>
               <Section label="Pair">
                 <div className="flex items-center gap-2">
-                  <select
+                  <PairPicker
+                    pairs={watchlist}
                     value={draft.pair}
-                    onChange={(e) => patch({ pair: e.target.value })}
-                    className="field"
-                    aria-label="Pair this strategy trades"
-                    title="Tag this strategy with a pair (edit the list in Profile)"
-                  >
-                    <option value="">No pair</option>
-                    {watchlist.map((p) => (<option key={p} value={p}>{p}</option>))}
-                    {draft.pair && !watchlist.includes(draft.pair) && (
-                      <option value={draft.pair}>{draft.pair}</option>
-                    )}
-                  </select>
+                    onChange={(p) => patch({ pair: p })}
+                    emptyLabel="No pair"
+                    ariaLabel="Pair this strategy trades"
+                  />
                   <Link href="/settings?tab=pairs" className="shrink-0 text-[11px] text-accent2 hover:underline">Edit</Link>
                 </div>
               </Section>

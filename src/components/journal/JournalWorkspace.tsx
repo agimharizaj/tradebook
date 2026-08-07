@@ -162,7 +162,14 @@ export default function JournalWorkspace() {
       ({ data, error } = await base());
     }
     setLoadError(error ? `Could not load trades: ${error.message}` : null);
-    const list = (data as Trade[]) ?? [];
+    let list = (data as Trade[]) ?? [];
+    if (!scoped) {
+      // All accounts: hidden accounts are excluded from combined views -
+      // unassigned trades (no account) always count.
+      const { accounts: accs } = await fetchAccounts(supabase);
+      const hidden = new Set(accs.filter((a) => a.hidden).map((a) => a.id));
+      if (hidden.size) list = list.filter((t) => !t.account_id || !hidden.has(t.account_id));
+    }
     setTrades(list);
 
     // Trade reviews for the journaled indicator + emotions (migration 0014).

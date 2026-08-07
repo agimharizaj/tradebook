@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { usePairs } from "@/lib/usePairs";
+import PairPicker from "@/components/PairPicker";
 import { ENTRY_EMOTIONS } from "@/lib/settings";
 import {
   ALL_ACCOUNTS,
@@ -227,10 +228,13 @@ export default function TradeFormModal({
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Pair">
-            <input value={f.pair} onChange={(e) => set("pair", e.target.value)} placeholder="EUR/USD" list="journal-pairs" className="jfield" />
-            <datalist id="journal-pairs">
-              {watchlist.map((p) => (<option key={p} value={p} />))}
-            </datalist>
+            <PairPicker
+              pairs={watchlist}
+              value={f.pair}
+              onChange={(p) => set("pair", p)}
+              allowCustom
+              className="jfield"
+            />
             <span className="mt-0.5 block text-[11px]">
               <Link href="/settings?tab=pairs" className="text-accent2 hover:underline">Edit pairs</Link>
             </span>

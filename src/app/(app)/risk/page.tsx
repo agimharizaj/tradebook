@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   baseCurrency,
@@ -12,6 +12,9 @@ import {
 
 import Link from "next/link";
 import CurrencySelect from "@/components/CurrencySelect";
+import PairPicker from "@/components/PairPicker";
+import AccountSwitcher from "@/components/AccountSwitcher";
+import { ALL_ACCOUNTS, fetchAccounts, useSelectedAccount, type Account } from "@/lib/accounts";
 import { isSizable } from "@/lib/pairs";
 import { numFromInput, withCommas } from "@/lib/format";
 import { usePairs } from "@/lib/usePairs";
@@ -108,22 +111,48 @@ export default function RiskPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountCurrency]);
 
+  // Prop-firm accounts: sizing against the right pot matters when accounts
+  // differ in size or currency. The switcher shares the app-wide selection;
+  // a specific account prefills size + currency, "All accounts" falls back
+  // to the trading-profile defaults. Fields stay editable either way.
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selAccount] = useSelectedAccount();
+  const profileDefaults = useRef<{ cur?: string; size?: string }>({});
+
   // Prefill account currency and default risk from the user's saved profile.
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => {
       const m = (data.user?.user_metadata ?? {}) as Record<string, unknown>;
       if (typeof m.account_currency === "string" && m.account_currency) {
+        profileDefaults.current.cur = m.account_currency;
         setAccountCurrency(m.account_currency);
       }
       if (typeof m.account_size === "string" && m.account_size) {
+        profileDefaults.current.size = withCommas(m.account_size);
         setAccountSize(withCommas(m.account_size));
       }
       if (typeof m.default_risk_pct === "string" && m.default_risk_pct) {
         setRiskPct(m.default_risk_pct);
       }
     });
+    fetchAccounts(supabase).then(({ accounts: a }) => setAccounts(a));
   }, []);
+
+  const selectedAccount = useMemo(
+    () => (selAccount === ALL_ACCOUNTS ? null : accounts.find((a) => a.id === selAccount) ?? null),
+    [accounts, selAccount]
+  );
+  useEffect(() => {
+    if (selectedAccount) {
+      if (selectedAccount.currency) setAccountCurrency(selectedAccount.currency);
+      if (selectedAccount.size != null) setAccountSize(withCommas(String(selectedAccount.size)));
+    } else {
+      if (profileDefaults.current.cur) setAccountCurrency(profileDefaults.current.cur);
+      if (profileDefaults.current.size) setAccountSize(profileDefaults.current.size);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccount?.id]);
 
   const result = useMemo(() => {
     const size = numFromInput(accountSize);
@@ -212,7 +241,8 @@ export default function RiskPage() {
             Enter your account risk and trade levels to size the position correctly.
           </p>
         </div>
-        <div className="flex gap-2 self-start sm:shrink-0">
+        <div className="flex flex-wrap gap-2 self-start sm:shrink-0">
+          <AccountSwitcher />
           <button
             onClick={() => { setEntry(""); setStop(""); setLots(""); }}
             className="rounded-lg border border-border2 px-3 py-2 text-xs text-muted transition hover:border-accent hover:text-foreground"
@@ -256,9 +286,7 @@ export default function RiskPage() {
       <div className="mt-6 grid gap-6 md:grid-cols-2">
         <div className="space-y-4 rounded-2xl bg-card p-6 ring-1 ring-border">
           <Field label="Pair">
-            <select value={pair} onChange={(e) => setPair(e.target.value)} className="input">
-              {sizablePairs.map((p) => (<option key={p}>{p}</option>))}
-            </select>
+            <PairPicker pairs={sizablePairs} value={pair} onChange={setPair} className="input" />
             <span className="mt-1 block text-xs">
               <Link href="/settings?tab=pairs" className="text-accent2 hover:underline">Edit pairs</Link>
             </span>
@@ -291,6 +319,9 @@ export default function RiskPage() {
             </Field>
             <Field label="Account size">
               <input inputMode="decimal" value={accountSize} onChange={(e) => setAccountSize(withCommas(e.target.value))} className="input" />
+              {selectedAccount && (
+                <span className="mt-1 block text-xs text-dim">From {selectedAccount.name}</span>
+              )}
             </Field>
           </div>
 

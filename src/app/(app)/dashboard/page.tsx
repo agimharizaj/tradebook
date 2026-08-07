@@ -75,11 +75,21 @@ export default async function DashboardPage({
   }
   const loadError = tradesRes.error;
   const allTrades = (tradesRes.data as Trade[]) ?? [];
-  const trades = selected ? allTrades.filter((t) => t.account_id === selected.id) : allTrades;
+  // Hidden accounts are excluded from combined views entirely - their sizes
+  // and their trades. Unassigned trades (no account) always count.
+  const hiddenIds = new Set(accounts.filter((a) => a.hidden).map((a) => a.id));
+  const trades = selected
+    ? allTrades.filter((t) => t.account_id === selected.id)
+    : allTrades.filter((t) => !t.account_id || !hiddenIds.has(t.account_id));
 
   const cur = selected?.currency ?? ((meta.account_currency as string) || "USD");
   const metaSize = parseFloat((meta.account_size as string) ?? "");
-  const accountSize = selected?.size ?? metaSize;
+  // Combined balance base: the sum of visible account sizes when a ledger
+  // exists (hiding an account removes its pot), else the profile default.
+  const visibleSizes = accounts
+    .filter((a) => !a.hidden)
+    .reduce((s, a) => s + (a.size ?? 0), 0);
+  const accountSize = selected?.size ?? (visibleSizes > 0 ? visibleSizes : metaSize);
 
   const withPnl = trades.filter((t) => t.pnl != null) as (Trade & { pnl: number })[];
   const wins = withPnl.filter((t) => t.pnl > 0);
@@ -167,8 +177,8 @@ export default async function DashboardPage({
   const pct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
   const equityDates = withPnl.map((t) => t.traded_on.slice(0, 10));
 
-  // Per-account cards (hidden accounts stay off the dashboard; their trades
-  // still count in the combined numbers).
+  // Per-account cards (hidden accounts stay off the dashboard and out of the
+  // combined numbers above; a hidden account only surfaces while selected).
   const accountCards = accounts.filter((a) => !a.hidden || a.id === selected?.id).map((a) => {
     const at = allTrades.filter((t) => t.account_id === a.id && t.pnl != null);
     const aNet = at.reduce((s, t) => s + (t.pnl as number), 0);
