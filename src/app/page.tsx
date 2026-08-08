@@ -145,48 +145,45 @@ export default async function Home({
             Everything between the idea and the fill.
           </h2>
           <p className="mt-2 max-w-xl text-muted">
-            Six core tools, wired together and aware of each other.
+            Plan it, trade it, face it. One tool per step.
           </p>
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
-                t: "Strategy playbooks",
-                d: "Your setup as a tickable contract: criteria, management rules, risk caps. If the boxes aren't ticked, it's not your trade.",
+                k: "Plan",
+                t: "Playbooks + risk",
+                d: "Your setup as a tickable contract - criteria, management rules, risk caps - and a sizing engine that does the math before the trade exists.",
                 i: "M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5",
               },
               {
-                t: "Journal + trade reviews",
-                d: "A calendar that keeps score, and a post-mortem for every trade: chart screenshots, confluence and mistake tags, emotions, dictated reflections.",
-                i: "M4 4h16v16H4zM4 9h16M9 4v16",
-              },
-              {
-                t: "Guardrails + routine",
-                d: "Max trades, loss caps, trading windows and a pre-market checklist. Rule breaks are called out on the chart and in the journal.",
-                i: "M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10zM9 12l2 2 4-4",
-              },
-              {
-                t: "Risk engine",
-                d: "Stop distance in, lot size out, live prices. The math is done before the trade exists.",
-                i: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 8v4M12 16h.01",
-              },
-              {
-                t: "Trading terminal",
-                d: "TradingView with your watchlist, the trading-day panel beside the candles - routine, guardrails, today's news - and a log of every read you take.",
+                k: "Trade",
+                t: "Terminal + guardrails",
+                d: "TradingView with your watchlist, and the trading day beside the candles: routine, max trades, loss caps, windows, today's news. Rule breaks are named out loud.",
                 i: "M4 19V5M4 19h16M8 15l3-3 3 2 4-5",
               },
               {
+                k: "Review",
+                t: "Journal + dashboard",
+                d: "A calendar that keeps score and a post-mortem for every trade: screenshots, tags, emotions, dictated reflections - rolled up into your curve and stats.",
+                i: "M4 4h16v16H4zM4 9h16M9 4v16",
+              },
+              {
+                k: "Ask",
                 t: "Sidekick, the AI",
                 d: "It has read your journal, your rules and the page you're on. Chart reads and rule-by-rule setup checks - opinions with reasoning, never certainty.",
                 i: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3zM18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z",
               },
             ].map((f, i) => (
-              <Reveal key={f.t} delay={(i % 3) * 90}>
+              <Reveal key={f.t} delay={(i % 4) * 90}>
                 <div className="h-full rounded-2xl bg-card p-6 ring-1 ring-border transition hover:-translate-y-0.5 hover:ring-accent">
-                  <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-accent2">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d={f.i} />
-                    </svg>
-                  </span>
+                  <div className="mb-4 flex items-center justify-between">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-accent2">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d={f.i} />
+                      </svg>
+                    </span>
+                    <span className="font-mono text-[11px] uppercase tracking-wider text-dim">{f.k}</span>
+                  </div>
                   <h3 className="font-medium" style={{ fontFamily: "var(--font-display)" }}>
                     {f.t}
                   </h3>
@@ -196,51 +193,12 @@ export default async function Home({
             ))}
           </div>
 
-          {/* The quieter half of the app, one line each. */}
+          {/* The quieter half of the app, one line total. */}
           <Reveal>
-            <div className="mt-6 grid gap-3 rounded-2xl bg-card p-5 ring-1 ring-border sm:grid-cols-2 lg:grid-cols-5">
-              {[
-                {
-                  t: "Dashboard",
-                  d: "Equity curve, profit factor, drawdown.",
-                  i: "M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z",
-                },
-                {
-                  t: "Notebook",
-                  d: "Block notes with images and dictation.",
-                  i: "M15.5 3.5a2.12 2.12 0 0 1 3 3L8 17l-4 1 1-4z",
-                },
-                {
-                  t: "News + calendar",
-                  d: "Headlines and events, archived as they arrive.",
-                  i: "M4 5h13v14H4zM7 8h7M7 12h7M7 16h5M17 8h3v9a2 2 0 0 1-2 2",
-                },
-                {
-                  t: "Sessions",
-                  d: "Four market clocks. Know whose money is awake.",
-                  i: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 7v5l3.5 2",
-                },
-                {
-                  t: "Calm",
-                  d: "Box breathing for when it gets loud.",
-                  i: "M12 21C7 18 4 14 4 10a4 4 0 0 1 8-1 4 4 0 0 1 8 1c0 4-3 8-8 11z",
-                },
-              ].map((f) => (
-                <div key={f.t} className="flex items-start gap-3">
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface2 text-muted">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d={f.i} />
-                    </svg>
-                  </span>
-                  <span>
-                    <span className="block text-sm font-medium" style={{ fontFamily: "var(--font-display)" }}>
-                      {f.t}
-                    </span>
-                    <span className="block text-xs leading-relaxed text-dim">{f.d}</span>
-                  </span>
-                </div>
-              ))}
-            </div>
+            <p className="mt-6 text-sm text-dim">
+              Also inside: a notebook with dictation, market news and the economic calendar,
+              session clocks for four exchanges, and a breathing room for when it gets loud.
+            </p>
           </Reveal>
         </div>
       </section>
