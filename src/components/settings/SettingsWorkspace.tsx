@@ -40,7 +40,9 @@ export default function SettingsWorkspace({ meta }: { meta: Meta }) {
   const [settings, setSettings] = useState<UserSettings>(emptySettings());
   const [available, setAvailable] = useState(true);
   const [loaded, setLoaded] = useState(false);
-  const [msg, setMsg] = useState<{ t: "ok" | "err"; text: string } | null>(null);
+  // src ties a message to the button that caused it, so confirmations render
+  // NEXT to that button (the page-top slot scrolls out of view on long tabs).
+  const [msg, setMsg] = useState<{ t: "ok" | "err"; text: string; src?: "guard" | "profile" } | null>(null);
 
   // Trading profile (auth metadata, moved here from Profile).
   const [profile, setProfile] = useState({
@@ -117,7 +119,11 @@ export default function SettingsWorkspace({ meta }: { meta: Meta }) {
       },
     });
     setSavingProfile(false);
-    setMsg(error ? { t: "err", text: error.message } : { t: "ok", text: "Trading profile saved." });
+    setMsg(
+      error
+        ? { t: "err", text: error.message, src: "profile" }
+        : { t: "ok", text: "Trading profile saved.", src: "profile" }
+    );
   }
 
   async function saveGuardrails() {
@@ -136,8 +142,8 @@ export default function SettingsWorkspace({ meta }: { meta: Meta }) {
     setSavingGuard(false);
     setMsg(
       err
-        ? { t: "err", text: `Could not save: ${err}` }
-        : { t: "ok", text: available ? "Guardrails saved." : "Saved locally only - apply migration 0016 to persist." }
+        ? { t: "err", text: `Could not save: ${err}`, src: "guard" }
+        : { t: "ok", text: available ? "Guardrails saved." : "Saved locally only - apply migration 0016 to persist.", src: "guard" }
     );
   }
 
@@ -184,7 +190,7 @@ export default function SettingsWorkspace({ meta }: { meta: Meta }) {
       <h1 className="mt-2 text-2xl">Settings</h1>
       <p className="mt-1 text-muted">Account-level trading configuration.</p>
 
-      {msg && (
+      {msg && !msg.src && (
         <p aria-live="polite" className={`mt-4 text-sm ${msg.t === "ok" ? "text-success" : "text-danger"}`}>
           {msg.text}
         </p>
@@ -261,13 +267,20 @@ export default function SettingsWorkspace({ meta }: { meta: Meta }) {
                   onToggle={() => persist({ warn_on_charts: !settings.warn_on_charts })}
                 />
               </div>
-              <button
-                onClick={saveGuardrails}
-                disabled={savingGuard}
-                className="mt-4 rounded-lg bg-accent px-5 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
-              >
-                {savingGuard ? "Saving..." : "Save guardrails"}
-              </button>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <button
+                  onClick={saveGuardrails}
+                  disabled={savingGuard}
+                  className="rounded-lg bg-accent px-5 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {savingGuard ? "Saving..." : "Save guardrails"}
+                </button>
+                {msg?.src === "guard" && (
+                  <span aria-live="polite" className={`text-sm ${msg.t === "ok" ? "text-success" : "text-danger"}`}>
+                    {msg.text}
+                  </span>
+                )}
+              </div>
             </Section>
 
             <Section
@@ -304,13 +317,20 @@ export default function SettingsWorkspace({ meta }: { meta: Meta }) {
                 </Field>
                 <Field label="Markets traded"><input value={profile.markets} onChange={(e) => setP("markets", e.target.value)} placeholder="FX, indices, gold" className="field" /></Field>
               </div>
-              <button
-                onClick={saveProfile}
-                disabled={savingProfile}
-                className="mt-4 rounded-lg bg-accent px-5 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
-              >
-                {savingProfile ? "Saving..." : "Save trading profile"}
-              </button>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <button
+                  onClick={saveProfile}
+                  disabled={savingProfile}
+                  className="rounded-lg bg-accent px-5 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {savingProfile ? "Saving..." : "Save trading profile"}
+                </button>
+                {msg?.src === "profile" && (
+                  <span aria-live="polite" className={`text-sm ${msg.t === "ok" ? "text-success" : "text-danger"}`}>
+                    {msg.text}
+                  </span>
+                )}
+              </div>
             </Section>
           </>
         )}
