@@ -93,15 +93,6 @@ export default function SnapshotMenu({
     }
   }
 
-  async function openTab() {
-    setOpen(false);
-    const blob = await capture();
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank", "noopener");
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  }
-
   async function copyLink() {
     setOpen(false);
     const link = `${window.location.origin}/trading?tvwidgetsymbol=${encodeURIComponent(tv)}`;
@@ -136,18 +127,6 @@ export default function SnapshotMenu({
     window.dispatchEvent(new CustomEvent("tb:snap-to-sidekick", { detail: { blob } }));
   }
 
-  // The free TradingView embed can't persist drawings (no save/load hooks),
-  // so this jumps to the same symbol on tradingview.com where the user's own
-  // account autosaves them.
-  function openOnTradingView() {
-    setOpen(false);
-    window.open(
-      `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tv)}`,
-      "_blank",
-      "noopener"
-    );
-  }
-
   // Capture-based items are dropped where the Screen Capture API is missing
   // (iOS Safari); the link items work everywhere.
   const items: { label: string; run: () => void; icon: string }[] = [
@@ -160,12 +139,8 @@ export default function SnapshotMenu({
         ]
       : []),
     { label: "Copy chart link", run: copyLink, icon: "M10 14a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5M14 10a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5" },
-    { label: "Open on TradingView (drawings save there)", run: openOnTradingView, icon: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" },
     ...(canSnap
-      ? [
-          { label: "Open image in new tab", run: openTab, icon: "M4 5h16v14H4zM4 15l4-4 3 3 5-6 4 5" },
-          { label: "Post on X (copies image)", run: postOnX, icon: "M4 4l16 16M20 4L4 20" },
-        ]
+      ? [{ label: "Post on X (copies image)", run: postOnX, icon: "M4 4l16 16M20 4L4 20" }]
       : []),
   ];
 
