@@ -62,7 +62,7 @@ export default async function Home({
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div>
             <div className="mb-4 flex flex-wrap gap-1.5">
-              {["Playbooks", "Journal", "Guardrails", "Risk", "Trading", "AI sidekick"].map((tag) => (
+              {["Playbooks", "Journal", "Guardrails", "Risk", "Accounts", "AI sidekick"].map((tag) => (
                 <span
                   key={tag}
                   className="rounded-full border border-border2 px-2.5 py-1 font-mono text-xs text-muted"
@@ -100,7 +100,7 @@ export default async function Home({
               </Link>
             </div>
             <p className="mt-4 font-mono text-xs text-dim">
-              Runs in the browser, on desktop and phone. Your data is yours.
+              Runs in the browser, installs on your phone. Your data is yours.
             </p>
           </div>
 
@@ -196,8 +196,9 @@ export default async function Home({
           {/* The quieter half of the app, one line total. */}
           <Reveal>
             <p className="mt-6 text-sm text-dim">
-              Also inside: a notebook with dictation, market news and the economic calendar,
-              session clocks for four exchanges, and a breathing room for when it gets loud.
+              Also inside: prop-firm account tracking from challenge to funded, each with its
+              own guardrails; a notebook with dictation; market news and the economic calendar;
+              session clocks for four exchanges; and a breathing room for when it gets loud.
             </p>
           </Reveal>
         </div>

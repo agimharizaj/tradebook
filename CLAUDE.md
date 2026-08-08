@@ -44,7 +44,7 @@ The approved look is the dark "terminal" concept in `design/tradebook-brand-conc
 
 ## Current status
 
-- Phase 1 (auth): DONE. Email + password and Google SSO, protected shell, sign out.
+- Phase 1 (auth): DONE. Email + password (Google SSO removed by design, commit 08b6445), protected shell, sign out. Failed auth links (`/login?error=auth`) surface a visible error on the login form.
 - Phase 2 (strategy builder): DONE. `/strategy` with read-only view + Edit mode, drag-reorder, checkboxes tickable in view, entry-model screenshot upload, risk controls, delete confirm modal.
 - Phase 3 (journal): DONE. `/journal` monthly calendar, per-day trade add/list/delete modal, monthly + weekly summaries.
 - Phase 4 (risk calculator): DONE. `/risk` with 3 modes (segmented switcher) and live prices via `/api/fx` (Frankfurter/ECB for fiat, CoinGecko for BTC, gold-api.com for XAU, all keyless). Pure sizing math lives in `src/lib/risk.ts` (lot output floors to 0.01 steps). Changing pair clears entry/SL/lots and prefills entry with the live price.

@@ -54,7 +54,13 @@ function Spinner() {
   );
 }
 
-export default function AuthForm({ mode }: { mode: Mode }) {
+export default function AuthForm({
+  mode,
+  initialError = null,
+}: {
+  mode: Mode;
+  initialError?: string | null;
+}) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -65,7 +71,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [message, setMessage] = useState<string | null>(null);
 
   const siteUrl =
@@ -84,16 +90,25 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     setLoading(true);
     resetFeedback();
 
+    const cleanEmail = email.trim();
+    const cleanFirst = firstName.trim();
+    const cleanLast = lastName.trim();
+
     if (mode === "signup") {
+      if (!cleanFirst) {
+        setError("Enter your first name.");
+        setLoading(false);
+        return;
+      }
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: cleanEmail,
         password,
         options: {
           emailRedirectTo: `${siteUrl}/auth/callback`,
           data: {
-            first_name: firstName,
-            last_name: lastName,
-            display_name: `${firstName} ${lastName}`.trim(),
+            first_name: cleanFirst,
+            last_name: cleanLast,
+            display_name: `${cleanFirst} ${cleanLast}`.trim(),
           },
         },
       });
@@ -109,7 +124,10 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         setMessage("Check your email to confirm your account, then log in.");
       }
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      });
       if (error) {
         setError(friendlyAuthError(error.message));
       } else {
@@ -125,7 +143,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     e.preventDefault();
     setLoading(true);
     resetFeedback();
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${siteUrl}/auth/callback?next=/auth/reset`,
     });
     if (error) setError(friendlyAuthError(error.message));
