@@ -91,6 +91,9 @@ export default function AccountsTab({
   const [pickTo, setPickTo] = useState("");
   // Two-step delete: the confirm shows how many trades will detach.
   const [confirmDelete, setConfirmDelete] = useState<{ account: Account; trades: number } | null>(null);
+  // Two-step wipe of ALL unassigned trades (orphans from deleted accounts).
+  const [confirmWipe, setConfirmWipe] = useState(false);
+  const [wiping, setWiping] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
 
   const load = useCallback(async () => {
@@ -293,6 +296,23 @@ export default function AccountsTab({
     if (getSelectedAccountId() === confirmDelete.account.id) setSelectedAccountId(ALL_ACCOUNTS);
     if (draft?.id === confirmDelete.account.id) setDraft(null);
     setConfirmDelete(null);
+    load();
+  }
+
+  async function deleteUnassigned() {
+    setWiping(true);
+    // Reviews cascade with their trades (FK on delete cascade); this only
+    // ever touches rows with no account.
+    const { error } = await supabase.from("trades").delete().is("account_id", null);
+    setWiping(false);
+    setConfirmWipe(false);
+    if (error) {
+      setMsg(`Could not delete: ${error.message}`);
+      return;
+    }
+    setMsg("Unassigned trades deleted.");
+    setPickList(null);
+    setPicked(new Set());
     load();
   }
 
@@ -517,36 +537,84 @@ export default function AccountsTab({
         </div>
       )}
 
-      {/* unassigned trades */}
-      {unassigned > 0 && accounts.length > 0 && (
+      {confirmWipe && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setConfirmWipe(false);
+          }}
+        >
+          <div className="w-full max-w-sm rounded-2xl bg-card p-6 ring-1 ring-border2">
+            <h3 className="text-base font-medium" style={{ fontFamily: "var(--font-display)" }}>
+              Delete {unassigned} unassigned trade{unassigned === 1 ? "" : "s"}?
+            </h3>
+            <p className="mt-1.5 text-sm text-muted">
+              This permanently deletes every trade with no account, including any journal reviews
+              on them - there is no undo. Trades attached to an account are untouched. To keep
+              them instead, attach them to an account.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmWipe(false)}
+                className="rounded-lg border border-border2 px-3.5 py-2 text-sm text-muted transition hover:text-foreground"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={deleteUnassigned}
+                disabled={wiping}
+                className="rounded-lg bg-danger px-3.5 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+              >
+                {wiping ? "Deleting…" : "Delete permanently"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* unassigned trades: always surfaced when any exist - deleted accounts
+          leave their trades here, and with zero accounts this banner was
+          hidden entirely, silently feeding stats from orphaned data. */}
+      {unassigned > 0 && (
         <div className="rounded-xl border border-gold/40 bg-gold/10 p-3.5">
           <p className="text-sm text-gold">
-            {unassigned} existing {unassigned === 1 ? "trade has" : "trades have"} no account.
+            {unassigned} existing {unassigned === 1 ? "trade has" : "trades have"} no account
+            {accounts.length === 0 ? " (left behind by deleted accounts). They still count in your dashboard and journal." : "."}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <select
-              value={attachTo}
-              onChange={(e) => setAttachTo(e.target.value)}
-              className="field !w-auto !py-1.5 !text-sm"
-              aria-label="Account to attach unassigned trades to"
-            >
-              <option value="">Choose account…</option>
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </select>
+            {accounts.length > 0 && (
+              <>
+                <select
+                  value={attachTo}
+                  onChange={(e) => setAttachTo(e.target.value)}
+                  className="field !w-auto !py-1.5 !text-sm"
+                  aria-label="Account to attach unassigned trades to"
+                >
+                  <option value="">Choose account…</option>
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={attachUnassigned}
+                  disabled={!attachTo}
+                  className="rounded-lg border border-border2 px-3 py-1.5 text-xs font-medium text-muted transition hover:border-accent hover:text-foreground disabled:opacity-50"
+                >
+                  Attach all
+                </button>
+                <button
+                  onClick={() => (pickList ? setPickList(null) : openPicker())}
+                  className="rounded-lg border border-border2 px-3 py-1.5 text-xs font-medium text-muted transition hover:border-accent hover:text-foreground"
+                >
+                  {pickList ? "Hide list" : "Choose trades…"}
+                </button>
+              </>
+            )}
             <button
-              onClick={attachUnassigned}
-              disabled={!attachTo}
-              className="rounded-lg border border-border2 px-3 py-1.5 text-xs font-medium text-muted transition hover:border-accent hover:text-foreground disabled:opacity-50"
+              onClick={() => setConfirmWipe(true)}
+              className="rounded-lg border border-danger/40 px-3 py-1.5 text-xs font-medium text-danger transition hover:bg-danger/10"
             >
-              Attach all
-            </button>
-            <button
-              onClick={() => (pickList ? setPickList(null) : openPicker())}
-              className="rounded-lg border border-border2 px-3 py-1.5 text-xs font-medium text-muted transition hover:border-accent hover:text-foreground"
-            >
-              {pickList ? "Hide list" : "Choose trades…"}
+              Delete unassigned trades…
             </button>
           </div>
 
