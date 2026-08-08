@@ -24,7 +24,9 @@ export default async function Home({
   const sp = await searchParams;
 
   return (
-    <div className="min-h-dvh bg-background text-foreground">
+    // pt clears the phone status bar / Dynamic Island; the app shell has its
+    // own spacer, but public pages render outside it.
+    <div className="min-h-dvh bg-background pt-[env(safe-area-inset-top)] text-foreground">
       {/* Nav */}
       <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 md:px-8">
         <div className="flex items-center gap-2.5">

@@ -130,7 +130,7 @@ export default async function SharedTradePage({
     ) : null;
 
   return (
-    <div className="min-h-dvh bg-background text-foreground">
+    <div className="min-h-dvh bg-background pt-[env(safe-area-inset-top)] text-foreground">
       <header className="mx-auto flex max-w-3xl items-center justify-between px-5 py-5">
         <div className="flex items-center gap-2.5">
           <LogoMark size={28} className="rounded-lg" />
