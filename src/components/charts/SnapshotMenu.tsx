@@ -136,14 +136,37 @@ export default function SnapshotMenu({
     window.dispatchEvent(new CustomEvent("tb:snap-to-sidekick", { detail: { blob } }));
   }
 
+  // The free TradingView embed can't persist drawings (no save/load hooks),
+  // so this jumps to the same symbol on tradingview.com where the user's own
+  // account autosaves them.
+  function openOnTradingView() {
+    setOpen(false);
+    window.open(
+      `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tv)}`,
+      "_blank",
+      "noopener"
+    );
+  }
+
+  // Capture-based items are dropped where the Screen Capture API is missing
+  // (iOS Safari); the link items work everywhere.
   const items: { label: string; run: () => void; icon: string }[] = [
-    { label: "Send to a note", run: sendToNote, icon: "M15.5 3.5a2.12 2.12 0 0 1 3 3L8 17l-4 1 1-4z" },
-    { label: "Ask Sidekick about it", run: askSidekick, icon: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3zM18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" },
-    { label: "Download image", run: download, icon: "M12 3v12M7 10l5 5 5-5M4 21h16" },
-    { label: "Copy image", run: () => void copyImage(), icon: "M8 8h12v12H8zM16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" },
+    ...(canSnap
+      ? [
+          { label: "Send to a note", run: sendToNote, icon: "M15.5 3.5a2.12 2.12 0 0 1 3 3L8 17l-4 1 1-4z" },
+          { label: "Ask Sidekick about it", run: askSidekick, icon: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3zM18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" },
+          { label: "Download image", run: download, icon: "M12 3v12M7 10l5 5 5-5M4 21h16" },
+          { label: "Copy image", run: () => void copyImage(), icon: "M8 8h12v12H8zM16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" },
+        ]
+      : []),
     { label: "Copy chart link", run: copyLink, icon: "M10 14a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5M14 10a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5" },
-    { label: "Open in new tab", run: openTab, icon: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" },
-    { label: "Post on X (copies image)", run: postOnX, icon: "M4 4l16 16M20 4L4 20" },
+    { label: "Open on TradingView (drawings save there)", run: openOnTradingView, icon: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" },
+    ...(canSnap
+      ? [
+          { label: "Open image in new tab", run: openTab, icon: "M4 5h16v14H4zM4 15l4-4 3 3 5-6 4 5" },
+          { label: "Post on X (copies image)", run: postOnX, icon: "M4 4l16 16M20 4L4 20" },
+        ]
+      : []),
   ];
 
   return (
@@ -151,8 +174,8 @@ export default function SnapshotMenu({
       <button
         ref={btnRef}
         onClick={toggleOpen}
-        disabled={busy || !canSnap}
-        title={canSnap ? "Chart snapshot" : "Screen capture isn't supported in this browser"}
+        disabled={busy}
+        title={canSnap ? "Chart snapshot" : "Chart links (capture isn't supported in this browser)"}
         aria-label="Chart snapshot menu"
         aria-expanded={open}
         className={`rounded-lg border px-3 py-2 transition disabled:opacity-50 ${
