@@ -28,6 +28,28 @@ const SPEEDS = [
   { label: "10x", ms: 100 },
 ];
 
+// Bar-time display helpers. All bar times are UTC bar OPENS, so a trade's
+// duration is measured open-bar to close-bar - the finest granularity the
+// replay has.
+function fmtBarTime(ts: number) {
+  return new Date(ts * 1000).toLocaleString("en-GB", {
+    day: "2-digit", month: "short",
+    hour: "2-digit", minute: "2-digit", timeZone: "UTC",
+  });
+}
+
+function fmtDuration(secs: number) {
+  if (secs < 60) return "<1m";
+  const m = Math.round(secs / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  if (h < 24) return mm ? `${h}h ${mm}m` : `${h}h`;
+  const d = Math.floor(h / 24);
+  const hh = h % 24;
+  return hh ? `${d}d ${hh}h` : `${d}d`;
+}
+
 type OpenTrade = {
   direction: "long" | "short";
   entry: number;
@@ -443,6 +465,8 @@ export default function ReplayView({
                 <Row k="Entry" v={openTrade.entry.toFixed(decimals)} />
                 <Row k="Stop" v={openTrade.stop.toFixed(decimals)} />
                 <Row k="Target" v={openTrade.target != null ? openTrade.target.toFixed(decimals) : "none"} />
+                <Row k="Opened" v={`${fmtBarTime(openTrade.enteredAt)} UTC`} />
+                <Row k="Held" v={fmtDuration(bar.t - openTrade.enteredAt)} />
                 <Row
                   k="Open R"
                   v={openR != null ? `${openR >= 0 ? "+" : ""}${openR.toFixed(2)}R` : "-"}
@@ -533,16 +557,27 @@ export default function ReplayView({
           {closed.length > 0 && (
             <div className="rounded-2xl bg-card p-4 ring-1 ring-border">
               <h2 className="text-sm font-medium">Closed trades</h2>
-              <ul className="mt-2 space-y-1.5">
+              <ul className="mt-2 space-y-2.5">
                 {[...closed].reverse().map((t) => (
-                  <li key={t.id} className="flex items-center justify-between text-xs">
-                    <span className="text-muted">
-                      {t.direction === "long" ? "Long" : "Short"} @ <span className="font-mono">{t.entry.toFixed(decimals)}</span>
-                      <span className="ml-1 text-dim">{t.outcome === "tp" ? "target" : t.outcome === "sl" ? "stopped" : "manual"}</span>
-                    </span>
-                    <span className={`font-mono ${((t.r ?? 0) >= 0 ? "text-success" : "text-danger")}`}>
-                      {t.r != null ? `${t.r >= 0 ? "+" : ""}${t.r.toFixed(2)}R` : "-"}
-                    </span>
+                  <li key={t.id} className="text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted">
+                        {t.direction === "long" ? "Long" : "Short"} @ <span className="font-mono">{t.entry.toFixed(decimals)}</span>
+                        <span className="ml-1 text-dim">{t.outcome === "tp" ? "target" : t.outcome === "sl" ? "stopped" : "manual"}</span>
+                      </span>
+                      <span className={`font-mono ${((t.r ?? 0) >= 0 ? "text-success" : "text-danger")}`}>
+                        {t.r != null ? `${t.r >= 0 ? "+" : ""}${t.r.toFixed(2)}R` : "-"}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 flex items-center justify-between text-[11px] text-dim">
+                      <span className="font-mono">
+                        {fmtBarTime(t.enteredAt)}
+                        {t.exitedAt != null && ` to ${fmtBarTime(t.exitedAt)}`} UTC
+                      </span>
+                      {t.exitedAt != null && (
+                        <span className="font-mono">{fmtDuration(t.exitedAt - t.enteredAt)}</span>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
