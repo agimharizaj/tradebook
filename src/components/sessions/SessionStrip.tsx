@@ -2,7 +2,7 @@
 
 // Compact market-session chips for the trading-day panel: one chip per
 // market with a live open/closed dot, reusing the same indicative hours and
-// DST-safe zone math as the full MarketClocks section on /news#sessions.
+// DST-safe zone math as the full MarketClocks section on /news?tab=sessions.
 import { useEffect, useState } from "react";
 import { MARKETS, sessionStatus, zoneParts } from "@/components/sessions/MarketClocks";
 

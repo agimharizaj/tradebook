@@ -446,13 +446,13 @@ export default function TradingDayPanel({
           ))}
       </div>
 
-      {/* market sessions: who's open right now (full clocks live on /news#sessions) */}
+      {/* market sessions: who's open right now (full clocks live on /news?tab=sessions) */}
       <div className="border-b border-border px-4 py-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium uppercase tracking-wide text-muted">
             Market sessions
           </span>
-          <Link href="/news#sessions" className="text-[11px] text-accent2 hover:underline">
+          <Link href="/news?tab=sessions" className="text-[11px] text-accent2 hover:underline">
             Clocks + converter
           </Link>
         </div>

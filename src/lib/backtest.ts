@@ -10,15 +10,24 @@ export type Candle = {
   c: number;
 };
 
-export type Timeframe = "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+// Full set both data providers can serve (intersection of Twelve Data and
+// Binance intervals - that's the real constraint, not a UI choice; 3m and 45m
+// exist on only one side each, so they're out).
+export type Timeframe =
+  | "1m" | "5m" | "15m" | "30m"
+  | "1h" | "2h" | "4h"
+  | "1d" | "1w";
 
 export const TIMEFRAMES: { id: Timeframe; label: string; seconds: number }[] = [
   { id: "1m", label: "1 minute", seconds: 60 },
   { id: "5m", label: "5 minutes", seconds: 300 },
   { id: "15m", label: "15 minutes", seconds: 900 },
+  { id: "30m", label: "30 minutes", seconds: 1800 },
   { id: "1h", label: "1 hour", seconds: 3600 },
+  { id: "2h", label: "2 hours", seconds: 7200 },
   { id: "4h", label: "4 hours", seconds: 14400 },
   { id: "1d", label: "Daily", seconds: 86400 },
+  { id: "1w", label: "Weekly", seconds: 604800 },
 ];
 
 export const tfSeconds = (tf: Timeframe) =>

@@ -11,12 +11,14 @@ export const dynamic = "force-dynamic";
 // (migration 0021) so repeat replays cost zero quota. Cache read/write both
 // degrade gracefully when the migration is missing.
 
-const TF_IDS: Timeframe[] = ["1m", "5m", "15m", "1h", "4h", "1d"];
+const TF_IDS: Timeframe[] = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d", "1w"];
 const TD_INTERVAL: Record<Timeframe, string> = {
-  "1m": "1min", "5m": "5min", "15m": "15min", "1h": "1h", "4h": "4h", "1d": "1day",
+  "1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min",
+  "1h": "1h", "2h": "2h", "4h": "4h", "1d": "1day", "1w": "1week",
 };
 const BINANCE_INTERVAL: Record<Timeframe, string> = {
-  "1m": "1m", "5m": "5m", "15m": "15m", "1h": "1h", "4h": "4h", "1d": "1d",
+  "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m",
+  "1h": "1h", "2h": "2h", "4h": "4h", "1d": "1d", "1w": "1w",
 };
 
 // Cryptos in the pair catalog, mapped to Binance USDT symbols.

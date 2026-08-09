@@ -31,17 +31,40 @@ function useAppTheme() {
   return theme;
 }
 
+// Tabs, deep-linkable via ?tab= like Settings (/sessions redirects to
+// ?tab=sessions, the trading-day panel links here too). Widgets mount per
+// tab on purpose: TradingView embeds missize inside display:none.
+const TABS = [
+  { id: "news", label: "News & calendar" },
+  { id: "sessions", label: "Market sessions" },
+  { id: "heatmap", label: "Heatmap" },
+] as const;
+type TabId = (typeof TABS)[number]["id"];
+
 export default function NewsPage() {
   const theme = useAppTheme();
   const mobile = useIsMobile();
   const tall = mobile ? 480 : 720;
+  const [tab, setTab] = useState<TabId>("news");
   // TradingView's calendar always lists upcoming events; the one filter it
   // supports from outside is importance, so that's the toggle we expose.
   const [highOnly, setHighOnly] = useState(false);
   // Send widget symbol clicks to our own Trading page instead of tradingview.com.
   const [origin, setOrigin] = useState("");
-  useEffect(() => setOrigin(window.location.origin), []);
+  useEffect(() => {
+    setOrigin(window.location.origin);
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t && TABS.some((x) => x.id === t)) setTab(t as TabId);
+  }, []);
   const largeChartUrl = origin ? `${origin}/trading` : undefined;
+
+  function pickTab(id: TabId) {
+    setTab(id);
+    // Keep the URL shareable/refreshable without a navigation.
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", id);
+    window.history.replaceState(null, "", url);
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
@@ -70,72 +93,93 @@ export default function NewsPage() {
         />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl bg-card p-4 ring-1 ring-border">
-          <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">Market news</h2>
-          <NewsFeed height={tall} />
-        </div>
+      <div
+        className="mt-5 inline-flex items-center gap-0.5 rounded-xl border border-border2 bg-surface2/60 p-1"
+        role="tablist"
+        aria-label="News sections"
+      >
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => pickTab(t.id)}
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+              tab === t.id ? "bg-accent text-white" : "text-muted hover:text-foreground"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-        <div className="rounded-2xl bg-card p-3 ring-1 ring-border">
-          <div className="mb-2 flex items-center justify-between gap-2 px-1 pt-1">
-            <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Economic calendar</h2>
-            <div
-              className="flex items-center gap-0.5 rounded-lg border border-border2 bg-surface2/60 p-0.5"
-              role="group"
-              aria-label="Event importance"
-            >
-              {([
-                { on: false, label: "All impact" },
-                { on: true, label: "High only" },
-              ] as const).map((o) => (
-                <button
-                  key={o.label}
-                  onClick={() => setHighOnly(o.on)}
-                  className={`rounded-md px-2 py-1 text-xs font-medium transition ${
-                    highOnly === o.on ? "bg-accent text-white" : "text-muted hover:text-foreground"
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
+      {tab === "news" && (
+        <div className="mt-5 grid gap-6 lg:grid-cols-2">
+          <div className="rounded-2xl bg-card p-4 ring-1 ring-border">
+            <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">Market news</h2>
+            <NewsFeed height={tall} />
           </div>
+
+          <div className="rounded-2xl bg-card p-3 ring-1 ring-border">
+            <div className="mb-2 flex items-center justify-between gap-2 px-1 pt-1">
+              <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Economic calendar</h2>
+              <div
+                className="flex items-center gap-0.5 rounded-lg border border-border2 bg-surface2/60 p-0.5"
+                role="group"
+                aria-label="Event importance"
+              >
+                {([
+                  { on: false, label: "All impact" },
+                  { on: true, label: "High only" },
+                ] as const).map((o) => (
+                  <button
+                    key={o.label}
+                    onClick={() => setHighOnly(o.on)}
+                    className={`rounded-md px-2 py-1 text-xs font-medium transition ${
+                      highOnly === o.on ? "bg-accent text-white" : "text-muted hover:text-foreground"
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <TVWidget
+              src="https://s3.tradingview.com/external-embedding/embed-widget-events.js"
+              height={tall}
+              config={{
+                colorTheme: theme,
+                isTransparent: false,
+                locale: "en",
+                importanceFilter: highOnly ? "1" : "0,1",
+                currencyFilter: "USD,EUR,GBP,JPY,AUD,CAD,CHF,NZD",
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {tab === "sessions" && (
+        <div className="mt-5">
+          <MarketClocks />
+        </div>
+      )}
+
+      {tab === "heatmap" && (
+        <div className="mt-5 rounded-2xl bg-card p-3 ring-1 ring-border">
           <TVWidget
-            src="https://s3.tradingview.com/external-embedding/embed-widget-events.js"
-            height={tall}
+            src="https://s3.tradingview.com/external-embedding/embed-widget-forex-heat-map.js"
+            height={mobile ? 420 : 560}
             config={{
-              colorTheme: theme,
+              currencies: ["EUR", "USD", "JPY", "GBP", "CHF", "AUD", "CAD", "NZD"],
               isTransparent: false,
+              colorTheme: theme,
               locale: "en",
-              importanceFilter: highOnly ? "1" : "0,1",
-              currencyFilter: "USD,EUR,GBP,JPY,AUD,CAD,CHF,NZD",
+              largeChartUrl,
             }}
           />
         </div>
-      </div>
-
-      {/* Market sessions (moved here from the old /sessions page; that route
-          redirects to /news#sessions). MarketClocks draws its own cards, so
-          no wrapper card - just the section heading and anchor. */}
-      <div id="sessions" className="mt-8 scroll-mt-6">
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">Market sessions</h2>
-        <MarketClocks />
-      </div>
-
-      <div className="mt-6 rounded-2xl bg-card p-3 ring-1 ring-border">
-        <h2 className="mb-2 px-1 pt-1 text-sm font-medium uppercase tracking-wide text-muted">Forex heatmap</h2>
-        <TVWidget
-          src="https://s3.tradingview.com/external-embedding/embed-widget-forex-heat-map.js"
-          height={mobile ? 360 : 420}
-          config={{
-            currencies: ["EUR", "USD", "JPY", "GBP", "CHF", "AUD", "CAD", "NZD"],
-            isTransparent: false,
-            colorTheme: theme,
-            locale: "en",
-            largeChartUrl,
-          }}
-        />
-      </div>
+      )}
     </div>
   );
 }
