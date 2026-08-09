@@ -59,9 +59,33 @@ type Replay = {
 const isMissingTable = (e: { code?: string; message?: string } | null) =>
   !!e && (e.code === "42P01" || (e.message ?? "").includes("does not exist"));
 
+// Symbols the free Twelve Data plan refuses (their error says "available
+// starting with the Grow or Venture plan"). Known ones are seeded; any new
+// rejection is learned at runtime and remembered in localStorage.
+const UNAVAILABLE_KEY = "tb_bt_unavailable";
+const KNOWN_UNAVAILABLE = ["XAG/USD"];
+const isPlanError = (msg: string) => /grow or venture|consider upgrading/i.test(msg);
+
 export default function BacktestWorkspace() {
   const supabase = useMemo(() => createClient(), []);
-  const watchlist = usePairs().filter((p) => p.includes("/")); // indices/energy have no candle source yet
+  const allPairs = usePairs().filter((p) => p.includes("/")); // indices/energy have no candle source yet
+
+  const [unavailable, setUnavailable] = useState<string[]>(KNOWN_UNAVAILABLE);
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(UNAVAILABLE_KEY) || "[]") as string[];
+      setUnavailable((u) => [...new Set([...u, ...stored])]);
+    } catch {}
+  }, []);
+  function markUnavailable(p: string) {
+    setUnavailable((prev) => {
+      const next = [...new Set([...prev, p])];
+      try { localStorage.setItem(UNAVAILABLE_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }
+  const watchlist = allPairs.filter((p) => !unavailable.includes(p));
+  const unavailableInWatchlist = allPairs.filter((p) => unavailable.includes(p));
 
   const [uid, setUid] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
@@ -172,12 +196,17 @@ export default function BacktestWorkspace() {
     const r = await fetch(`/api/candles?pair=${encodeURIComponent(p)}&tf=${t}&from=${encodeURIComponent(from)}`);
     const j = await r.json();
     if (!r.ok) {
+      const msg = typeof j?.error === "string" ? j.error : "";
+      if (isPlanError(msg)) {
+        markUnavailable(p);
+        throw new Error(`${p} isn't available on the free data plan, so it's been removed from the backtest pair list.`);
+      }
       throw new Error(
         j?.error === "missing_key"
           ? j.message
           : j?.error === "rate_limited"
             ? "Data provider rate limit hit. Wait a minute and try again."
-            : j?.error ?? "Could not load candles."
+            : msg || "Could not load candles."
       );
     }
     return j.candles as Candle[];
@@ -391,6 +420,11 @@ export default function BacktestWorkspace() {
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Pair">
             <PairPicker pairs={watchlist} value={pair} onChange={setPair} className="input" />
+            {unavailableInWatchlist.length > 0 && (
+              <span className="mt-1 block text-xs text-dim">
+                {unavailableInWatchlist.join(", ")} not available on the free data plan.
+              </span>
+            )}
           </Field>
           <Field label="Timeframe">
             <select value={tf} onChange={(e) => setTf(e.target.value as Timeframe)} className="input">
