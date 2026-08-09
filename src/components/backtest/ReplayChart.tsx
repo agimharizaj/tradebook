@@ -27,11 +27,15 @@ export default function ReplayChart({
   revealIndex,
   openTrade,
   closedTrades,
+  onPriceClick,
 }: {
   candles: Candle[];
   revealIndex: number; // inclusive
   openTrade: { entry: number; stop: number; target: number | null } | null;
   closedTrades: BtTrade[];
+  // When set, a click on the chart reports the price at the cursor (used by
+  // the trade form to fill entry/stop/target from the chart).
+  onPriceClick?: (price: number) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -39,6 +43,10 @@ export default function ReplayChart({
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const linesRef = useRef<IPriceLine[]>([]);
   const lastIndexRef = useRef(-1);
+  // Ref so the click subscription (registered once) always sees the latest
+  // callback without re-creating the chart.
+  const onPriceClickRef = useRef(onPriceClick);
+  onPriceClickRef.current = onPriceClick;
 
   // Chart lifecycle.
   useEffect(() => {
@@ -78,6 +86,12 @@ export default function ReplayChart({
     seriesRef.current = series;
     markersRef.current = createSeriesMarkers(series, []);
     lastIndexRef.current = -1;
+    chart.subscribeClick((param) => {
+      const cb = onPriceClickRef.current;
+      if (!cb || !param.point) return;
+      const price = series.coordinateToPrice(param.point.y);
+      if (price != null) cb(price);
+    });
     return () => {
       chart.remove();
       chartRef.current = null;
