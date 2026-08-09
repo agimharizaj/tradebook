@@ -461,7 +461,6 @@ export default function BacktestWorkspace() {
             className="accent-[#6A58F0]"
           />
           Save this session
-          {!saveSession && <span className="text-xs text-dim">- throwaway practice, nothing stored</span>}
         </label>
         <div className="mt-4 flex items-center gap-3">
           <button
