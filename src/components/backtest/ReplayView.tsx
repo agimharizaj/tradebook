@@ -97,6 +97,15 @@ export default function ReplayView({
   // prefilled with the bar close.
   const [armed, setArmed] = useState<"entry" | "stop" | "target">("stop");
 
+  // Hide the Sidekick dock bar while replaying - it overlaps the transport
+  // controls and gets in the way of the work (body[data-replay] in globals.css).
+  useEffect(() => {
+    document.body.dataset.replay = "1";
+    return () => {
+      delete document.body.dataset.replay;
+    };
+  }, []);
+
   const bar = candles[idx];
   const decimals = priceDecimalsFor(pair);
   const atEnd = idx >= candles.length - 1;

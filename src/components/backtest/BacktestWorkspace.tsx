@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import PairPicker from "@/components/PairPicker";
+import AccountSwitcher from "@/components/AccountSwitcher";
+import { ALL_ACCOUNTS, fetchAccounts, useSelectedAccount, type Account } from "@/lib/accounts";
 import { usePairs } from "@/lib/usePairs";
 import {
   computeStats,
@@ -62,7 +64,12 @@ export default function BacktestWorkspace() {
   const [uid, setUid] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [tradesBySession, setTradesBySession] = useState<Record<string, BtTrade[]>>({});
-  const [strategies, setStrategies] = useState<{ id: string; name: string }[]>([]);
+  const [strategies, setStrategies] = useState<
+    { id: string; name: string; risk_per_trade_pct: string | null }[]
+  >([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selAccount] = useSelectedAccount();
+  const profileDefaults = useRef<{ size?: string; risk?: string }>({});
   const [tablesOk, setTablesOk] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,13 +103,21 @@ export default function BacktestWorkspace() {
     if (!user) return;
     setUid(user.id);
     const m = (user.user_metadata ?? {}) as Record<string, unknown>;
-    if (typeof m.account_size === "string" && m.account_size) setBalance(m.account_size.replace(/,/g, ""));
-    if (typeof m.default_risk_pct === "string" && m.default_risk_pct) setRiskPct(m.default_risk_pct);
+    if (typeof m.account_size === "string" && m.account_size) {
+      profileDefaults.current.size = m.account_size.replace(/,/g, "");
+      setBalance(profileDefaults.current.size);
+    }
+    if (typeof m.default_risk_pct === "string" && m.default_risk_pct) {
+      profileDefaults.current.risk = m.default_risk_pct;
+      setRiskPct(m.default_risk_pct);
+    }
 
-    const [sess, strat] = await Promise.all([
+    const [sess, strat, acc] = await Promise.all([
       supabase.from("backtest_sessions").select("*").order("created_at", { ascending: false }),
-      supabase.from("strategies").select("id,name").order("sort_order"),
+      supabase.from("strategies").select("id,name,risk_per_trade_pct").order("sort_order"),
+      fetchAccounts(supabase),
     ]);
+    setAccounts(acc.accounts);
     if (sess.error) {
       if (isMissingTable(sess.error)) setTablesOk(false);
     } else {
@@ -125,6 +140,28 @@ export default function BacktestWorkspace() {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Selected prop-firm account prefills the balance (same pattern as the
+  // risk calculator); "All accounts" falls back to the trading profile.
+  const selectedAccount = useMemo(
+    () => (selAccount === ALL_ACCOUNTS ? null : accounts.find((a) => a.id === selAccount) ?? null),
+    [accounts, selAccount]
+  );
+  useEffect(() => {
+    if (selectedAccount?.size != null) setBalance(String(selectedAccount.size));
+    else if (profileDefaults.current.size) setBalance(profileDefaults.current.size);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccount?.id]);
+
+  // Picking a plan pulls its risk-per-trade setting; "No plan" restores the
+  // profile default.
+  useEffect(() => {
+    const strat = strategies.find((s) => s.id === strategyId);
+    const raw = strat?.risk_per_trade_pct?.replace("%", "").trim();
+    if (raw && Number.isFinite(parseFloat(raw))) setRiskPct(raw);
+    else if (profileDefaults.current.risk) setRiskPct(profileDefaults.current.risk);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [strategyId]);
 
   async function fetchCandles(p: string, t: Timeframe, fromSec: number): Promise<Candle[]> {
     const from = new Date(fromSec * 1000).toISOString();
@@ -334,7 +371,10 @@ export default function BacktestWorkspace() {
 
       {/* New session */}
       <div className="mt-6 rounded-2xl bg-card p-6 ring-1 ring-border">
-        <h2 className="font-medium">New replay session</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-medium">New replay session</h2>
+          <AccountSwitcher />
+        </div>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Pair">
             <PairPicker pairs={watchlist} value={pair} onChange={setPair} className="input" />

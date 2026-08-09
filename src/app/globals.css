@@ -283,3 +283,9 @@ input[type="time"] {
 body[data-editing="1"] .sk-dock-launcher {
   display: none;
 }
+
+/* Backtest replay: the dock bar sits over the transport controls, so hide it
+   while a replay is on screen (flag set by ReplayView). */
+body[data-replay="1"] .sk-dock-launcher {
+  display: none;
+}
