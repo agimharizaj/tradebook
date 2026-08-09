@@ -49,6 +49,7 @@ export default function NewsPage() {
   // TradingView's calendar always lists upcoming events; the one filter it
   // supports from outside is importance, so that's the toggle we expose.
   const [highOnly, setHighOnly] = useState(false);
+  const [heatView, setHeatView] = useState<"pct" | "rates">("pct");
   // Send widget symbol clicks to our own Trading page instead of tradingview.com.
   const [origin, setOrigin] = useState("");
   useEffect(() => {
@@ -167,17 +168,47 @@ export default function NewsPage() {
 
       {tab === "heatmap" && (
         <div className="mt-5 rounded-2xl bg-card p-3 ring-1 ring-border">
-          <TVWidget
-            src="https://s3.tradingview.com/external-embedding/embed-widget-forex-heat-map.js"
-            height={mobile ? 420 : 560}
-            config={{
-              currencies: ["EUR", "USD", "JPY", "GBP", "CHF", "AUD", "CAD", "NZD"],
-              isTransparent: false,
-              colorTheme: theme,
-              locale: "en",
-              largeChartUrl,
-            }}
-          />
+          {/* Same currency grid, two views: % change (heat map) or the raw
+              quoted rates (cross rates). TradingView widgets are iframes, so
+              the values can't live in one grid - hence the toggle. */}
+          <div className="mb-3 flex gap-1 rounded-xl border border-border2 bg-background p-1 w-fit">
+            {([["pct", "% change"], ["rates", "Rates"]] as const).map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => setHeatView(id)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  heatView === id ? "bg-accent text-white" : "text-muted hover:text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {heatView === "pct" ? (
+            <TVWidget
+              src="https://s3.tradingview.com/external-embedding/embed-widget-forex-heat-map.js"
+              height={mobile ? 420 : 560}
+              config={{
+                currencies: ["EUR", "USD", "JPY", "GBP", "CHF", "AUD", "CAD", "NZD"],
+                isTransparent: false,
+                colorTheme: theme,
+                locale: "en",
+                largeChartUrl,
+              }}
+            />
+          ) : (
+            <TVWidget
+              src="https://s3.tradingview.com/external-embedding/embed-widget-forex-cross-rates.js"
+              height={mobile ? 420 : 560}
+              config={{
+                currencies: ["EUR", "USD", "JPY", "GBP", "CHF", "AUD", "CAD", "NZD"],
+                isTransparent: false,
+                colorTheme: theme,
+                locale: "en",
+                largeChartUrl,
+              }}
+            />
+          )}
         </div>
       )}
     </div>
