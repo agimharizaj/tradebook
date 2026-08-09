@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import TVWidget from "@/components/TVWidget";
 import NewsFeed from "@/components/news/NewsFeed";
+import MarketClocks from "@/components/sessions/MarketClocks";
 
 // Shorter embeds on phones so the page doesn't become a 2000px scroll.
 function useIsMobile() {
@@ -45,7 +46,7 @@ export default function NewsPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
       <h1 className="text-2xl">News</h1>
-      <p className="mt-1 text-muted">Live market headlines, calendar, and cross-rates.</p>
+      <p className="mt-1 text-muted">Live market headlines, calendar, sessions, and cross-rates.</p>
 
       <div className="mt-5 overflow-hidden rounded-2xl ring-1 ring-border">
         <TVWidget
@@ -111,6 +112,14 @@ export default function NewsPage() {
             }}
           />
         </div>
+      </div>
+
+      {/* Market sessions (moved here from the old /sessions page; that route
+          redirects to /news#sessions). MarketClocks draws its own cards, so
+          no wrapper card - just the section heading and anchor. */}
+      <div id="sessions" className="mt-8 scroll-mt-6">
+        <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">Market sessions</h2>
+        <MarketClocks />
       </div>
 
       <div className="mt-6 rounded-2xl bg-card p-3 ring-1 ring-border">

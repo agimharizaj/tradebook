@@ -24,6 +24,7 @@ import PairFlag from "@/components/PairFlag";
 import { usePairs } from "@/lib/usePairs";
 import { tvSymbolFor } from "@/lib/pairs";
 import AccountSwitcher from "@/components/AccountSwitcher";
+import SessionStrip from "@/components/sessions/SessionStrip";
 import {
   ALL_ACCOUNTS,
   effectiveGuardrails,
@@ -443,6 +444,21 @@ export default function TradingDayPanel({
               {v.kind === "max_loss" ? "Max daily loss hit. Stop trading for today." : v.label}
             </p>
           ))}
+      </div>
+
+      {/* market sessions: who's open right now (full clocks live on /news#sessions) */}
+      <div className="border-b border-border px-4 py-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted">
+            Market sessions
+          </span>
+          <Link href="/news#sessions" className="text-[11px] text-accent2 hover:underline">
+            Clocks + converter
+          </Link>
+        </div>
+        <div className="mt-2">
+          <SessionStrip />
+        </div>
       </div>
 
       {/* today's news: aware of the day before trading it */}

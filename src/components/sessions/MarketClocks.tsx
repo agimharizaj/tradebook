@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 // all times come from Intl with explicit IANA zones, so DST is handled by
 // the browser and nothing here needs a server or a library.
 
-type Market = {
+export type Market = {
   name: string;
   tz: string;
   // Indicative session hours in the market's LOCAL time, minutes from 00:00.
@@ -15,7 +15,7 @@ type Market = {
   note: string;
 };
 
-const MARKETS: Market[] = [
+export const MARKETS: Market[] = [
   { name: "Sydney", tz: "Australia/Sydney", open: 7 * 60, close: 16 * 60, note: "AUD, NZD" },
   { name: "Tokyo", tz: "Asia/Tokyo", open: 9 * 60, close: 18 * 60, note: "JPY, Asia FX" },
   { name: "London", tz: "Europe/London", open: 8 * 60, close: 16 * 60 + 30, note: "GBP, EUR, XAU" },
@@ -24,7 +24,7 @@ const MARKETS: Market[] = [
 
 const WDS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-function zoneParts(date: Date, tz: string) {
+export function zoneParts(date: Date, tz: string) {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: tz,
     year: "numeric",
@@ -62,7 +62,7 @@ function wallToUtc(tz: string, y: number, mo: number, d: number, h: number, mi: 
 }
 
 // Session state at a given zone-local weekday + minutes.
-function sessionStatus(m: Market, wd: number, mins: number): { open: boolean; minsTo: number } {
+export function sessionStatus(m: Market, wd: number, mins: number): { open: boolean; minsTo: number } {
   const weekday = wd >= 1 && wd <= 5;
   if (weekday && mins >= m.open && mins < m.close) return { open: true, minsTo: m.close - mins };
   if (weekday && mins < m.open) return { open: false, minsTo: m.open - mins };

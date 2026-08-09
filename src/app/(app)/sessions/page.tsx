@@ -1,17 +1,9 @@
-import MarketClocks from "@/components/sessions/MarketClocks";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Sessions · Tradebook" };
+export const dynamic = "force-dynamic";
 
-export default function SessionsPage() {
-  return (
-    <div className="mx-auto max-w-5xl px-4 py-6 md:px-8 md:py-8">
-      <h1 className="text-2xl">Sessions</h1>
-      <p className="mt-1 text-sm text-muted">
-        Market clocks, what&apos;s open right now, and a converter between the majors.
-      </p>
-      <div className="mt-6">
-        <MarketClocks />
-      </div>
-    </div>
-  );
+// The Sessions page merged into News (Aug 2026). Old links land here and get
+// carried to the Market sessions section; the hash survives the redirect.
+export default function SessionsRedirect() {
+  redirect("/news#sessions");
 }
