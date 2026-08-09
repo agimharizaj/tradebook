@@ -43,7 +43,10 @@ export default async function AppLayout({
           aria-hidden="true"
           className="hidden shrink-0 bg-background pt-[env(safe-area-inset-top)] md:!hidden [@media(display-mode:standalone)]:block"
         />
-        <main className="flex-1 overflow-y-auto bg-bg2">{children}</main>
+        {/* Mobile bottom padding clears the fixed tab bar. */}
+        <main className="flex-1 overflow-y-auto bg-bg2 pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-0">
+          {children}
+        </main>
         <MobileNav />
         <SidekickDock />
         <TutorialTour />
