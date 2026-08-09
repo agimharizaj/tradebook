@@ -305,7 +305,9 @@ export default function ReplayView({
   });
 
   return (
-    <div className="flex h-full flex-col gap-4 px-4 py-6 md:px-8">
+    // Mobile: a normal scrolling page (fixed-height chart, panels stack
+    // below). Desktop (lg+): viewport-locked two-column layout.
+    <div className="flex flex-col gap-4 px-4 py-6 md:px-8 lg:h-full">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -374,10 +376,10 @@ export default function ReplayView({
         )}
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[1fr_300px]">
+      <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[1fr_300px]">
         {/* Chart + transport */}
-        <div className="flex min-h-0 flex-col gap-3">
-          <div className="min-h-[320px] flex-1 overflow-hidden rounded-2xl bg-card p-2 ring-1 ring-border">
+        <div className="flex flex-col gap-3 lg:min-h-0">
+          <div className="h-[45vh] min-h-[280px] overflow-hidden rounded-2xl bg-card p-2 ring-1 ring-border lg:h-auto lg:min-h-[320px] lg:flex-1">
             <ReplayChart
               candles={candles}
               revealIndex={idx}
@@ -426,7 +428,7 @@ export default function ReplayView({
         </div>
 
         {/* Side panel */}
-        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto">
+        <div className="flex flex-col gap-4 lg:min-h-0 lg:overflow-y-auto">
           {/* Trade panel */}
           <div className="rounded-2xl bg-card p-4 ring-1 ring-border">
             <div className="flex items-center justify-between">
