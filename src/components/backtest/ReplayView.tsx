@@ -50,6 +50,7 @@ export default function ReplayView({
   criteria,
   initialTrades,
   persisted,
+  notSavingNote,
   watchlist,
   onSwitch,
   onExit,
@@ -67,6 +68,7 @@ export default function ReplayView({
   criteria: string[];
   initialTrades: BtTrade[];
   persisted: boolean;
+  notSavingNote: string | null;
   watchlist: string[];
   onSwitch: (next: { pair: string; tf: Timeframe; date: string }) => void;
   onExit: () => void;
@@ -317,7 +319,7 @@ export default function ReplayView({
           <p className="mt-0.5 text-xs text-dim">
             {strategyName ? `Plan: ${strategyName} · ` : ""}
             Risk {riskPct}% of {startingBalance.toLocaleString()} per trade (flat)
-            {!persisted && " · not saving (apply migration 0021)"}
+            {notSavingNote && ` · ${notSavingNote}`}
             {saveError && " · save failed, session continues in-memory"}
           </p>
         </div>

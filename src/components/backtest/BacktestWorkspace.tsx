@@ -53,6 +53,7 @@ type Replay = {
   strategyName: string | null;
   criteria: string[];
   initialTrades: BtTrade[];
+  notSavingNote: string | null;
 };
 
 const isMissingTable = (e: { code?: string; message?: string } | null) =>
@@ -91,6 +92,8 @@ export default function BacktestWorkspace() {
   const [balance, setBalance] = useState("10000");
   const [riskPct, setRiskPct] = useState("1");
   const [name, setName] = useState("");
+  // Off = throwaway practice: no session row, no trades stored.
+  const [saveSession, setSaveSession] = useState(true);
 
   useEffect(() => {
     if (watchlist.length && !watchlist.includes(pair)) setPair(watchlist[0]);
@@ -201,6 +204,7 @@ export default function BacktestWorkspace() {
     strategyId: string | null;
     strategyName: string | null;
     sessionName: string | null;
+    save: boolean;
   }) {
     setError(null);
     setStarting(true);
@@ -217,7 +221,7 @@ export default function BacktestWorkspace() {
 
       let sessionId: string | null = null;
       let persisted = false;
-      if (tablesOk) {
+      if (tablesOk && opts.save) {
         const { data: auth } = await supabase.auth.getUser();
         const { data, error: insErr } = await supabase
           .from("backtest_sessions")
@@ -256,6 +260,11 @@ export default function BacktestWorkspace() {
         strategyName: opts.strategyName,
         criteria,
         initialTrades: [],
+        notSavingNote: persisted
+          ? null
+          : !opts.save
+            ? "practice run - not saved"
+            : "not saving (apply migration 0021)",
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start the session.");
@@ -274,6 +283,7 @@ export default function BacktestWorkspace() {
       strategyId: strat?.id ?? null,
       strategyName: strat?.name ?? null,
       sessionName: name.trim() || null,
+      save: saveSession,
     });
   }
 
@@ -291,6 +301,7 @@ export default function BacktestWorkspace() {
       strategyId: cur.strategyId,
       strategyName: cur.strategyName,
       sessionName: null,
+      save: cur.persisted, // an unsaved practice run stays unsaved after a switch
     });
     loadAll();
   }
@@ -323,6 +334,7 @@ export default function BacktestWorkspace() {
         strategyName: s.strategy_name,
         criteria,
         initialTrades: tradesBySession[s.id] ?? [],
+        notSavingNote: null,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not open the session.");
@@ -407,6 +419,16 @@ export default function BacktestWorkspace() {
             <input value={name} onChange={(e) => setName(e.target.value)} className="input" placeholder="e.g. London breakout Jan-Mar" />
           </Field>
         </div>
+        <label className="mt-4 flex w-fit cursor-pointer items-center gap-2 text-sm text-muted">
+          <input
+            type="checkbox"
+            checked={saveSession}
+            onChange={(e) => setSaveSession(e.target.checked)}
+            className="accent-[#6A58F0]"
+          />
+          Save this session
+          {!saveSession && <span className="text-xs text-dim">- throwaway practice, nothing stored</span>}
+        </label>
         <div className="mt-4 flex items-center gap-3">
           <button
             onClick={startSession}
