@@ -14,18 +14,24 @@ import {
 } from "@/lib/backtest";
 import ReplayChart from "@/components/backtest/ReplayChart";
 import PairPicker from "@/components/PairPicker";
+import { sizeFromRisk, quoteCurrency, isCrypto } from "@/lib/risk";
 
 // The replay screen: chart, playback controls, trade panel, live stats and
 // (optionally) the selected strategy's entry checklist. PnL uses flat risk on
 // the starting balance; trades persist to backtest_trades when the migration
 // is applied, otherwise the session runs in-memory with a notice.
 
+// step > 1 advances several bars per tick (timers below ~50ms are unreliable
+// in browsers, so raw interval speed tops out around 20x). advance() still
+// resolves the open trade bar by bar, so no stop hit is ever skipped.
 const SPEEDS = [
-  { label: "0.5x", ms: 2000 },
-  { label: "1x", ms: 1000 },
-  { label: "2x", ms: 500 },
-  { label: "5x", ms: 200 },
-  { label: "10x", ms: 100 },
+  { label: "0.5x", ms: 2000, step: 1 },
+  { label: "1x", ms: 1000, step: 1 },
+  { label: "2x", ms: 500, step: 1 },
+  { label: "5x", ms: 200, step: 1 },
+  { label: "10x", ms: 100, step: 1 },
+  { label: "20x", ms: 50, step: 1 },
+  { label: "50x", ms: 100, step: 5 },
 ];
 
 // Bar-time display helpers. All bar times are UTC bar OPENS, so a trade's
@@ -172,6 +178,19 @@ export default function ReplayView({
 
   const riskAmount = (startingBalance * riskPct) / 100;
 
+  // Position size for an entry/stop at the session's flat risk, via the same
+  // math as the risk calculator. Replay has no historical FX conversion, so
+  // this assumes the account is denominated in the pair's QUOTE currency -
+  // exact for a USD account on */USD pairs, approximate otherwise.
+  const lotsFor = useCallback(
+    (entry: number, stop: number) =>
+      sizeFromRisk({ accountSize: startingBalance, riskPct, entry, stop, pair, conversion: 1 }),
+    [startingBalance, riskPct, pair]
+  );
+  const sizeUnit = isCrypto(pair) ? pair.split("/")[0] : "lots";
+  const fmtMoney = (n: number) =>
+    `${n >= 0 ? "+" : ""}${n.toLocaleString(undefined, { maximumFractionDigits: Math.abs(n) < 100 ? 1 : 0 })}`;
+
   const closeTrade = useCallback(
     (trade: OpenTrade, exit: number, outcome: "tp" | "sl" | "manual", atBar: number) => {
       const r = rMultiple(trade.direction, trade.entry, trade.stop, exit);
@@ -225,7 +244,7 @@ export default function ReplayView({
       setPlaying(false);
       return;
     }
-    const h = setInterval(() => advance(1), SPEEDS[speed].ms);
+    const h = setInterval(() => advance(SPEEDS[speed].step), SPEEDS[speed].ms);
     return () => clearInterval(h);
   }, [playing, speed, advance, atEnd]);
 
@@ -465,11 +484,23 @@ export default function ReplayView({
                 <Row k="Entry" v={openTrade.entry.toFixed(decimals)} />
                 <Row k="Stop" v={openTrade.stop.toFixed(decimals)} />
                 <Row k="Target" v={openTrade.target != null ? openTrade.target.toFixed(decimals) : "none"} />
+                {(() => {
+                  const sz = lotsFor(openTrade.entry, openTrade.stop);
+                  return sz ? (
+                    <Row k="Size" v={`${sz.lots > 0 ? sz.lots.toFixed(2) : "<0.01"} ${sizeUnit}`} />
+                  ) : null;
+                })()}
+                <Row k="Risk" v={riskAmount.toLocaleString(undefined, { maximumFractionDigits: 1 })} />
                 <Row k="Opened" v={`${fmtBarTime(openTrade.enteredAt)} UTC`} />
                 <Row k="Held" v={fmtDuration(bar.t - openTrade.enteredAt)} />
                 <Row
                   k="Open R"
                   v={openR != null ? `${openR >= 0 ? "+" : ""}${openR.toFixed(2)}R` : "-"}
+                  tone={openR != null ? (openR >= 0 ? "up" : "down") : undefined}
+                />
+                <Row
+                  k="Open PnL"
+                  v={openR != null ? fmtMoney(riskAmount * openR) : "-"}
                   tone={openR != null ? (openR >= 0 ? "up" : "down") : undefined}
                 />
                 <button
@@ -494,6 +525,27 @@ export default function ReplayView({
                 <label className="block text-xs text-dim">Target (optional)
                   <input type="number" step="any" inputMode="decimal" value={fTarget} onChange={(e) => setFTarget(e.target.value)} onFocus={() => setArmed("target")} className={`input mt-1 ${armed === "target" ? "!border-accent" : ""}`} />
                 </label>
+                {(() => {
+                  const e = parseFloat(fEntry);
+                  const s = parseFloat(fStop);
+                  if (!Number.isFinite(e) || !Number.isFinite(s)) return null;
+                  if (formDir === "long" ? s >= e : s <= e) return null;
+                  const sz = lotsFor(e, s);
+                  if (!sz) return null;
+                  return (
+                    <p className="text-xs text-dim">
+                      Size{" "}
+                      <span className="font-mono text-foreground">
+                        {sz.lots > 0 ? sz.lots.toFixed(2) : "<0.01"} {sizeUnit}
+                      </span>{" "}
+                      risking{" "}
+                      <span className="font-mono text-foreground">
+                        {riskAmount.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                      </span>
+                      {" "}(assumes a {quoteCurrency(pair)} account)
+                    </p>
+                  );
+                })()}
                 {formError && <p className="text-xs text-danger">{formError}</p>}
                 <div className="flex gap-2">
                   <button onClick={placeTrade} className="flex-1 rounded-lg bg-accent px-3 py-2 text-xs font-medium text-white transition hover:opacity-90">Place trade</button>
@@ -567,6 +619,7 @@ export default function ReplayView({
                       </span>
                       <span className={`font-mono ${((t.r ?? 0) >= 0 ? "text-success" : "text-danger")}`}>
                         {t.r != null ? `${t.r >= 0 ? "+" : ""}${t.r.toFixed(2)}R` : "-"}
+                        {t.pnl != null && <span className="ml-1.5 text-dim">{fmtMoney(t.pnl)}</span>}
                       </span>
                     </div>
                     <div className="mt-0.5 flex items-center justify-between text-[11px] text-dim">
