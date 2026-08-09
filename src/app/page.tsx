@@ -64,7 +64,7 @@ export default async function Home({
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div>
             <div className="mb-4 flex flex-wrap gap-1.5">
-              {["Playbooks", "Journal", "Guardrails", "Risk", "Accounts", "AI sidekick"].map((tag) => (
+              {["Playbooks", "Backtest", "Journal", "Guardrails", "Risk", "Accounts", "AI sidekick"].map((tag) => (
                 <span
                   key={tag}
                   className="rounded-full border border-border2 px-2.5 py-1 font-mono text-xs text-muted"
@@ -154,7 +154,7 @@ export default async function Home({
               {
                 k: "Plan",
                 t: "Playbooks + risk",
-                d: "Your setup as a tickable contract - criteria, management rules, risk caps - and a sizing engine that does the math before the trade exists.",
+                d: "Your setup as a tickable contract - criteria, management rules, risk caps - and a sizing engine that does the math before the trade exists. Then prove it: replay history bar by bar against your plan before real money meets it.",
                 i: "M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5",
               },
               {
