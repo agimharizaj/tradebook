@@ -91,7 +91,14 @@ export async function GET(request: Request) {
   let candles: Candle[];
   try {
     if (BINANCE_SYMBOL[base]) {
-      candles = await fetchBinance(BINANCE_SYMBOL[base], tf, from, cappedTo);
+      try {
+        candles = await fetchBinance(BINANCE_SYMBOL[base], tf, from, cappedTo);
+      } catch (e) {
+        // Geo-block or outage: Twelve Data also carries the majors' crypto.
+        const key = process.env.TWELVE_DATA_API_KEY;
+        if (!key) throw e;
+        candles = await fetchTwelveData(pair, tf, from, cappedTo, key);
+      }
     } else {
       const key = process.env.TWELVE_DATA_API_KEY;
       if (!key) {
@@ -148,8 +155,11 @@ async function fetchBinance(
   const out: Candle[] = [];
   let start = from * 1000;
   for (let page = 0; page < 10 && start < to * 1000; page++) {
+    // data-api.binance.vision is Binance's public market-data host: same
+    // klines, no key, and NOT geo-blocked (api.binance.com returns 451 in
+    // the UK and other restricted regions).
     const url =
-      `https://api.binance.com/api/v3/klines?symbol=${symbol}` +
+      `https://data-api.binance.vision/api/v3/klines?symbol=${symbol}` +
       `&interval=${BINANCE_INTERVAL[tf]}&startTime=${start}&endTime=${to * 1000}&limit=1000`;
     const r = await fetch(url);
     if (r.status === 429) throw new Error("rate_limited");
