@@ -74,11 +74,13 @@ export default function ReplayView({
   initialIndex,
   startingBalance,
   riskPct,
+  strategyId,
   strategyName,
   criteria,
   initialTrades,
   persisted,
   notSavingNote,
+  canSaveLater,
   watchlist,
   onSwitch,
   onExit,
@@ -92,11 +94,13 @@ export default function ReplayView({
   initialIndex: number;
   startingBalance: number;
   riskPct: number;
+  strategyId: string | null;
   strategyName: string | null;
   criteria: string[];
   initialTrades: BtTrade[];
   persisted: boolean;
   notSavingNote: string | null;
+  canSaveLater: boolean;
   watchlist: string[];
   onSwitch: (next: { pair: string; tf: Timeframe; date: string }) => void;
   onExit: () => void;
@@ -108,6 +112,12 @@ export default function ReplayView({
   const [closed, setClosed] = useState<BtTrade[]>(initialTrades);
   const [ticks, setTicks] = useState<boolean[]>(criteria.map(() => false));
   const [saveError, setSaveError] = useState(false);
+  // A practice run can be promoted to a saved session mid-replay ("Save
+  // session" in the header): these shadow the persisted/sessionId props from
+  // that moment on.
+  const [live, setLive] = useState({ persisted, sessionId });
+  const [savedNote, setSavedNote] = useState<string | null>(notSavingNote);
+  const [savingSession, setSavingSession] = useState(false);
 
   // In-replay switch controls (pair / timeframe / start date). Changing them
   // relaunches as a NEW session so one session never mixes markets.
@@ -150,9 +160,9 @@ export default function ReplayView({
 
   const persistTrade = useCallback(
     async (t: BtTrade) => {
-      if (!persisted || !sessionId) return;
+      if (!live.persisted || !live.sessionId) return;
       const { error } = await supabase.from("backtest_trades").insert({
-        session_id: sessionId,
+        session_id: live.sessionId,
         user_id: uid,
         direction: t.direction,
         entry: t.entry,
@@ -170,10 +180,10 @@ export default function ReplayView({
       supabase
         .from("backtest_sessions")
         .update({ replayed_to: new Date(candles[idxRef.current].t * 1000).toISOString() })
-        .eq("id", sessionId)
+        .eq("id", live.sessionId)
         .then(() => {});
     },
-    [persisted, sessionId, supabase, uid, candles]
+    [live, supabase, uid, candles]
   );
 
   const riskAmount = (startingBalance * riskPct) / 100;
@@ -313,27 +323,78 @@ export default function ReplayView({
     setTicks(criteria.map(() => false));
   }
 
+  // Promote a practice run to a saved session: create the session row, then
+  // bulk-insert every trade closed so far. From here on persistTrade saves
+  // new trades as they close, exactly like a session saved from the start.
+  async function saveSessionNow() {
+    if (live.persisted || savingSession) return;
+    setSavingSession(true);
+    try {
+      const { data, error } = await supabase
+        .from("backtest_sessions")
+        .insert({
+          user_id: uid,
+          pair,
+          timeframe: tf,
+          replay_from: new Date(candles[startIndex].t * 1000).toISOString(),
+          name: null,
+          strategy_id: strategyId,
+          strategy_name: strategyName,
+          starting_balance: startingBalance,
+          risk_pct: riskPct,
+          replayed_to: new Date(bar.t * 1000).toISOString(),
+        })
+        .select("id")
+        .single();
+      if (error || !data) throw error ?? new Error("insert failed");
+      if (closed.length > 0) {
+        const { error: tErr } = await supabase.from("backtest_trades").insert(
+          closed.map((t) => ({
+            session_id: data.id,
+            user_id: uid,
+            direction: t.direction,
+            entry: t.entry,
+            stop: t.stop,
+            target: t.target,
+            exit: t.exit,
+            entered_at: new Date(t.enteredAt * 1000).toISOString(),
+            exited_at: t.exitedAt ? new Date(t.exitedAt * 1000).toISOString() : null,
+            outcome: t.outcome,
+            r: t.r,
+            pnl: t.pnl,
+          }))
+        );
+        if (tErr) throw tErr;
+      }
+      setLive({ persisted: true, sessionId: data.id });
+      setSavedNote(null);
+    } catch {
+      setSaveError(true);
+    }
+    setSavingSession(false);
+  }
+
   async function finishSession() {
     setPlaying(false);
-    if (persisted && sessionId) {
+    if (live.persisted && live.sessionId) {
       await supabase
         .from("backtest_sessions")
         .update({
           status: "done",
           replayed_to: new Date(bar.t * 1000).toISOString(),
         })
-        .eq("id", sessionId);
+        .eq("id", live.sessionId);
     }
     onExit();
   }
 
   async function leaveSession() {
     setPlaying(false);
-    if (persisted && sessionId) {
+    if (live.persisted && live.sessionId) {
       await supabase
         .from("backtest_sessions")
         .update({ replayed_to: new Date(bar.t * 1000).toISOString() })
-        .eq("id", sessionId);
+        .eq("id", live.sessionId);
     }
     onExit();
   }
@@ -360,13 +421,27 @@ export default function ReplayView({
           <p className="mt-0.5 text-xs text-dim">
             {strategyName ? `Plan: ${strategyName} · ` : ""}
             Risk {riskPct}% of {startingBalance.toLocaleString()} per trade (flat)
-            {notSavingNote && ` · ${notSavingNote}`}
+            {savedNote && ` · ${savedNote}`}
             {saveError && " · save failed, session continues in-memory"}
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={leaveSession} className="rounded-lg border border-border2 px-3 py-2 text-xs text-muted transition hover:border-accent hover:text-foreground">
-            Save &amp; exit
+          {!live.persisted && canSaveLater && (
+            <button
+              onClick={saveSessionNow}
+              disabled={savingSession}
+              title="Turn this practice run into a saved session: everything traded so far is stored, and it keeps saving from here on"
+              className="rounded-lg border border-accent/60 px-3 py-2 text-xs text-accent2 transition hover:border-accent hover:text-foreground disabled:opacity-40"
+            >
+              {savingSession ? "Saving..." : "Save session"}
+            </button>
+          )}
+          <button
+            onClick={leaveSession}
+            title={live.persisted ? "Save progress and go back to the session list" : "Back to the session list (practice run, nothing is stored)"}
+            className="rounded-lg border border-border2 px-3 py-2 text-xs text-muted transition hover:border-accent hover:text-foreground"
+          >
+            {live.persisted ? "Save & exit" : "Exit"}
           </button>
           <button onClick={finishSession} className="rounded-lg bg-accent px-3 py-2 text-xs font-medium text-white transition hover:opacity-90">
             Finish session
@@ -394,11 +469,11 @@ export default function ReplayView({
               onClick={async () => {
                 if (openTrade) return;
                 setPlaying(false);
-                if (persisted && sessionId) {
+                if (live.persisted && live.sessionId) {
                   await supabase
                     .from("backtest_sessions")
                     .update({ replayed_to: new Date(bar.t * 1000).toISOString() })
-                    .eq("id", sessionId);
+                    .eq("id", live.sessionId);
                 }
                 onSwitch({ pair: selPair, tf: selTf, date: selDate });
               }}
@@ -435,17 +510,24 @@ export default function ReplayView({
             <button
               onClick={() => setPlaying((p) => !p)}
               disabled={atEnd}
+              title="Play/pause the replay (Space)"
               className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-40"
             >
               {playing ? "Pause" : "Play"}
             </button>
-            <button onClick={() => advance(1)} disabled={atEnd} className="rounded-lg border border-border2 px-3 py-2 text-sm text-muted transition hover:border-accent hover:text-foreground disabled:opacity-40">
+            <button onClick={() => advance(1)} disabled={atEnd} title="Advance one candle (ArrowRight or .)" className="rounded-lg border border-border2 px-3 py-2 text-sm text-muted transition hover:border-accent hover:text-foreground disabled:opacity-40">
               Step
             </button>
-            <button onClick={() => advance(10)} disabled={atEnd} className="rounded-lg border border-border2 px-3 py-2 text-sm text-muted transition hover:border-accent hover:text-foreground disabled:opacity-40">
+            <button onClick={() => advance(10)} disabled={atEnd} title="Advance 10 candles at once" className="rounded-lg border border-border2 px-3 py-2 text-sm text-muted transition hover:border-accent hover:text-foreground disabled:opacity-40">
               +10
             </button>
-            <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="input !w-auto !py-2 text-sm" aria-label="Replay speed">
+            <select
+              value={speed}
+              onChange={(e) => setSpeed(Number(e.target.value))}
+              className="input !w-auto !py-2 text-sm"
+              aria-label="Replay speed"
+              title="Playback speed in candles per second (1x = 1 candle/s). 50x moves 5 candles at a time; stops and targets are still checked on every candle"
+            >
               {SPEEDS.map((s, i) => (<option key={s.label} value={i}>{s.label}</option>))}
             </select>
             <input

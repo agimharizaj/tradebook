@@ -54,6 +54,9 @@ type Replay = {
   criteria: string[];
   initialTrades: BtTrade[];
   notSavingNote: string | null;
+  // Practice runs can be promoted to a saved session mid-replay (only when
+  // the backtest tables exist).
+  canSaveLater: boolean;
 };
 
 const isMissingTable = (e: { code?: string; message?: string } | null) =>
@@ -250,6 +253,7 @@ export default function BacktestWorkspace() {
 
       let sessionId: string | null = null;
       let persisted = false;
+      let tOk = tablesOk;
       if (tablesOk && opts.save) {
         const { data: auth } = await supabase.auth.getUser();
         const { data, error: insErr } = await supabase
@@ -268,7 +272,10 @@ export default function BacktestWorkspace() {
           .select("id")
           .single();
         if (insErr) {
-          if (isMissingTable(insErr)) setTablesOk(false);
+          if (isMissingTable(insErr)) {
+            setTablesOk(false);
+            tOk = false;
+          }
         } else {
           sessionId = data.id;
           persisted = true;
@@ -294,6 +301,7 @@ export default function BacktestWorkspace() {
           : !opts.save
             ? "practice run - not saved"
             : "not saving (apply migration 0021)",
+        canSaveLater: !persisted && tOk,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start the session.");
@@ -364,6 +372,7 @@ export default function BacktestWorkspace() {
         criteria,
         initialTrades: tradesBySession[s.id] ?? [],
         notSavingNote: null,
+        canSaveLater: false,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not open the session.");
