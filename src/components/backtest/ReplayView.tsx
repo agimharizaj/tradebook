@@ -138,9 +138,11 @@ export default function ReplayView({
   // prefilled with the bar close.
   const [armed, setArmed] = useState<"entry" | "stop" | "target">("stop");
 
-  // Mid-trade stop editing (trailing / breakeven).
+  // Mid-trade stop editing (trailing / breakeven). stopArm = the next chart
+  // click sets the stop, mirroring how the entry form fills its fields.
   const [editStop, setEditStop] = useState("");
   const [stopError, setStopError] = useState<string | null>(null);
+  const [stopArm, setStopArm] = useState(false);
 
   // Hide the Sidekick dock bar while replaying - it overlaps the transport
   // controls and gets in the way of the work (body[data-replay] in globals.css).
@@ -287,6 +289,7 @@ export default function ReplayView({
   useEffect(() => {
     setEditStop(openTrade ? openTrade.stop.toFixed(decimals) : "");
     setStopError(null);
+    if (!openTrade) setStopArm(false);
   }, [openTrade, decimals]);
 
   // Move the current stop. Only rule: it can't be on the triggering side of
@@ -537,7 +540,16 @@ export default function ReplayView({
               revealIndex={idx}
               openTrade={openTrade}
               closedTrades={closed}
-              onPriceClick={formDir ? pickPrice : undefined}
+              onPriceClick={
+                formDir
+                  ? pickPrice
+                  : stopArm && openTrade
+                    ? (p) => {
+                        moveStop(parseFloat(p.toFixed(decimals)));
+                        setStopArm(false);
+                      }
+                    : undefined
+              }
             />
           </div>
           <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-card px-4 py-3 ring-1 ring-border">
@@ -626,8 +638,20 @@ export default function ReplayView({
                     >
                       BE
                     </button>
+                    <button
+                      onClick={() => setStopArm((a) => !a)}
+                      aria-label="Set stop by clicking the chart"
+                      title="Set stop by clicking the chart"
+                      className={`rounded border px-1.5 py-1 transition ${stopArm ? "border-accent text-accent2" : "border-border2 text-muted hover:border-accent hover:text-foreground"}`}
+                    >
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <circle cx="12" cy="12" r="7" />
+                        <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+                      </svg>
+                    </button>
                   </span>
                 </div>
+                {stopArm && <p className="text-xs text-accent2">Click the chart to place the stop.</p>}
                 {stopError && <p className="text-xs text-danger">{stopError}</p>}
                 <Row k="Target" v={openTrade.target != null ? openTrade.target.toFixed(decimals) : "none"} />
                 {(() => {
