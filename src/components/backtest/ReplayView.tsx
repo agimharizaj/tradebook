@@ -59,7 +59,8 @@ function fmtDuration(secs: number) {
 type OpenTrade = {
   direction: "long" | "short";
   entry: number;
-  stop: number;
+  stop: number; // CURRENT stop - movable mid-trade (breakeven, trailing)
+  initialStop: number; // stop at entry - the risk basis all R math uses
   target: number | null;
   enteredAt: number;
 };
@@ -137,6 +138,10 @@ export default function ReplayView({
   // prefilled with the bar close.
   const [armed, setArmed] = useState<"entry" | "stop" | "target">("stop");
 
+  // Mid-trade stop editing (trailing / breakeven).
+  const [editStop, setEditStop] = useState("");
+  const [stopError, setStopError] = useState<string | null>(null);
+
   // Hide the Sidekick dock bar while replaying - it overlaps the transport
   // controls and gets in the way of the work (body[data-replay] in globals.css).
   useEffect(() => {
@@ -203,12 +208,15 @@ export default function ReplayView({
 
   const closeTrade = useCallback(
     (trade: OpenTrade, exit: number, outcome: "tp" | "sl" | "manual", atBar: number) => {
-      const r = rMultiple(trade.direction, trade.entry, trade.stop, exit);
+      // R is always measured against the INITIAL stop: that's the distance the
+      // position was sized on. A stop trailed to breakeven exits at 0R, a
+      // trailed runner keeps its true R.
+      const r = rMultiple(trade.direction, trade.entry, trade.initialStop, exit);
       const t: BtTrade = {
         id: crypto.randomUUID(),
         direction: trade.direction,
         entry: trade.entry,
-        stop: trade.stop,
+        stop: trade.initialStop,
         target: trade.target,
         exit,
         enteredAt: trade.enteredAt,
@@ -275,6 +283,32 @@ export default function ReplayView({
     return () => window.removeEventListener("keydown", onKey);
   }, [advance]);
 
+  // Keep the stop input in sync with the open trade (placement, hits, edits).
+  useEffect(() => {
+    setEditStop(openTrade ? openTrade.stop.toFixed(decimals) : "");
+    setStopError(null);
+  }, [openTrade, decimals]);
+
+  // Move the current stop. Only rule: it can't be on the triggering side of
+  // the current close (it would fire instantly). Beyond entry is fine -
+  // that's the whole point of trailing.
+  function moveStop(v: number) {
+    if (!openTrade) return;
+    const invalid =
+      !Number.isFinite(v) || (openTrade.direction === "long" ? v >= bar.c : v <= bar.c);
+    if (invalid) {
+      setStopError(
+        openTrade.direction === "long"
+          ? "Stop must stay below the current price."
+          : "Stop must stay above the current price."
+      );
+      setEditStop(openTrade.stop.toFixed(decimals));
+      return;
+    }
+    setStopError(null);
+    setOpenTrade({ ...openTrade, stop: v });
+  }
+
   function startForm(dir: "long" | "short") {
     setFormDir(dir);
     setFEntry(bar.c.toFixed(decimals));
@@ -318,7 +352,7 @@ export default function ReplayView({
       setFormError("Target is on the wrong side of entry.");
       return;
     }
-    setOpenTrade({ direction: formDir, entry, stop, target, enteredAt: bar.t });
+    setOpenTrade({ direction: formDir, entry, stop, initialStop: stop, target, enteredAt: bar.t });
     setFormDir(null);
     setTicks(criteria.map(() => false));
   }
@@ -400,7 +434,7 @@ export default function ReplayView({
   }
 
   const openR = openTrade
-    ? rMultiple(openTrade.direction, openTrade.entry, openTrade.stop, bar.c)
+    ? rMultiple(openTrade.direction, openTrade.entry, openTrade.initialStop, bar.c)
     : null;
   const barDate = new Date(bar.t * 1000);
   const barLabel = barDate.toLocaleString("en-GB", {
@@ -564,10 +598,40 @@ export default function ReplayView({
               <div className="mt-3 space-y-2 text-sm">
                 <Row k="Direction" v={openTrade.direction === "long" ? "Long" : "Short"} />
                 <Row k="Entry" v={openTrade.entry.toFixed(decimals)} />
-                <Row k="Stop" v={openTrade.stop.toFixed(decimals)} />
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted">Stop</span>
+                  <span className="flex items-center gap-1.5">
+                    {openTrade.stop !== openTrade.initialStop && (
+                      <span className="text-[10px] text-dim">was {openTrade.initialStop.toFixed(decimals)}</span>
+                    )}
+                    <input
+                      type="number"
+                      step="any"
+                      inputMode="decimal"
+                      value={editStop}
+                      onChange={(e) => setEditStop(e.target.value)}
+                      onBlur={() => moveStop(parseFloat(editStop))}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                      }}
+                      title="Movable mid-trade (trailing / breakeven). R stays measured against the original stop"
+                      aria-label="Stop (movable mid-trade)"
+                      className="input !w-28 !py-1 text-right font-mono !text-sm"
+                    />
+                    <button
+                      onClick={() => moveStop(openTrade.entry)}
+                      disabled={openTrade.direction === "long" ? bar.c <= openTrade.entry : bar.c >= openTrade.entry}
+                      title="Move stop to breakeven (entry price)"
+                      className="rounded border border-border2 px-1.5 py-1.5 text-[10px] text-muted transition hover:border-accent hover:text-foreground disabled:opacity-40"
+                    >
+                      BE
+                    </button>
+                  </span>
+                </div>
+                {stopError && <p className="text-xs text-danger">{stopError}</p>}
                 <Row k="Target" v={openTrade.target != null ? openTrade.target.toFixed(decimals) : "none"} />
                 {(() => {
-                  const sz = lotsFor(openTrade.entry, openTrade.stop);
+                  const sz = lotsFor(openTrade.entry, openTrade.initialStop);
                   return sz ? (
                     <Row k="Size" v={`${sz.lots > 0 ? sz.lots.toFixed(2) : "<0.01"} ${sizeUnit}`} />
                   ) : null;
