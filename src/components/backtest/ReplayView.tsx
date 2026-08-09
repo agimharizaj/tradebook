@@ -764,6 +764,13 @@ export default function ReplayView({
             <div className="mt-3 space-y-2 text-sm">
               <Row k="Trades" v={String(stats.trades)} />
               <Row k="Market time" v={fmtDuration(bar.t - candles[startIndex].t)} />
+              <Row
+                k="In trades"
+                v={fmtDuration(
+                  closed.reduce((s, t) => s + (t.exitedAt != null ? t.exitedAt - t.enteredAt : 0), 0) +
+                    (openTrade ? bar.t - openTrade.enteredAt : 0)
+                )}
+              />
               <Row k="Win rate" v={stats.winRate != null ? `${stats.winRate.toFixed(0)}%` : "-"} />
               <Row k="Avg R" v={stats.avgR != null ? stats.avgR.toFixed(2) : "-"} />
               <Row k="Expectancy" v={stats.expectancyR != null ? `${stats.expectancyR.toFixed(2)}R` : "-"} />
