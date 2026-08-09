@@ -6,6 +6,7 @@ import PairPicker from "@/components/PairPicker";
 import AccountSwitcher from "@/components/AccountSwitcher";
 import { ALL_ACCOUNTS, fetchAccounts, useSelectedAccount, type Account } from "@/lib/accounts";
 import { usePairs } from "@/lib/usePairs";
+import { numFromInput, withCommas } from "@/lib/format";
 import {
   computeStats,
   tfSeconds,
@@ -104,7 +105,7 @@ export default function BacktestWorkspace() {
     setUid(user.id);
     const m = (user.user_metadata ?? {}) as Record<string, unknown>;
     if (typeof m.account_size === "string" && m.account_size) {
-      profileDefaults.current.size = m.account_size.replace(/,/g, "");
+      profileDefaults.current.size = withCommas(m.account_size);
       setBalance(profileDefaults.current.size);
     }
     if (typeof m.default_risk_pct === "string" && m.default_risk_pct) {
@@ -148,7 +149,7 @@ export default function BacktestWorkspace() {
     [accounts, selAccount]
   );
   useEffect(() => {
-    if (selectedAccount?.size != null) setBalance(String(selectedAccount.size));
+    if (selectedAccount?.size != null) setBalance(withCommas(String(selectedAccount.size)));
     else if (profileDefaults.current.size) setBalance(profileDefaults.current.size);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccount?.id]);
@@ -268,7 +269,7 @@ export default function BacktestWorkspace() {
       pair,
       tf,
       startTs: Math.floor(Date.parse(date + "T00:00:00Z") / 1000),
-      bal: parseFloat(balance.replace(/,/g, "")) || 10000,
+      bal: numFromInput(balance) || 10000,
       risk: parseFloat(riskPct) || 1,
       strategyId: strat?.id ?? null,
       strategyName: strat?.name ?? null,
@@ -394,7 +395,10 @@ export default function BacktestWorkspace() {
             </select>
           </Field>
           <Field label="Starting balance">
-            <input inputMode="decimal" value={balance} onChange={(e) => setBalance(e.target.value)} className="input" />
+            <input inputMode="decimal" value={balance} onChange={(e) => setBalance(withCommas(e.target.value))} className="input" />
+            {selectedAccount && (
+              <span className="mt-1 block text-xs text-dim">From {selectedAccount.name}</span>
+            )}
           </Field>
           <Field label="Risk % per trade">
             <input type="number" inputMode="decimal" step="0.1" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} className="input" />
