@@ -275,8 +275,11 @@ input[type="time"] {
    set by the workspaces) lift the launcher above the pill on desktop; on
    mobile the pill already sits higher (bottom-40 vs bottom-20). While
    actually editing (body[data-editing]) hide the launcher entirely. */
-/* The launcher is right-middle (not bottom) since Aug 2026, so the floating
-   Save pill (body[data-fab]) no longer needs to push it up. */
+@media (min-width: 768px) {
+  body[data-fab="1"] .sk-dock-launcher {
+    bottom: 5.5rem;
+  }
+}
 body[data-editing="1"] .sk-dock-launcher {
   display: none;
 }

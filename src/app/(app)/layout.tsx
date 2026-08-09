@@ -29,7 +29,9 @@ export default async function AppLayout({
     // height) by the boot script in the root layout.
     <div className="flex h-dvh overflow-hidden [@media(display-mode:standalone)]:h-[var(--app-height,100vh)]">
       <Sidebar email={user.email ?? ""} name={displayName} />
-      <div className="flex flex-1 flex-col overflow-hidden">
+      {/* relative: the Sidekick launcher positions against this column, so it
+          stays centred on the CONTENT area as the sidebar is dragged/collapsed. */}
+      <div className="relative flex flex-1 flex-col overflow-hidden">
         {/* Browser tabs get the logo header for orientation. The installed
             PWA hides it (nav lives in the tab bar) and keeps only a spacer
             so content clears the iPhone status bar / Dynamic Island. */}

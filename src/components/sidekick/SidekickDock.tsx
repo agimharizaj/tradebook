@@ -138,9 +138,9 @@ export default function SidekickDock() {
 
   return (
     <>
-      {/* Anchored to the viewport's right edge, vertically centred, so the
-          sidebar's width (dragged or collapsed) never affects it and the
-          panel opens from the same spot. Expands leftward on hover/focus. */}
+      {/* Bottom-centre of the CONTENT column (absolute against the app
+          layout's relative wrapper), so it re-centres live as the sidebar is
+          dragged or collapsed. Expands into the ask bar on hover/focus. */}
       {!open && (
         <form
           onSubmit={(e) => {
@@ -149,7 +149,7 @@ export default function SidekickDock() {
           }}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
-          className={`sk-dock-launcher fixed right-4 top-1/2 z-40 hidden -translate-y-1/2 items-center overflow-hidden rounded-full border border-border2 bg-card/95 shadow-[0_10px_34px_rgba(0,0,0,0.45)] backdrop-blur transition-all duration-300 ease-out focus-within:border-accent md:flex ${
+          className={`sk-dock-launcher absolute bottom-6 left-1/2 z-40 hidden -translate-x-1/2 items-center overflow-hidden rounded-full border border-border2 bg-card/95 shadow-[0_10px_34px_rgba(0,0,0,0.45)] backdrop-blur transition-all duration-300 ease-out focus-within:border-accent md:flex ${
             expanded ? "w-[26rem] max-w-[calc(100vw-3rem)] gap-1.5 py-1.5 pl-2 pr-1.5" : "w-16 justify-center py-2"
           }`}
         >
