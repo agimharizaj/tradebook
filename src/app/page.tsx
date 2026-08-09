@@ -64,7 +64,7 @@ export default async function Home({
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div>
             <div className="mb-4 flex flex-wrap gap-1.5">
-              {["Playbooks", "Backtest", "Journal", "Guardrails", "Risk", "Accounts", "AI sidekick"].map((tag) => (
+              {["Playbooks", "Backtest", "Journal", "AI sidekick"].map((tag) => (
                 <span
                   key={tag}
                   className="rounded-full border border-border2 px-2.5 py-1 font-mono text-xs text-muted"
@@ -82,10 +82,8 @@ export default async function Home({
               <span className="text-accent2">Face the numbers.</span>
             </h1>
             <p className="mt-5 max-w-md text-lg text-muted">
-              Tradebook is a trading companion built around your own rules.
-              Playbooks you tick before entry, a journal that keeps score
-              without flattering you, a risk engine that sizes the position
-              before you click, and an AI sidekick that has read all of it.
+              Playbooks you tick before entry. A journal that keeps score.
+              Risk sized before you click. An AI that has read all of it.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link
@@ -134,7 +132,7 @@ export default async function Home({
               </div>
             </div>
             <p className="px-2 pt-3 pb-1 font-mono text-xs text-dim">
-              The dashboard draws this from your trades. These numbers are a demo.
+              Demo numbers. Yours come from your trades.
             </p>
           </div>
         </div>
@@ -154,25 +152,25 @@ export default async function Home({
               {
                 k: "Plan",
                 t: "Playbooks + risk",
-                d: "Your setup as a tickable contract - criteria, management rules, risk caps - and a sizing engine that does the math before the trade exists. Then prove it: replay history bar by bar against your plan before real money meets it.",
+                d: "Your setup as a tickable contract, sizing done before the trade exists, and bar-by-bar replay to prove the edge first.",
                 i: "M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5",
               },
               {
                 k: "Trade",
                 t: "Terminal + guardrails",
-                d: "TradingView with your watchlist, and the trading day beside the candles: routine, max trades, loss caps, windows, today's news. Rule breaks are named out loud.",
+                d: "TradingView with the trading day beside it: routine, max trades, loss caps, windows. Rule breaks are named out loud.",
                 i: "M4 19V5M4 19h16M8 15l3-3 3 2 4-5",
               },
               {
                 k: "Review",
                 t: "Journal + dashboard",
-                d: "A calendar that keeps score and a post-mortem for every trade: screenshots, tags, emotions, dictated reflections - rolled up into your curve and stats.",
+                d: "A calendar that keeps score and a post-mortem for every trade, rolled up into your curve and stats.",
                 i: "M4 4h16v16H4zM4 9h16M9 4v16",
               },
               {
                 k: "Ask",
                 t: "Sidekick, the AI",
-                d: "It has read your journal, your rules and the page you're on. Chart reads and rule-by-rule setup checks - opinions with reasoning, never certainty.",
+                d: "Has read your journal, your rules and the page you're on. Opinions with reasoning, never certainty.",
                 i: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3zM18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z",
               },
             ].map((f, i) => (
@@ -198,9 +196,8 @@ export default async function Home({
           {/* The quieter half of the app, one line total. */}
           <Reveal>
             <p className="mt-6 text-sm text-dim">
-              Also inside: prop-firm account tracking from challenge to funded, each with its
-              own guardrails; a notebook with dictation; market news and the economic calendar;
-              session clocks for four exchanges; and a breathing room for when it gets loud.
+              Also inside: prop-firm account tracking, a notebook with dictation, news and
+              the economic calendar, session clocks, and a breathing room for loud days.
             </p>
           </Reveal>
         </div>
@@ -214,13 +211,12 @@ export default async function Home({
               Limits that argue back.
             </h2>
             <p className="mt-4 max-w-md leading-relaxed text-muted">
-              Set your max trades, max daily loss, profit target and trading
-              windows once. The Trading page then watches the day with you:
-              trades count up, the PnL bar tracks your caps, and rule breaks
-              are named out loud - here and in the journal.
+              Max trades, loss cap, profit target, windows - set once. The
+              Trading page counts your day against them and names rule breaks
+              out loud.
             </p>
             <p className="mt-3 max-w-md leading-relaxed text-muted">
-              Try it: drag the demo day into trouble and watch it push back.
+              Drag the demo day into trouble. Watch it push back.
             </p>
           </Reveal>
           <Reveal lazy delay={90}>
@@ -238,14 +234,8 @@ export default async function Home({
                 The sizing engine, live on this page.
               </h2>
               <p className="mt-4 max-w-md leading-relaxed text-muted">
-                This is the actual sizing math from the app, running in your
-                browser right now. Account size and risk in, lot size out, floored
-                to 0.01 steps so a position never risks more than you stated.
-              </p>
-              <p className="mt-3 max-w-md leading-relaxed text-muted">
-                Inside Tradebook the prices are live, the pairs come from your own
-                watchlist, and there are two more modes: solve for the stop, or
-                audit the risk of a size you already have on.
+                The app&apos;s actual sizing math, live on this page. Account and
+                risk in, lot size out - never more risk than you stated.
               </p>
             </Reveal>
             <Reveal lazy delay={90}>
@@ -266,14 +256,8 @@ export default async function Home({
               A month of trading at a glance.
             </h2>
             <p className="mt-4 max-w-md leading-relaxed text-muted">
-              The journal is a calendar, exactly like this one. Green days,
-              red days, tap any of them and a panel opens with the day&apos;s
-              stats, guardrail violations, your routine and every trade -
-              each one a dot that fills in as you journal it.
-            </p>
-            <p className="mt-3 max-w-md leading-relaxed text-muted">
-              Log trades in seconds or import your broker history, commission
-              and swap included, so the score is the real one.
+              Green days, red days - tap one and every trade is there. Log in
+              seconds or import your broker history. The score is the real one.
             </p>
           </Reveal>
         </div>
@@ -288,15 +272,9 @@ export default async function Home({
                 An analyst who has actually read your journal.
               </h2>
               <p className="mt-4 max-w-md leading-relaxed text-muted">
-                Sidekick sits on every page. It knows your trades, your written
-                rules, your notes and what&apos;s on screen, so you can ask it to
-                read a chart, explain the news, or say plainly where the money
-                leaks.
-              </p>
-              <p className="mt-3 max-w-md leading-relaxed text-muted">
-                Attach a chart screenshot and it checks the setup against your
-                own entry criteria, rule by rule. Opinions with reasoning, never
-                certainty; the trade stays yours.
+                It knows your trades, your rules and the page you&apos;re on.
+                Attach a chart and it checks the setup rule by rule. Opinions
+                with reasoning, never certainty.
               </p>
             </Reveal>
             <Reveal lazy delay={90}>
@@ -317,14 +295,9 @@ export default async function Home({
               Your rules, in writing, next to the chart.
             </h2>
             <p className="mt-4 max-w-md leading-relaxed text-muted">
-              Every strategy is a checklist you tick before entry. Try the one
-              on the left: criteria strike through as they're met, exactly as
-              they do in the app. Risk controls cap the damage on bad days, and
-              the journal records what you actually did, not what you remember
-              doing.
-            </p>
-            <p className="mt-3 max-w-md leading-relaxed text-muted">
-              There is even a breathing page for the moments the market gets loud.
+              Every strategy is a checklist you tick before entry - try the one
+              on the left. The journal records what you actually did, not what
+              you remember doing.
             </p>
           </Reveal>
         </div>
