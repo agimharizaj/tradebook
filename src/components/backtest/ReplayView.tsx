@@ -7,11 +7,13 @@ import {
   priceDecimalsFor,
   resolveTradeOnBar,
   rMultiple,
+  TIMEFRAMES,
   type BtTrade,
   type Candle,
   type Timeframe,
 } from "@/lib/backtest";
 import ReplayChart from "@/components/backtest/ReplayChart";
+import PairPicker from "@/components/PairPicker";
 
 // The replay screen: chart, playback controls, trade panel, live stats and
 // (optionally) the selected strategy's entry checklist. PnL uses flat risk on
@@ -48,6 +50,8 @@ export default function ReplayView({
   criteria,
   initialTrades,
   persisted,
+  watchlist,
+  onSwitch,
   onExit,
 }: {
   uid: string;
@@ -63,6 +67,8 @@ export default function ReplayView({
   criteria: string[];
   initialTrades: BtTrade[];
   persisted: boolean;
+  watchlist: string[];
+  onSwitch: (next: { pair: string; tf: Timeframe; date: string }) => void;
   onExit: () => void;
 }) {
   const [idx, setIdx] = useState(initialIndex);
@@ -73,12 +79,23 @@ export default function ReplayView({
   const [ticks, setTicks] = useState<boolean[]>(criteria.map(() => false));
   const [saveError, setSaveError] = useState(false);
 
+  // In-replay switch controls (pair / timeframe / start date). Changing them
+  // relaunches as a NEW session so one session never mixes markets.
+  const origDate = new Date(candles[startIndex].t * 1000).toISOString().slice(0, 10);
+  const [selPair, setSelPair] = useState(pair);
+  const [selTf, setSelTf] = useState<Timeframe>(tf);
+  const [selDate, setSelDate] = useState(origDate);
+  const switchDirty = selPair !== pair || selTf !== tf || selDate !== origDate;
+
   // Trade form.
   const [formDir, setFormDir] = useState<"long" | "short" | null>(null);
   const [fEntry, setFEntry] = useState("");
   const [fStop, setFStop] = useState("");
   const [fTarget, setFTarget] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  // Which field a chart click fills. Stop is armed first: entry is already
+  // prefilled with the bar close.
+  const [armed, setArmed] = useState<"entry" | "stop" | "target">("stop");
 
   const bar = candles[idx];
   const decimals = priceDecimalsFor(pair);
@@ -202,7 +219,24 @@ export default function ReplayView({
     setFStop("");
     setFTarget("");
     setFormError(null);
+    setArmed("stop");
     setPlaying(false);
+  }
+
+  // Chart click while the form is open: fill the armed field, then arm the
+  // next empty one (stop, then target).
+  function pickPrice(price: number) {
+    if (!formDir) return;
+    const v = price.toFixed(decimals);
+    if (armed === "entry") {
+      setFEntry(v);
+      setArmed("stop");
+    } else if (armed === "stop") {
+      setFStop(v);
+      setArmed("target");
+    } else {
+      setFTarget(v);
+    }
   }
 
   function placeTrade() {
@@ -286,11 +320,62 @@ export default function ReplayView({
         </div>
       </div>
 
+      {/* Quick switch: pair / timeframe / date. Applies as a fresh session. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <PairPicker pairs={watchlist} value={selPair} onChange={setSelPair} className="input !w-44 !py-1.5 text-sm" />
+        <select value={selTf} onChange={(e) => setSelTf(e.target.value as Timeframe)} className="input !w-auto !py-1.5 text-sm" aria-label="Timeframe">
+          {TIMEFRAMES.map((t) => (<option key={t.id} value={t.id}>{t.label}</option>))}
+        </select>
+        <input
+          type="date"
+          value={selDate}
+          onChange={(e) => setSelDate(e.target.value)}
+          max={new Date(Date.now() - 86400000).toISOString().slice(0, 10)}
+          className="input !w-auto !py-1.5 text-sm"
+          aria-label="Start date (UTC)"
+        />
+        {switchDirty && (
+          <>
+            <button
+              onClick={async () => {
+                if (openTrade) return;
+                setPlaying(false);
+                if (persisted && sessionId) {
+                  await supabase
+                    .from("backtest_sessions")
+                    .update({ replayed_to: new Date(bar.t * 1000).toISOString() })
+                    .eq("id", sessionId);
+                }
+                onSwitch({ pair: selPair, tf: selTf, date: selDate });
+              }}
+              disabled={!!openTrade}
+              title={openTrade ? "Close the open trade first" : undefined}
+              className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-40"
+            >
+              Restart with changes
+            </button>
+            <button
+              onClick={() => { setSelPair(pair); setSelTf(tf); setSelDate(origDate); }}
+              className="rounded-lg border border-border2 px-3 py-1.5 text-xs text-muted transition hover:text-foreground"
+            >
+              Reset
+            </button>
+            {openTrade && <span className="text-xs text-dim">Close the open trade first</span>}
+          </>
+        )}
+      </div>
+
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[1fr_300px]">
         {/* Chart + transport */}
         <div className="flex min-h-0 flex-col gap-3">
           <div className="min-h-[320px] flex-1 overflow-hidden rounded-2xl bg-card p-2 ring-1 ring-border">
-            <ReplayChart candles={candles} revealIndex={idx} openTrade={openTrade} closedTrades={closed} />
+            <ReplayChart
+              candles={candles}
+              revealIndex={idx}
+              openTrade={openTrade}
+              closedTrades={closed}
+              onPriceClick={formDir ? pickPrice : undefined}
+            />
           </div>
           <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-card px-4 py-3 ring-1 ring-border">
             <button
@@ -309,6 +394,21 @@ export default function ReplayView({
             <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="input !w-auto !py-2 text-sm" aria-label="Replay speed">
               {SPEEDS.map((s, i) => (<option key={s.label} value={i}>{s.label}</option>))}
             </select>
+            <input
+              type="range"
+              min={startIndex}
+              max={candles.length - 1}
+              value={idx}
+              onChange={(e) => {
+                if (openTrade) return;
+                setPlaying(false);
+                setIdx(Number(e.target.value));
+              }}
+              disabled={!!openTrade}
+              title={openTrade ? "Locked while a trade is open" : "Drag to jump through the data"}
+              className="min-w-[120px] flex-1 accent-[#6A58F0] disabled:opacity-40"
+              aria-label="Replay position"
+            />
             <span className="ml-auto font-mono text-xs text-dim">
               {barLabel} UTC · bar {Math.max(0, idx - startIndex) + 1}/{candles.length - startIndex}
               {atEnd && " · end of data"}
@@ -345,14 +445,17 @@ export default function ReplayView({
             ) : formDir ? (
               <div className="mt-3 space-y-2">
                 <p className="text-xs text-dim">{formDir === "long" ? "Long" : "Short"} at bar close (editable)</p>
+                <p className="text-xs text-accent2">
+                  Click the chart to set {armed === "entry" ? "Entry" : armed === "stop" ? "Stop loss" : "Target"}
+                </p>
                 <label className="block text-xs text-dim">Entry
-                  <input type="number" step="any" inputMode="decimal" value={fEntry} onChange={(e) => setFEntry(e.target.value)} className="input mt-1" />
+                  <input type="number" step="any" inputMode="decimal" value={fEntry} onChange={(e) => setFEntry(e.target.value)} onFocus={() => setArmed("entry")} className={`input mt-1 ${armed === "entry" ? "!border-accent" : ""}`} />
                 </label>
                 <label className="block text-xs text-dim">Stop loss
-                  <input type="number" step="any" inputMode="decimal" value={fStop} onChange={(e) => setFStop(e.target.value)} className="input mt-1" autoFocus />
+                  <input type="number" step="any" inputMode="decimal" value={fStop} onChange={(e) => setFStop(e.target.value)} onFocus={() => setArmed("stop")} className={`input mt-1 ${armed === "stop" ? "!border-accent" : ""}`} autoFocus />
                 </label>
                 <label className="block text-xs text-dim">Target (optional)
-                  <input type="number" step="any" inputMode="decimal" value={fTarget} onChange={(e) => setFTarget(e.target.value)} className="input mt-1" />
+                  <input type="number" step="any" inputMode="decimal" value={fTarget} onChange={(e) => setFTarget(e.target.value)} onFocus={() => setArmed("target")} className={`input mt-1 ${armed === "target" ? "!border-accent" : ""}`} />
                 </label>
                 {formError && <p className="text-xs text-danger">{formError}</p>}
                 <div className="flex gap-2">

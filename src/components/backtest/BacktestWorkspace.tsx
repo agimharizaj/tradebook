@@ -46,6 +46,7 @@ type Replay = {
   initialIndex: number;
   startingBalance: number;
   riskPct: number;
+  strategyId: string | null;
   strategyName: string | null;
   criteria: string[];
   initialTrades: BtTrade[];
@@ -150,24 +151,31 @@ export default function BacktestWorkspace() {
     return (data ?? []).map((r) => r.content as string);
   }
 
-  async function startSession() {
+  // Shared launcher for "Start replay", and for in-replay switches of
+  // pair/timeframe/date (which carry balance, risk and plan over into a
+  // fresh session so stats never mix markets).
+  async function launch(opts: {
+    pair: string;
+    tf: Timeframe;
+    startTs: number;
+    bal: number;
+    risk: number;
+    strategyId: string | null;
+    strategyName: string | null;
+    sessionName: string | null;
+  }) {
     setError(null);
     setStarting(true);
     try {
-      const startTs = Math.floor(Date.parse(date + "T00:00:00Z") / 1000);
-      if (Number.isNaN(startTs)) throw new Error("Pick a start date.");
-      if (startTs * 1000 > Date.now() - 86400000) throw new Error("Start date must be in the past.");
-      const step = tfSeconds(tf);
-      const candles = await fetchCandles(pair, tf, startTs - WARMUP_BARS * step);
-      const startIndex = candles.findIndex((c) => c.t >= startTs);
+      if (Number.isNaN(opts.startTs)) throw new Error("Pick a start date.");
+      if (opts.startTs * 1000 > Date.now() - 86400000) throw new Error("Start date must be in the past.");
+      const step = tfSeconds(opts.tf);
+      const candles = await fetchCandles(opts.pair, opts.tf, opts.startTs - WARMUP_BARS * step);
+      const startIndex = candles.findIndex((c) => c.t >= opts.startTs);
       if (startIndex < 0 || candles.length - startIndex < 30) {
         throw new Error("Not enough data after that date. Try an earlier date or a bigger timeframe.");
       }
-
-      const bal = parseFloat(balance.replace(/,/g, "")) || 10000;
-      const risk = parseFloat(riskPct) || 1;
-      const strat = strategies.find((s) => s.id === strategyId) ?? null;
-      const criteria = strat ? await fetchCriteria(strat.id) : [];
+      const criteria = opts.strategyId ? await fetchCriteria(opts.strategyId) : [];
 
       let sessionId: string | null = null;
       let persisted = false;
@@ -177,14 +185,14 @@ export default function BacktestWorkspace() {
           .from("backtest_sessions")
           .insert({
             user_id: auth.user!.id,
-            pair,
-            timeframe: tf,
+            pair: opts.pair,
+            timeframe: opts.tf,
             replay_from: new Date(candles[startIndex].t * 1000).toISOString(),
-            name: name.trim() || null,
-            strategy_id: strat?.id ?? null,
-            strategy_name: strat?.name ?? null,
-            starting_balance: bal,
-            risk_pct: risk,
+            name: opts.sessionName,
+            strategy_id: opts.strategyId,
+            strategy_name: opts.strategyName,
+            starting_balance: opts.bal,
+            risk_pct: opts.risk,
           })
           .select("id")
           .single();
@@ -199,14 +207,15 @@ export default function BacktestWorkspace() {
       setReplay({
         sessionId,
         persisted,
-        pair,
-        tf,
+        pair: opts.pair,
+        tf: opts.tf,
         candles,
         startIndex,
         initialIndex: startIndex,
-        startingBalance: bal,
-        riskPct: risk,
-        strategyName: strat?.name ?? null,
+        startingBalance: opts.bal,
+        riskPct: opts.risk,
+        strategyId: opts.strategyId,
+        strategyName: opts.strategyName,
         criteria,
         initialTrades: [],
       });
@@ -214,6 +223,38 @@ export default function BacktestWorkspace() {
       setError(e instanceof Error ? e.message : "Could not start the session.");
     }
     setStarting(false);
+  }
+
+  async function startSession() {
+    const strat = strategies.find((s) => s.id === strategyId) ?? null;
+    await launch({
+      pair,
+      tf,
+      startTs: Math.floor(Date.parse(date + "T00:00:00Z") / 1000),
+      bal: parseFloat(balance.replace(/,/g, "")) || 10000,
+      risk: parseFloat(riskPct) || 1,
+      strategyId: strat?.id ?? null,
+      strategyName: strat?.name ?? null,
+      sessionName: name.trim() || null,
+    });
+  }
+
+  // In-replay switch: relaunch with new market settings, same money settings.
+  async function switchReplay(next: { pair: string; tf: Timeframe; date: string }) {
+    const cur = replay;
+    if (!cur) return;
+    setReplay(null);
+    await launch({
+      pair: next.pair,
+      tf: next.tf,
+      startTs: Math.floor(Date.parse(next.date + "T00:00:00Z") / 1000),
+      bal: cur.startingBalance,
+      risk: cur.riskPct,
+      strategyId: cur.strategyId,
+      strategyName: cur.strategyName,
+      sessionName: null,
+    });
+    loadAll();
   }
 
   async function openSession(s: SessionRow) {
@@ -240,6 +281,7 @@ export default function BacktestWorkspace() {
         initialIndex,
         startingBalance: Number(s.starting_balance),
         riskPct: Number(s.risk_pct),
+        strategyId: s.strategy_id,
         strategyName: s.strategy_name,
         criteria,
         initialTrades: tradesBySession[s.id] ?? [],
@@ -261,6 +303,8 @@ export default function BacktestWorkspace() {
       <ReplayView
         {...replay}
         uid={uid}
+        watchlist={watchlist}
+        onSwitch={switchReplay}
         onExit={() => {
           setReplay(null);
           loadAll();
