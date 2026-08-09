@@ -433,39 +433,43 @@ export default function BacktestWorkspace() {
             {sessions.map((s) => {
               const st = computeStats(tradesBySession[s.id] ?? [], Number(s.starting_balance), Number(s.risk_pct));
               return (
-                <li key={s.id} className="flex flex-wrap items-center gap-3 rounded-xl bg-card px-4 py-3 ring-1 ring-border">
-                  <div className="min-w-0 flex-1">
+                // Mobile: identity on the first line, stats + actions on the
+                // second. Wide screens: everything on one row.
+                <li key={s.id} className="flex flex-col gap-3 rounded-xl bg-card px-4 py-3 ring-1 ring-border sm:flex-row sm:items-center">
+                  <div className="min-w-0 sm:flex-1">
                     <div className="flex items-center gap-2">
                       <span className="truncate font-medium">{s.name || `${s.pair} ${s.timeframe}`}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${s.status === "done" ? "bg-surface2 text-muted" : "bg-accent-soft text-accent2"}`}>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${s.status === "done" ? "bg-surface2 text-muted" : "bg-accent-soft text-accent2"}`}>
                         {s.status === "done" ? "Done" : "Active"}
                       </span>
                     </div>
-                    <p className="mt-0.5 text-xs text-dim">
+                    <p className="mt-0.5 truncate text-xs text-dim">
                       {s.pair} · {s.timeframe} · from {new Date(s.replay_from).toLocaleDateString("en-GB")}
                       {s.strategy_name ? ` · ${s.strategy_name}` : ""}
                     </p>
                   </div>
-                  <div className="flex items-center gap-4 font-mono text-xs">
-                    <span className="text-muted">{st.trades} trades</span>
-                    <span className="text-muted">{st.winRate != null ? `${st.winRate.toFixed(0)}%` : "-"}</span>
-                    <span className={st.totalR >= 0 ? "text-success" : "text-danger"}>
-                      {st.trades ? `${st.totalR >= 0 ? "+" : ""}${st.totalR.toFixed(1)}R` : "-"}
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => openSession(s)} className="rounded-lg border border-border2 px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground">
-                      {s.status === "done" ? "Review" : "Resume"}
-                    </button>
-                    {confirmDelete === s.id ? (
-                      <button onClick={() => deleteSession(s.id)} className="rounded-lg bg-danger px-3 py-1.5 text-xs font-medium text-white">
-                        Confirm
+                  <div className="flex items-center justify-between gap-3 sm:justify-end">
+                    <div className="flex items-center gap-3 font-mono text-xs sm:gap-4">
+                      <span className="text-muted">{st.trades} {st.trades === 1 ? "trade" : "trades"}</span>
+                      <span className="text-muted">{st.winRate != null ? `${st.winRate.toFixed(0)}%` : "-"}</span>
+                      <span className={st.totalR >= 0 ? "text-success" : "text-danger"}>
+                        {st.trades ? `${st.totalR >= 0 ? "+" : ""}${st.totalR.toFixed(1)}R` : "-"}
+                      </span>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <button onClick={() => openSession(s)} className="rounded-lg border border-border2 px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground">
+                        {s.status === "done" ? "Review" : "Resume"}
                       </button>
-                    ) : (
-                      <button onClick={() => setConfirmDelete(s.id)} className="rounded-lg border border-border2 px-3 py-1.5 text-xs text-dim transition hover:border-danger hover:text-danger">
-                        Delete
-                      </button>
-                    )}
+                      {confirmDelete === s.id ? (
+                        <button onClick={() => deleteSession(s.id)} className="rounded-lg bg-danger px-3 py-1.5 text-xs font-medium text-white">
+                          Confirm
+                        </button>
+                      ) : (
+                        <button onClick={() => setConfirmDelete(s.id)} className="rounded-lg border border-border2 px-3 py-1.5 text-xs text-dim transition hover:border-danger hover:text-danger">
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </li>
               );
