@@ -540,6 +540,7 @@ export default function ReplayView({
               revealIndex={idx}
               openTrade={openTrade}
               closedTrades={closed}
+              decimals={decimals}
               onPriceClick={
                 formDir
                   ? pickPrice

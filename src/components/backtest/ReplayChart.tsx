@@ -27,12 +27,17 @@ export default function ReplayChart({
   revealIndex,
   openTrade,
   closedTrades,
+  decimals,
   onPriceClick,
 }: {
   candles: Candle[];
   revealIndex: number; // inclusive
   openTrade: { entry: number; stop: number; target: number | null } | null;
   closedTrades: BtTrade[];
+  // Price precision for the pair (from priceDecimalsFor). Without it the
+  // library defaults to 2 decimals, which caps the y-axis at 0.01-step
+  // labels - the axis looked near-empty on 5-decimal FX pairs.
+  decimals: number;
   // When set, a click on the chart reports the price at the cursor (used by
   // the trade form to fill entry/stop/target from the chart).
   onPriceClick?: (price: number) => void;
@@ -65,12 +70,13 @@ export default function ReplayChart({
         vertLines: { color: "rgba(255,255,255,.05)" },
         horzLines: { color: "rgba(255,255,255,.05)" },
       },
-      rightPriceScale: { borderColor: "rgba(255,255,255,.08)" },
+      rightPriceScale: { borderColor: "rgba(255,255,255,.08)", ticksVisible: true },
       timeScale: {
         borderColor: "rgba(255,255,255,.08)",
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 6,
+        ticksVisible: true,
       },
       crosshair: { mode: 0 },
     });
@@ -81,6 +87,7 @@ export default function ReplayChart({
       borderDownColor: DOWN,
       wickUpColor: UP,
       wickDownColor: DOWN,
+      priceFormat: { type: "price", precision: decimals, minMove: Math.pow(10, -decimals) },
     });
     chartRef.current = chart;
     seriesRef.current = series;
@@ -99,7 +106,8 @@ export default function ReplayChart({
       markersRef.current = null;
       linesRef.current = [];
     };
-  }, []);
+    // Recreate the chart if precision changes (new pair = fresh mount anyway).
+  }, [decimals]);
 
   // Reveal candles. Single-step forward is a cheap `update`; anything else
   // (initial load, jumps, new dataset) is a full `setData`.
