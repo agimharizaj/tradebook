@@ -7,6 +7,7 @@
 // rect because the toolbar is an overflow-x-auto strip that clips absolute
 // children (same trick as SnapshotMenu).
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import PairFlag from "@/components/PairFlag";
 
 export default function PairSelect({
@@ -73,13 +74,17 @@ export default function PairSelect({
         </svg>
       </button>
 
-      {open && anchor && (
+      {/* Portaled to <body>: the toolbar is an overflow-x-auto strip and iOS
+          Safari clips even position:fixed children of scroll containers, which
+          left the panel cut off behind the chart on phones. z-50 clears
+          MobileNav (z-30). */}
+      {open && anchor && createPortal(
         <>
-          <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} aria-hidden="true" />
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden="true" />
           <div
             style={{ top: anchor.top, left: anchor.left }}
             role="listbox"
-            className="fixed z-30 w-56 rounded-xl border border-border2 bg-card py-1.5 shadow-2xl"
+            className="fixed z-50 w-56 rounded-xl border border-border2 bg-card py-1.5 shadow-2xl"
           >
             <div className="px-2 pb-1.5">
               <input
@@ -128,7 +133,8 @@ export default function PairSelect({
               })}
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </>
   );
