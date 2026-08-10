@@ -30,9 +30,16 @@ export default function PairSelect({
     setOpen((o) => {
       if (!o && btnRef.current) {
         const r = btnRef.current.getBoundingClientRect();
-        setAnchor({ top: r.bottom + 6, left: Math.max(8, r.left) });
+        // Clamp inside the viewport (panel is w-56 = 224px) so it can't
+        // anchor off the right edge on narrow phone screens.
+        const left = Math.max(8, Math.min(r.left, window.innerWidth - 224 - 8));
+        setAnchor({ top: r.bottom + 6, left });
         setQ("");
-        requestAnimationFrame(() => searchRef.current?.focus());
+        // Auto-focus only with a mouse/trackpad. On touch devices the iOS
+        // keyboard would instantly cover the list; let the user tap search.
+        if (!window.matchMedia("(pointer: coarse)").matches) {
+          requestAnimationFrame(() => searchRef.current?.focus());
+        }
       }
       return !o;
     });
@@ -87,7 +94,7 @@ export default function PairSelect({
                 }}
                 placeholder="Search pairs…"
                 aria-label="Search pairs"
-                className="w-full rounded-md border border-border bg-surface2 px-2.5 py-1.5 text-xs outline-none transition focus:border-accent"
+                className="w-full rounded-md border border-border bg-surface2 px-2.5 py-1.5 text-base outline-none transition focus:border-accent md:text-xs"
               />
             </div>
             <div className="max-h-72 overflow-y-auto">
