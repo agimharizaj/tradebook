@@ -480,7 +480,8 @@ export default function BacktestWorkspace() {
             {starting ? "Loading data..." : "Start replay"}
           </button>
           <span className="text-xs text-dim">
-            Loads up to 5,000 bars from the start date. Lower timeframes cover less calendar time.
+            Loads from the start date up to now, capped at 50,000 bars. Long windows take a few
+            seconds on the first load, then they are cached.
           </span>
         </div>
       </div>
