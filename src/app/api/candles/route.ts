@@ -27,7 +27,12 @@ const BINANCE_SYMBOL: Record<string, string> = {
   DOGE: "DOGEUSDT", ADA: "ADAUSDT", LTC: "LTCUSDT",
 };
 
-const MAX_BARS = 5000; // Twelve Data's per-request max; also our response cap
+const MAX_BARS = 5000; // Twelve Data's per-request max
+// Response cap. Longer windows are covered by paging the provider (each page
+// is one Twelve Data request out of the free 800/day, then it's cached), so a
+// replay started months back still runs right up to today.
+const MAX_TOTAL_BARS = 25000;
+const MAX_PAGES = 6;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -46,8 +51,9 @@ export async function GET(request: Request) {
   }
 
   const step = tfSeconds(tf);
-  // Cap the window at MAX_BARS so one provider request always covers it.
-  const cappedTo = Math.min(to, from + MAX_BARS * step);
+  // Only cap absurd windows (MAX_TOTAL_BARS worth of calendar time). Anything
+  // shorter is fetched in full, paging the provider as needed.
+  const cappedTo = Math.min(to, from + MAX_TOTAL_BARS * step);
 
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
@@ -67,7 +73,7 @@ export async function GET(request: Request) {
       .gte("ts", new Date(from * 1000).toISOString())
       .lte("ts", new Date(cappedTo * 1000).toISOString())
       .order("ts", { ascending: true })
-      .limit(MAX_BARS);
+      .limit(MAX_TOTAL_BARS);
     if (!error && cached && cached.length > 10) {
       const first = Math.floor(Date.parse(cached[0].ts) / 1000);
       const last = Math.floor(Date.parse(cached[cached.length - 1].ts) / 1000);
@@ -154,7 +160,7 @@ async function fetchBinance(
 ): Promise<Candle[]> {
   const out: Candle[] = [];
   let start = from * 1000;
-  for (let page = 0; page < 10 && start < to * 1000; page++) {
+  for (let page = 0; page < 30 && start < to * 1000 && out.length < MAX_TOTAL_BARS; page++) {
     // data-api.binance.vision is Binance's public market-data host: same
     // klines, no key, and NOT geo-blocked (api.binance.com returns 451 in
     // the UK and other restricted regions).
@@ -176,11 +182,39 @@ async function fetchBinance(
     if (rows.length < 1000) break;
     start = lastOpen + 1;
   }
-  return out;
+  return out.slice(0, MAX_TOTAL_BARS);
 }
 
-// Twelve Data time_series: one request covers up to 5000 bars.
+// Twelve Data time_series: one request covers up to 5000 bars, so walk the
+// window forward a page at a time until it reaches `to`. Without this a long
+// replay silently stopped ~5000 bars after its start date instead of running
+// up to today.
 async function fetchTwelveData(
+  pair: string,
+  tf: Timeframe,
+  from: number,
+  to: number,
+  key: string
+): Promise<Candle[]> {
+  const step = tfSeconds(tf);
+  const out: Candle[] = [];
+  let cursor = from;
+  for (let page = 0; page < MAX_PAGES && cursor < to && out.length < MAX_TOTAL_BARS; page++) {
+    const pageTo = Math.min(to, cursor + MAX_BARS * step);
+    const rows = await fetchTwelveDataPage(pair, tf, cursor, pageTo, key);
+    if (!rows.length) {
+      // Market closed for the whole slice (weekend/holiday): skip past it.
+      cursor = pageTo + step;
+      continue;
+    }
+    const last = rows[rows.length - 1].t;
+    for (const c of rows) if (!out.length || c.t > out[out.length - 1].t) out.push(c);
+    cursor = Math.max(last + step, cursor + step);
+  }
+  return out.slice(0, MAX_TOTAL_BARS);
+}
+
+async function fetchTwelveDataPage(
   pair: string,
   tf: Timeframe,
   from: number,
