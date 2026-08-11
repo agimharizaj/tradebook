@@ -31,8 +31,11 @@ const MAX_BARS = 5000; // Twelve Data's per-request max
 // Response cap. Longer windows are covered by paging the provider (each page
 // is one Twelve Data request out of the free 800/day, then it's cached), so a
 // replay started months back still runs right up to today.
-const MAX_TOTAL_BARS = 25000;
-const MAX_PAGES = 6;
+// 50k bars is ~1.7 years of 15m FX, or 6 months of 5m. It's 10 Twelve Data
+// pages; the free tier allows 8 requests/minute, so going much past this
+// starts getting rate-limited mid-fetch rather than returning more data.
+const MAX_TOTAL_BARS = 50000;
+const MAX_PAGES = 12;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -131,8 +134,8 @@ export async function GET(request: Request) {
 
   // 3) Write-through cache, insert-only in chunks; duplicates are ignored.
   if (cacheOk) {
-    for (let i = 0; i < candles.length; i += 500) {
-      const rows = candles.slice(i, i + 500).map((c) => ({
+    for (let i = 0; i < candles.length; i += 1000) {
+      const rows = candles.slice(i, i + 1000).map((c) => ({
         symbol: pair,
         timeframe: tf,
         ts: new Date(c.t * 1000).toISOString(),
@@ -201,7 +204,15 @@ async function fetchTwelveData(
   let cursor = from;
   for (let page = 0; page < MAX_PAGES && cursor < to && out.length < MAX_TOTAL_BARS; page++) {
     const pageTo = Math.min(to, cursor + MAX_BARS * step);
-    const rows = await fetchTwelveDataPage(pair, tf, cursor, pageTo, key);
+    let rows: Candle[];
+    try {
+      rows = await fetchTwelveDataPage(pair, tf, cursor, pageTo, key);
+    } catch (e) {
+      // Hit the 8-requests/minute ceiling part way through a long window:
+      // return the bars we did get rather than failing the whole replay.
+      if (out.length && e instanceof Error && e.message === "rate_limited") break;
+      throw e;
+    }
     if (!rows.length) {
       // Market closed for the whole slice (weekend/holiday): skip past it.
       cursor = pageTo + step;
