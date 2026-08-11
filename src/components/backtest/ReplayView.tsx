@@ -781,7 +781,9 @@ export default function ReplayView({
                 tone={stats.pnl >= 0 ? "up" : "down"}
               />
             </div>
-            {stats.equity.length > 2 && <EquityCurve points={stats.equity} />}
+            {stats.equity.length > 2 && (
+              <EquityCurve points={stats.equity} rs={closed.map((t) => t.r ?? 0)} />
+            )}
           </div>
 
           {/* Closed trades */}
@@ -830,19 +832,85 @@ function Row({ k, v, tone }: { k: string; v: string; tone?: "up" | "down" }) {
   );
 }
 
-function EquityCurve({ points }: { points: number[] }) {
+// points[0] is the starting balance; points[i] is the balance after closed
+// trade i, so rs[i - 1] is the R that produced it.
+function EquityCurve({ points, rs }: { points: number[]; rs: number[] }) {
   const w = 260;
   const h = 60;
+  const pad = 4;
+  const [hover, setHover] = useState<number | null>(null);
+  const touching = useRef(false);
+
   const min = Math.min(...points);
   const max = Math.max(...points);
   const span = max - min || 1;
-  const path = points
-    .map((p, i) => `${i === 0 ? "M" : "L"}${((i / (points.length - 1)) * w).toFixed(1)},${(h - ((p - min) / span) * h).toFixed(1)}`)
-    .join(" ");
+  const x = (i: number) => (i / (points.length - 1)) * w;
+  const y = (v: number) => h - pad - ((v - min) / span) * (h - 2 * pad);
+  const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(p).toFixed(1)}`).join(" ");
   const up = points[points.length - 1] >= points[0];
+  const color = up ? "#22D39A" : "#FF6274";
+
+  // Mouse hovers; touch scrubs only while pressed so the chart never traps
+  // vertical page scrolling.
+  function update(e: React.PointerEvent<HTMLDivElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const frac = (e.clientX - rect.left) / rect.width;
+    setHover(Math.min(points.length - 1, Math.max(0, Math.round(frac * (points.length - 1)))));
+  }
+  function onDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== "mouse") {
+      touching.current = true;
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    }
+    update(e);
+  }
+  function onEnd() {
+    touching.current = false;
+    setHover(null);
+  }
+
+  const r = hover != null && hover > 0 ? rs[hover - 1] : null;
+  const change = hover != null && hover > 0 ? points[hover] - points[hover - 1] : null;
+
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="mt-3 w-full" preserveAspectRatio="none" aria-hidden>
-      <path d={path} fill="none" stroke={up ? "#22D39A" : "#FF6274"} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
+    <div
+      className="relative mt-3 touch-pan-y select-none"
+      onPointerDown={onDown}
+      onPointerMove={(e) => {
+        if (e.pointerType === "mouse" || touching.current) update(e);
+      }}
+      onPointerUp={onEnd}
+      onPointerCancel={onEnd}
+      onPointerLeave={(e) => {
+        if (e.pointerType === "mouse") setHover(null);
+      }}
+    >
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" preserveAspectRatio="none">
+        <path d={path} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        {hover != null && (
+          <>
+            <line x1={x(hover)} x2={x(hover)} y1={0} y2={h} stroke="var(--border2)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+            <circle cx={x(hover)} cy={y(points[hover])} r="3" fill={color} vectorEffect="non-scaling-stroke" />
+          </>
+        )}
+      </svg>
+      {hover != null && (
+        <div
+          className="pointer-events-none absolute -top-1 z-10 -translate-x-1/2 whitespace-nowrap rounded-md border border-border2 bg-card px-2 py-1 text-[11px] shadow-lg"
+          style={{ left: `min(max(${(x(hover) / w) * 100}%, 3.25rem), calc(100% - 3.25rem))` }}
+        >
+          <span className="text-dim">{hover === 0 ? "Start" : `Trade ${hover}`}</span>{" "}
+          <span className="font-mono font-medium">
+            {points[hover].toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          </span>
+          {r != null && change != null && (
+            <span className={`ml-1.5 font-mono ${r >= 0 ? "text-success" : "text-danger"}`}>
+              {r >= 0 ? "+" : ""}{r.toFixed(2)}R ({change >= 0 ? "+" : ""}
+              {change.toLocaleString(undefined, { maximumFractionDigits: 0 })})
+            </span>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
